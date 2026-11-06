@@ -472,8 +472,12 @@ Deep link:
 - **Resume by default**, but only after validating that the mapfile and image belong to this device
   (size and serial recorded alongside). Refuse to write into an existing file that has no matching
   mapfile.
-- **Destination checks:** not on the source disk; enough free space for the full size; a filesystem
-  without a 4 GB file limit; writable.
+- **Destination checks:** not on the source disk; enough free space for the full size (or for the
+  `--limit`, below); a filesystem without a 4 GB file limit; writable.
+- **`--limit <GiB>`:** image only the first N GiB (`ddrescue -s`). The size confirmation still names the
+  whole device; the free-space check, ETA and the report use the limit and say the image is partial.
+  The mapfile records the limit, and resuming with a different limit is refused. A partial image is
+  never reported as a complete image of the device.
 - **Source identity confirmation** (§6): model + serial + size shown, last four of the serial typed.
 - **Prevent sleep:** hold an IOPMAssertion / `caffeinate` for the duration. A sleeping Mac drops
   the drive mid-image.
@@ -716,6 +720,11 @@ product, and awkward on Apple Silicon.
 ---
 
 ## 14. Revision history
+
+**v3.7 (2026-11-07), after the first real-hardware smoke:**
+
+- Added `image --limit <GiB>` (partial imaging) so a bounded real run is possible on a drive larger than
+  the free space; the free-space gate was confirmed enforced on real hardware.
 
 **v3.6 (2026-11-07), after the `check` command:**
 
