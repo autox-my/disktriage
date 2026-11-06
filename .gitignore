@@ -1,0 +1,13 @@
+.DS_Store
+.build/
+.swiftpm/
+*.xcodeproj
+DerivedData/
+# disk images and ddrescue state never belong in the repo
+*.img
+*.dmg
+*.mapfile
+*.map
+# real SignalSet captures contain serials; only redacted fixtures are committed
+captures/
+.env
