@@ -8,6 +8,7 @@ final class RecordingExecutor: CommandExecuting, @unchecked Sendable {
     private let lock = NSLock()
     private let results: [String: CollectorResult]
     private var recorded: [TriageCommand] = []
+    private var recordedTimeouts: [TimeInterval] = []
 
     init(_ results: [TriageCommand: CollectorResult]) {
         self.results = Dictionary(uniqueKeysWithValues: results.map { (key, value) in
@@ -21,9 +22,24 @@ final class RecordingExecutor: CommandExecuting, @unchecked Sendable {
         return recorded
     }
 
+    /// The per-command timeouts a collector asked for, in call order.
+    var requestedTimeouts: [TimeInterval] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedTimeouts
+    }
+
     func run(_ command: TriageCommand) -> CollectorResult {
         lock.lock()
         recorded.append(command)
+        lock.unlock()
+        return results[RecordingExecutor.key(command)] ?? .ok("")
+    }
+
+    func run(_ command: TriageCommand, timeout: TimeInterval) -> CollectorResult {
+        lock.lock()
+        recorded.append(command)
+        recordedTimeouts.append(timeout)
         lock.unlock()
         return results[RecordingExecutor.key(command)] ?? .ok("")
     }

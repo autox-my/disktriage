@@ -39,17 +39,21 @@ struct LiveCLITests {
                 "the live pipeline queried the log")
     }
 
-    @Test("the default log window is 6h and --log-window reaches the command")
+    @Test("the default log window is 1h and --log-window reaches the command")
     func theLogWindowReachesTheCommand() {
         let executor = standardExecutor()
+        _ = run(arguments: ["triage", "disk0"], executor: executor)
         _ = run(arguments: ["triage", "disk0", "--log-window", "12h"], executor: executor)
 
-        let log = executor.commands.compactMap { command -> (String, String)? in
+        let logs = executor.commands.compactMap { command -> (String, String)? in
             guard case .logShow(let last, let predicate) = command else { return nil }
             return (last, predicate)
-        }.first
-        #expect(log?.0 == "12h", "the requested window")
-        #expect(log?.1.contains("disk0") == true, "the predicate names the disk")
+        }
+        #expect(logs.count == 2, "one log query per run")
+        #expect(logs.first?.0 == "1h", "the default window")
+        #expect(logs.last?.0 == "12h", "the requested window")
+        #expect(logs.allSatisfy { $0.1 == KernelLogCollector.predicate },
+                "the query is the kernel predicate, not a per-disk one")
     }
 
     // REQ-0011 / REQ-0012: one collector's timeout never blocks the others and

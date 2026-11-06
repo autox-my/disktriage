@@ -55,6 +55,7 @@ public enum PolicyViolation: String, Codable, Sendable, Equatable {
     case smartctlDeviceType = "smartctl-device-type"
     case diskNameInvalid = "disk-name-invalid"
     case logOption = "log-option"
+    case logPredicate = "log-predicate"
 }
 
 public enum PolicyDecision: Sendable, Equatable {
@@ -151,6 +152,11 @@ public struct CommandPolicy: Sendable {
         }
         // A window is mandatory: an unbounded `log show` can read the whole log.
         guard last != nil else { return .rejected(.logOption) }
+        // ndjson is the shape the parser reads. A predicate is mandatory too:
+        // an unrestricted query can walk the whole log, and a predicate other
+        // than the kernel one was measured at ~117 s for 6 h.
+        guard sawStyle else { return .rejected(.logOption) }
+        guard predicate == KernelLogCollector.predicate else { return .rejected(.logPredicate) }
         return .allowed
     }
 

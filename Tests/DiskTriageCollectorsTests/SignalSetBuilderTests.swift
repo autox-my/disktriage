@@ -206,14 +206,14 @@ struct SignalSetBuilderTests {
     @Test("a log collection carries the sense key and retry count")
     func aLogCollectionCarriesTheEvidence() throws {
         let log = KernelLogCollector(executor: RecordingExecutor([
-            .logShow(last: "6h", predicate: ""): .ok(try collectorFixtureText("kernel-log-medium-errors.ndjson")),
+            .logShow(last: "1h", predicate: ""): .ok(try collectorFixtureText("kernel-log-medium-errors.ndjson")),
         ])).collect(bsd: "disk8")
         var builder = SignalSetBuilder(collectedAt: collectedAt)
         builder.setLog(log)
         let set = try builder.build()
 
         #expect(set.log?.status == .ok, "status")
-        #expect(set.log?.windowHours == 6, "window")
+        #expect(set.log?.windowHours == 1, "the default window")
         let event = try #require(set.log?.events?.first { $0.count == 1 }, "the dd event")
         #expect(event.senseKey == 3, "sense key")
         #expect(event.retry == 20, "max retry")

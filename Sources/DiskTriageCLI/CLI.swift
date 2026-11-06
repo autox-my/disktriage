@@ -89,7 +89,7 @@ private func triage(
             index += 2
         case "--log-window":
             guard index + 1 < arguments.count else {
-                return usageError("--log-window needs a value such as 6h")
+                return usageError("--log-window needs a value such as 1h")
             }
             let value = arguments[index + 1]
             guard KernelLogCollector.windowHours(value) != nil else {
@@ -406,7 +406,7 @@ private func rootHelp() -> CLIResult {
     )
 }
 
-private let triageUsage = "usage: disktriage triage <disk> [--json] [--local] [--record <file>] [--log-window <6h>]\n"
+private let triageUsage = "usage: disktriage triage <disk> [--json] [--local] [--record <file>] [--log-window <1h>]\n"
     + "       disktriage triage --from <signalset.json> [--json] [--local] [--record <file>]\n"
     + "\n"
     + "Collects the read-only signals for one whole disk: diskutil identity,\n"
@@ -414,7 +414,7 @@ private let triageUsage = "usage: disktriage triage <disk> [--json] [--local] [-
     + "\n"
     + "  --from <file>       classify a recorded SignalSet instead of a live disk\n"
     + "  --record <file>     write a redacted SignalSet (serial hashed) to this file only\n"
-    + "  --log-window <w>    unified-log window, default 6h (log show --last form)\n"
+    + "  --log-window <w>    unified-log window, default 1h (log show --last form)\n"
     + "  --json              print the verdict as JSON instead of the tty transcript\n"
     + "  --local             render log timestamps in the local zone (default UTC)\n"
 

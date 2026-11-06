@@ -15,9 +15,8 @@ struct CommandPolicyTests {
             ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-k", "Statistics", "-d", "1", "-w", "0"],
             ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-w", "0"],
             ["/usr/sbin/ioreg", "-r", "-c", "IOMedia", "-d", "1", "-w", "0"],
-            ["/usr/bin/log", "show", "--last", "1m", "--predicate", #"eventMessage CONTAINS "medium error""#],
-            ["/usr/bin/log", "show", "--last", "6h", "--style", "ndjson", "--predicate", #"eventMessage CONTAINS "medium error""#],
-            ["/usr/bin/log", "show", "--last", "72h"],
+            ["/usr/bin/log", "show", "--last", "1h", "--style", "ndjson", "--predicate", KernelLogCollector.predicate],
+            ["/usr/bin/log", "show", "--last", "24h", "--style", "ndjson", "--predicate", KernelLogCollector.predicate],
             ["/opt/homebrew/bin/smartctl", "--json=o", "-i", "/dev/disk0"],
             ["/opt/homebrew/bin/smartctl", "--json=o", "-H", "/dev/disk0"],
             ["/opt/homebrew/bin/smartctl", "--json=o", "-A", "/dev/rdisk4"],
@@ -46,6 +45,19 @@ struct CommandPolicyTests {
             ["/usr/bin/log", "show", "--predicate", "x"],
             ["/usr/bin/log", "stream", "--last", "1m"],
             ["/usr/bin/log", "show", "--last", "1m", "--extra"],
+            // The log query must be the kernel predicate: an arbitrary or
+            // unrestricted predicate can walk the whole log too slowly.
+            ["/usr/bin/log", "show", "--last", "1h", "--style", "ndjson"],
+            ["/usr/bin/log", "show", "--last", "1h", "--style", "ndjson", "--predicate", #"eventMessage CONTAINS[c] "I/O error""#],
+            [
+                "/usr/bin/log", "show", "--last", "1h", "--style", "ndjson", "--predicate",
+                #"process == "Finder" AND eventMessage CONTAINS[c] "I/O error""#,
+            ],
+            [
+                "/usr/bin/log", "show", "--last", "1h", "--style", "ndjson", "--predicate",
+                #"eventMessage CONTAINS[c] "medium error" OR eventMessage CONTAINS[c] "I/O error""#,
+            ],
+            ["/usr/bin/log", "show", "--last", "1h", "--predicate", KernelLogCollector.predicate],
             ["/opt/homebrew/bin/smartctl", "-i", "/dev/disk0"],
             ["/opt/homebrew/bin/smartctl", "--json=o", "-i", "/dev/disk0", "extra"],
             ["/opt/homebrew/bin/smartctl", "--json=o", "-i", "/dev/disk0s1"],

@@ -79,9 +79,25 @@ Findings:
   must drop the `log run noninteractively`/self-argv line before counting
   events, or the collector will report one phantom "medium error" forever.
 - `--last` is mandatory in the allow-list: an unbounded `log show` can walk the
-  whole log and blow the timeout. `--predicate` is optional.
+  whole log and blow the timeout. `--predicate` and `--style ndjson` are also
+  mandatory now, and the predicate must be the kernel one (see the measured
+  cost below): an arbitrary or unrestricted predicate is rejected before exec.
 - Log retention was **not** measured here; it stays `log.window_hours = nil`
   until the bench records it (P0 row 3).
+
+Measured again on 2026-11-07 while wiring live triage: the old broad predicate
+(`eventMessage CONTAINS[c] "medium error" OR … "I/O error" OR … "<bsd>"`) took
+**~117 s for `--last 6h`** and always hit the 30 s collector limit, so live
+triage always reported `log timeout`. Restricting the query to the kernel —
+`process == "kernel" AND eventMessage CONTAINS[c] "I/O error"` — took **~8 s for
+`--last 1h`** and **~50 s for `--last 6h`** (about 8 s per hour) and still
+matched every real medium-error line in the Phase C capture. The default window
+is therefore 1 h, and the collector's hard timeout is
+`max(30 s, 12 s × hours + 15 s)` (1 h → 30 s, 6 h → 87 s, 24 h → 303 s). The
+predicate cannot name a disk: the sense line carries no disk name and retry
+lines carry only the LBA, so the BSD filter runs after parsing and keeps events
+whose closing `diskN: I/O error.` line names the queried disk **or no disk**;
+only an event explicitly attributed to another disk is dropped.
 
 Redactions: serial/firmware above, PIDs and timestamps in the log line.
 

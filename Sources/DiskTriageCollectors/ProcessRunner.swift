@@ -4,6 +4,16 @@ import Darwin
 /// A collector that can be driven with a recorded result in tests.
 public protocol CommandExecuting: Sendable {
     func run(_ command: TriageCommand) -> CollectorResult
+    /// A command whose cost scales with its input (the unified-log window) can
+    /// ask for its own hard timeout. The default ignores it and keeps the
+    /// executor's configured timeout.
+    func run(_ command: TriageCommand, timeout: TimeInterval) -> CollectorResult
+}
+
+public extension CommandExecuting {
+    func run(_ command: TriageCommand, timeout: TimeInterval) -> CollectorResult {
+        run(command)
+    }
 }
 
 /// Runs one allow-listed argv in its own process group with a hard timeout.
@@ -39,14 +49,20 @@ public struct ProcessRunner: CommandExecuting, Sendable {
     }
 
     public func run(_ command: TriageCommand) -> CollectorResult {
-        execute(command.argv)
+        execute(command.argv, timeout: timeout)
+    }
+
+    /// A per-command hard timeout, for a query whose cost scales with its input
+    /// (the unified-log window). The process-group kill is unchanged.
+    public func run(_ command: TriageCommand, timeout: TimeInterval) -> CollectorResult {
+        execute(command.argv, timeout: timeout)
     }
 
     public func run(argv: [String]) -> CollectorResult {
-        execute(argv)
+        execute(argv, timeout: timeout)
     }
 
-    private func execute(_ argv: [String]) -> CollectorResult {
+    private func execute(_ argv: [String], timeout: TimeInterval) -> CollectorResult {
         let started = DispatchTime.now().uptimeNanoseconds
 
         switch policy.evaluate(argv) {

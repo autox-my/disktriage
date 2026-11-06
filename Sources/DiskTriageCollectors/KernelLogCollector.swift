@@ -24,12 +24,26 @@ public struct KernelLogCollection: Sendable, Equatable {
 /// Reads the kernel's medium-error history from the unified log
 /// (diskdoctor.md §4, P0 row 3/phase C).
 ///
-/// `log show` reads the log store, not the disk under triage, so it stays fast
-/// and gets the same 30 s hard timeout as every other collector. The predicate
-/// is built for one BSD name; parsed events attributed to a different disk are
-/// dropped, and an empty result is a measured `ok` with zero events.
+/// **Measured cost on this Mac (macOS 27.2, internal NVMe).** The old broad
+/// predicate — `eventMessage CONTAINS[c] "medium error" OR ... "I/O error" OR
+/// ... "<bsd>"` — took ~117 s for 6 h and always hit the collector's 30 s
+/// limit, so triage always reported `log timeout`. Restricting the query to
+/// the kernel process took ~8 s for `--last 1h` and ~50 s for `--last 6h`
+/// (about 8 s per hour) and still matched every real medium-error line in the
+/// Phase C capture, so the default window is 1 h.
+///
+/// The predicate cannot name a disk: the sense line
+/// (`[External] I/O error! ... Sense Data 0x03, 0x11, 0x00`) carries no disk
+/// name and the retry lines carry only the LBA. So every kernel I/O-error
+/// event in the window is reported; an event whose closing `diskN: I/O error.`
+/// line names another disk is dropped after parsing, while one that names the
+/// queried disk — or no disk at all — is kept. `bsd` in the event names the
+/// disk when a line carried one.
 public struct KernelLogCollector: Sendable {
-    public static let defaultWindow = "6h"
+    /// The only log predicate triage may run (enforced by `CommandPolicy`).
+    public static let predicate = #"process == "kernel" AND eventMessage CONTAINS[c] "I/O error""#
+
+    public static let defaultWindow = "1h"
 
     private let executor: any CommandExecuting
 
@@ -42,8 +56,10 @@ public struct KernelLogCollector: Sendable {
             return KernelLogCollection(status: .error, reason: "unrecognised --log-window '\(window)'")
         }
 
-        let predicate = #"eventMessage CONTAINS[c] "medium error" OR eventMessage CONTAINS[c] "I/O error" OR eventMessage CONTAINS[c] "\#(bsd)""#
-        let result = executor.run(.logShow(last: window, predicate: predicate))
+        let result = executor.run(
+            .logShow(last: window, predicate: Self.predicate),
+            timeout: Self.timeoutSeconds(forWindowHours: hours)
+        )
         guard result.outcome == .ok else {
             return KernelLogCollection(
                 status: result.outcome.signalStatus,
@@ -54,6 +70,13 @@ public struct KernelLogCollector: Sendable {
         let parsed = KernelLogParser.parse(result.stdout)
         let events = parsed.events.filter { belongs($0.bsd, to: bsd) }
         return KernelLogCollection(status: .ok, events: events, windowHours: hours)
+    }
+
+    /// The hard timeout scales with the queried window:
+    /// `max(30 s, 12 s x hours + 15 s)`. The measured cost is ~8 s per hour,
+    /// so 12 s per hour leaves headroom: 1 h -> 30 s, 6 h -> 87 s, 24 h -> 303 s.
+    public static func timeoutSeconds(forWindowHours hours: Int) -> TimeInterval {
+        max(30, 12 * Double(hours) + 15)
     }
 
     /// `--log-window` uses `log show`'s own compact forms; the SignalSet keeps
@@ -72,10 +95,11 @@ public struct KernelLogCollector: Sendable {
         }
     }
 
-    /// `disk8` owns `disk8s1`, not `disk80`. An event with no disk line is not
-    /// attributed and is dropped rather than credited to this disk.
+    /// `disk8` owns `disk8s1`, not `disk80`. An event with no disk line cannot
+    /// be attributed either way and is kept: the sense line carries no disk
+    /// name, so dropping it would lose the real evidence.
     private func belongs(_ event: String?, to bsd: String) -> Bool {
-        guard let event else { return false }
+        guard let event else { return true }
         return event == bsd || event.hasPrefix(bsd + "s")
     }
 }
