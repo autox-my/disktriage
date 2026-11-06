@@ -719,3 +719,21 @@ Open questions carried into P1: ______
   probed or mounted by the script's own session; it resumed cleanly (state `Ss`) after unplug.
 - **Not done:** P0 row 11 (boot-sector restore on a working copy) needs the earlier MiNaH image,
   which is not on this Mac.
+
+### Image smoke findings (2026-11-07, healthy 5 TB USB Seagate, `captures/p0-image-smoke.sh`)
+
+First real-device run of `guard` + `image`. Healthy drive, 3 GiB partial image (`--limit 3`).
+
+- **Free-space gate enforced on real hardware:** the first attempt (no limit) was refused with exit 30
+  (25.4 GiB free, 4657.5 GiB needed). That led to plan v3.7 (`image --limit`).
+- **Guard held:** the third-party NTFS driver got a `dissent` decision for the data volume; nothing mounted.
+- **Live triage of a healthy bridged drive:** exit 12 (bridge/link/power suspicion): SMART hidden by the
+  bridge, ioreg 0 retries / 0 errors. Expected, not a false alarm.
+- **Consent gate:** without `--accept-risk` exit 2, no image file created.
+- **Supervised pass, SIGINT, resume:** run 1 exited 1 at 1.3 GiB, run 2 resumed the same image to 2.4 GiB
+  (exit 1); no leftover `ddrescue`. The `ddrescue` command was `-n -b 512 -O -K 65536 -T 90 -s <limit>`.
+- **Integrity:** SHA-256 of the image's first GiB equals the source's first GiB.
+- **Defect found and fixed:** with `-s`, ddrescue's mapfile ends in an almost unbounded untried extent
+  (`0x7FFFFFFF709AFFFF`), so the summary printed ~8 EiB remaining. Mapfile accounting is now clamped to the
+  limit (REQ-0108..0110).
+- **Not covered:** a drive with bad sectors under `image` (the MiNaH drive), pass 2, `guard --suspend`.
