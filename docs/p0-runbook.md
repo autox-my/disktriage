@@ -385,7 +385,7 @@ TO 20  diskutil info -plist /dev/diskN | grep -A1 -E 'FilesystemType|MountPoint'
 
 ```sh
 TO 120 ./tools/p0/build-dadissent.sh                     # -> captures/dadissent (ad-hoc signed)
-sudo -v                                                  # authenticate: the approval callback must run as root
+sudo -v                                                  # authenticate: the probe runs as root (see A5)
 TO 600 sudo -n captures/dadissent --seconds 600 > captures/q5-dissent.log 2>&1 &
 # with it running, plug the control disk / attach the NTFS volume via E1
 TO 600  diskutil activity > captures/q5-da-activity.log 2>&1 &   # continuous; kill after
@@ -395,6 +395,9 @@ TO 20  ioreg -r -c IOMedia -d 1 -w 0 | grep '"BSD Name"'
 Expect if row 5 is yes: `decision … verdict=dissent` lines, no `/Volumes/*` mount, and the
 driver's own mount attempt failing (`kDAReturnExclusiveAccess`) in the DA activity
 log. Expect if no: the volume appears mounted anyway — record which driver did it.
+Root: the SDK headers set no privilege rule and `DARegisterDiskMountApprovalCallback`
+returns void, so an unprivileged run is indistinguishable from an ignored one; B3
+runs the probe as root so that variable is closed.
 
 - **Row 5** — yes only if the dissent blocks the **third-party** driver's mount,
   not just the native one. Otherwise if-no: principle 1 becomes advisory; choose
