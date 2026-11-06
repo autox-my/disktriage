@@ -104,6 +104,31 @@ struct GuardCommandTests {
         #expect(recorder.stderr.contains { $0.contains("sudo disktriage guard --seconds 1") })
     }
 
+    @Test("an interrupt is a clean exit, not a crash")
+    func interruptedDissentExitsZero() {
+        let recorder = GuardRecorder()
+        let result = runGuard(
+            arguments: ["--seconds", "5"],
+            isRoot: true,
+            dissent: FakeDissent(outcome: .interrupted),
+            output: recorder.output
+        )
+        #expect(result.exitCode == 0)
+    }
+
+    @Test("a failed DiskArbitration session is a tool error, never a silent success")
+    func failedSessionExitsThirty() {
+        let recorder = GuardRecorder()
+        let result = runGuard(
+            arguments: ["--seconds", "5"],
+            isRoot: true,
+            dissent: FakeDissent(outcome: .failed("DASessionCreate failed")),
+            output: recorder.output
+        )
+        #expect(result.exitCode == 30)
+        #expect(recorder.stderr.contains { $0.contains("DASessionCreate failed") })
+    }
+
     @Test("not root without --seconds refuses before idling unprotected")
     func notRootUnboundedRefusesBeforeRunning() {
         let recorder = GuardRecorder()
