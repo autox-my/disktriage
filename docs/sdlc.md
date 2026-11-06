@@ -72,6 +72,28 @@ were inconvenient:
 - `--json` prints the same verdict as the tty on stdout; progress stays on
   stderr. `--local` renders log timestamps in the local zone (default UTC).
 
+### CLI decisions (P3b)
+
+- `image --no-dry-run` exits **0** when both passes finish, **1** when it
+  stopped by the pass-2 rule, a device disappearance, an interrupt or a
+  ddrescue error (all resumable), and **30** for a precondition/tool error.
+  These are deliberately not the verdict codes.
+- A missing `--accept-risk` is a **usage error (2)**: it is a flag, not an
+  environment fact. Root, FDA, the mount guard, ddrescue and the dry-run
+  checks exit **30**.
+- FDA `UNKNOWN` blocks imaging as well as `DENIED`: an unverified grant is not
+  a pass (plan §7), even though the brief only named `DENIED`.
+- The resume command printed on an incomplete image is the
+  `disktriage image ... --no-dry-run` command, not the raw ddrescue line:
+  ddrescue resumes from the mapfile, and the wrapper re-runs the same
+  preconditions.
+- The sidecar (`<image>.disktriage.json`) is rewritten at each run start
+  (`created_at` is this attempt) and records both pass argv; the device
+  identity fields remain the resume authority.
+- "Complete" means both passes exited 0. Bad sectors can remain (`-` extents);
+  they are reported as bad bytes and are zero-filled in the image, not treated
+  as an incomplete run.
+
 ### The test report is the evidence
 
 `scripts/check.sh` reads a JUnit report, not the runner's prose:
