@@ -11,4 +11,6 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
+  - "DiskTriageCollectorsTests.SignalSetBuilderTests::REQ0029_theIORegDeltaIsDisplayedAndNotValidated()"
   - "DiskTriageCoreTests.ClassifierTests::`REQ-0029 I/O statistics are displayed but not counted until P0 validates them`()"
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0029 an Errors (Read) delta alone does not raise confidence while P0 is off`()"
