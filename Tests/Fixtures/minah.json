@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-11-06T00:14:02Z",
+  "device": {
+    "status": "ok",
+    "bsd": "disk4", "size_bytes": 320072933376,
+    "model": "WDC WD3200BJKT-75F4T0", "serial": "WD-WX0123456789",
+    "media": "hdd", "bus": "usb", "bridge": "generic-sata", "sat_passthrough": "partial",
+    "removable": true
+  },
+  "smart": {
+    "status": "ok", "overall": "PASSED",
+    "pending": 131, "reallocated": 14, "uncorrectable": 0,
+    "power_on_hours": 4531, "raw_read_errors": 21545,
+    "error_log": [{ "lba": 2048, "type": "uncorrected-read", "count": 6 }],
+    "self_test": { "last": "completed-no-error", "age_hours": 20 },
+    "history": null
+  },
+  "io": { "status": "ok", "retries": 1204, "timeouts": 3 },
+  "log": {
+    "status": "ok", "window_hours": 72,
+    "events": [{ "time": "2026-11-06T00:12:31Z", "kind": "medium_error", "lba": 2048, "count": 6 }]
+  },
+  "drivers": {
+    "status": "ok",
+    "items": [{ "path": "/Library/Filesystems/iboysoft-ntfs.fs", "third_party": true, "claims": ["ntfs"] }]
+  },
+  "permissions": { "root": true, "raw_read": "denied", "removable_volumes": "granted" },
+  "fs": { "status": "ok", "type": "ntfs", "partition_start_lba": 2048, "mounted": false, "readable": null },
+  "symptoms": { "source": "user", "clicking": false, "disappears": false, "works_on_other_port": null,
+                "works_with_other_cable": null, "works_with_other_enclosure": null },
+  "collector_notes": [{ "collector": "diskutil", "outcome": "timeout", "after_s": 10 }]
+}
