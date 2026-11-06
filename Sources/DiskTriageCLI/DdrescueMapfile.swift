@@ -30,6 +30,10 @@ public struct MapfileSnapshot: Equatable, Sendable {
     public let finished: Bool
     public let pass: Int?
     public let extents: [MapfileExtent]
+    /// The byte range the accounting is limited to, `nil` for a full image.
+    /// `ddrescue -s` leaves the untried tail ending at `Int64.max`, so a
+    /// partial image is measured only inside `[0, rangeBytes)` (REQ-0108).
+    public let rangeBytes: Int64?
 
     public init(
         rescuedBytes: Int64,
@@ -39,7 +43,8 @@ public struct MapfileSnapshot: Equatable, Sendable {
         nonScrapedBytes: Int64,
         finished: Bool,
         pass: Int?,
-        extents: [MapfileExtent]
+        extents: [MapfileExtent],
+        rangeBytes: Int64? = nil
     ) {
         self.rescuedBytes = rescuedBytes
         self.badBytes = badBytes
@@ -49,16 +54,25 @@ public struct MapfileSnapshot: Equatable, Sendable {
         self.finished = finished
         self.pass = pass
         self.extents = extents
+        self.rangeBytes = rangeBytes
     }
 
     /// Extents ddrescue has not finished: non-tried, non-trimmed, non-scraped
     /// and bad sectors. These are what a resume would still attempt.
+    ///
+    /// Inside a partial range, bad bytes are already accounted as `bad` and are
+    /// not "remaining to try", so `rescued + bad + remaining == rangeBytes`.
     public var remainingExtents: [MapfileExtent] {
-        extents.filter { !$0.isRescued && $0.size > 0 }
+        let candidates = extents.filter { !$0.isRescued && $0.size > 0 }
+        guard rangeBytes != nil else { return candidates }
+        return candidates.filter { $0.status != "-" }
     }
 
     public var remainingBytes: Int64 {
-        remainingExtents.reduce(0) { $0 + $1.size }
+        if let rangeBytes {
+            return max(0, rangeBytes - rescuedBytes - badBytes)
+        }
+        return remainingExtents.reduce(0) { $0 + $1.size }
     }
 
     /// Nothing is left to try. Bad sectors still count as remaining: they are
@@ -66,6 +80,9 @@ public struct MapfileSnapshot: Equatable, Sendable {
     public var isComplete: Bool { remainingBytes == 0 }
 
     public var rescuedFraction: Double {
+        if let rangeBytes, rangeBytes > 0 {
+            return Double(rescuedBytes) / Double(rangeBytes)
+        }
         let total = rescuedBytes + remainingBytes
         guard total > 0 else { return 0 }
         return Double(rescuedBytes) / Double(total)
@@ -83,7 +100,11 @@ public struct MapfileSnapshot: Equatable, Sendable {
 /// 0x00100000  0x00100000  ?
 /// ```
 public enum DdrescueMapfile {
-    public static func parse(_ text: String) -> MapfileSnapshot? {
+    /// Parses a mapfile. `limitBytes` is the partial image's limit: when it is
+    /// present every extent is clipped to `[0, limitBytes)` and the accounting
+    /// is computed inside that range. `nil` is a full image and keeps the
+    /// mapfile's own extents, including an unbounded tail (REQ-0108).
+    public static func parse(_ text: String, limitBytes: Int64? = nil) -> MapfileSnapshot? {
         var finished = false
         var pass: Int?
         var sawExtentHeader = false
@@ -129,6 +150,10 @@ public enum DdrescueMapfile {
 
         guard sawExtentHeader else { return nil }
 
+        if let limitBytes {
+            extents = clip(extents, to: limitBytes)
+        }
+
         func total(_ status: Character) -> Int64 {
             extents
                 .filter { $0.status == status }
@@ -143,8 +168,23 @@ public enum DdrescueMapfile {
             nonScrapedBytes: total("/"),
             finished: finished,
             pass: pass,
-            extents: extents
+            extents: extents,
+            rangeBytes: limitBytes
         )
+    }
+
+    /// Clips every extent to `[0, limit)`; an extent that starts at or after
+    /// the limit (or ends at or before zero) is dropped. A partial image's
+    /// `-s` leaves the untried tail ending at `Int64.max`, so this is what
+    /// keeps `remaining` and the percentage finite (REQ-0108).
+    private static func clip(_ extents: [MapfileExtent], to limit: Int64) -> [MapfileExtent] {
+        guard limit > 0 else { return [] }
+        return extents.compactMap { extent in
+            let start = max(0, extent.position)
+            let end = min(extent.end, limit)
+            guard end > start else { return nil }
+            return MapfileExtent(position: start, size: end - start, status: extent.status)
+        }
     }
 
     private static func hex(_ field: Substring) -> Int64? {

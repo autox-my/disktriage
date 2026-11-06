@@ -142,7 +142,7 @@ is XML-escaped by SwiftPM, and the trailing `()` is accepted verbatim — no nam
 missing `classname`, nothing that needs a `req` change or a Forgejo issue. Two limits are SwiftPM's,
 not `req`'s, and are handled in `scripts/`: the report is at a sibling path, and a parameterised test
 has no per-argument ids. On the real corpus `req check --test-report
-.build/test-results/junit-swift-testing.xml` is still **3** — because 89 of the 100 claims are
+.build/test-results/junit-swift-testing.xml` is still **3** — because 96 of the 110 claims are
 **unlinked**, not because the report is unreadable.
 
 - **Fixtures:** golden `SignalSet` JSON lives in `Tests/Fixtures/<case>.json` and is replayed by a
@@ -157,7 +157,7 @@ has no per-argument ids. On the real corpus `req check --test-report
   commit. A stale link is UNVERIFIABLE (exit 3), never a pass.
 - A claim with no `tests:` is *no linked test* — UNVERIFIABLE, named per claim. Do not declare
   `evidence: process` to silence it; process evidence is only for obligations a Decision,
-  signature or workflow establishes (none of the current 100 claims are process-evidenced).
+  signature or workflow establishes (none of the current 110 claims are process-evidenced).
 
 ## `req` in the TDD loop
 
@@ -206,15 +206,16 @@ only if that is impossible).
 
 ## Current state
 
-- 100 claims, all structured, 51 pins held, 0 lints (`req canon --fail-on-flag` → 0).
+- 110 claims, all structured, 58 pins held, 0 lints (`req canon --fail-on-flag` → 0).
 - The suite runs under Swift Testing and writes a JUnit report that `req` reads (measured above).
-  Eleven claims are linked to the ten existing tests by a `REQ` tag in the test function name:
+  Fourteen claims are linked to the tests by a `REQ` tag in the test function name:
   `REQ-0015`, `REQ-0018`, `REQ-0020`, `REQ-0021`, `REQ-0022`, `REQ-0024`, `REQ-0035`, `REQ-0036`,
-  `REQ-0037`, `REQ-0038`, `REQ-0041`. The other 89 have no linked test — linking is a judgement
-  about evidence, and only a test that demonstrably proves the obligation is linked. `req check
-  --test-report .build/test-results/junit-swift-testing.xml` is therefore still exit 3 (*no linked
-  test* on the 89), which is not a pass. `scripts/req-link.sh --check` reports 0 drift for the
-  eleven; `req-link.sh` keeps them in step with the report.
+  `REQ-0037`, `REQ-0038`, `REQ-0041`, `REQ-0108`, `REQ-0109`, `REQ-0110`. The other 96 have no
+  linked test — linking is a judgement about evidence, and only a test that demonstrably proves
+  the obligation is linked. `req check --test-report .build/test-results/junit-swift-testing.xml`
+  is therefore still exit 3 (*no linked test* on the 96), which is not a pass.
+  `scripts/req-link.sh --check` reports 0 drift for the fourteen; `req-link.sh` keeps them in step
+  with the report.
 - No `.req/variants` and no `.req/projections` are committed yet; `req check` therefore runs the
   default variant and checks no projection. Add a variant line in the commit that first uses
   `applicability`, and pin `docs/spec.md` only when a projection is a deliverable. Those two

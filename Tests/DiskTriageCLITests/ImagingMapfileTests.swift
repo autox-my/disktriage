@@ -95,4 +95,73 @@ struct ImagingMapfileTests {
         #expect(snapshot.remainingBytes == 0)
         #expect(snapshot.isComplete)
     }
+
+    // MARK: - A partial image's unbounded tail (diskdoctor.md §8 `--limit`)
+
+    private static let partialLimit: Int64 = 3_221_225_472 // 3 GiB
+    private static let rescuedBeforeTheLimit: Int64 = 2_405_761_024 // 0x8F650000
+
+    private static func fixture(_ name: String) -> String {
+        (try? String(contentsOfFile: fixturePath(name), encoding: .utf8)) ?? ""
+    }
+
+    // REQ-0108: `ddrescue -s` leaves the untried tail ending at Int64.max.
+    // Without a limit the mapfile is read exactly as before; with the partial
+    // limit every extent is clipped to [0, limit).
+    @Test("REQ0108 a partial mapfile's unbounded untried tail is clipped to the limit")
+    func REQ0108_partialMapfileClipsTheUnboundedTail() throws {
+        let text = Self.fixture("partial-limit-huge-tail.mapfile.txt")
+
+        let unclamped = try #require(DdrescueMapfile.parse(text))
+        #expect(unclamped.rescuedBytes == Self.rescuedBeforeTheLimit)
+        #expect(unclamped.remainingBytes == Int64.max - Self.rescuedBeforeTheLimit,
+                "a full image keeps today's accounting, including the tail")
+        #expect(unclamped.remainingExtents.count == 1)
+
+        let snapshot = try #require(DdrescueMapfile.parse(text, limitBytes: Self.partialLimit))
+        #expect(snapshot.rescuedBytes == Self.rescuedBeforeTheLimit)
+        #expect(snapshot.badBytes == 0)
+        #expect(snapshot.remainingBytes == 815_464_448, "3 GiB minus the rescued bytes")
+        #expect(snapshot.remainingExtents.count == 1)
+        #expect(snapshot.remainingExtents.first?.position == Self.rescuedBeforeTheLimit)
+        #expect(snapshot.remainingExtents.first?.size == 815_464_448,
+                "the untried tail is clipped at the limit, not Int64.max")
+        #expect(!snapshot.isComplete)
+        #expect(abs(snapshot.rescuedFraction - 0.7468) < 0.0001,
+                "the percentage is of the limit, not of 8.6 billion GiB")
+    }
+
+    // REQ-0108: a partial mapfile that rescued the whole limit is complete,
+    // even though the tail extent starts at the limit and runs to Int64.max.
+    @Test("REQ0108 a partial mapfile rescued to the limit is complete despite the tail")
+    func REQ0108_fullyRescuedToTheLimitIsComplete() throws {
+        let text = Self.fixture("partial-limit-fully-rescued.mapfile.txt")
+        let snapshot = try #require(DdrescueMapfile.parse(text, limitBytes: Self.partialLimit))
+
+        #expect(snapshot.rescuedBytes == Self.partialLimit)
+        #expect(snapshot.badBytes == 0)
+        #expect(snapshot.remainingBytes == 0)
+        #expect(snapshot.remainingExtents.isEmpty)
+        #expect(snapshot.extents.count == 1, "the extent starting at the limit is dropped")
+        #expect(snapshot.isComplete)
+        #expect(snapshot.rescuedFraction == 1.0)
+    }
+
+    // REQ-0108: a bad extent that crosses the limit contributes only the bytes
+    // inside the range, and bad bytes are not "remaining to try" inside it.
+    @Test("REQ0108 a bad extent straddling the limit is clipped at the limit")
+    func REQ0108_badExtentStraddlingTheLimitIsClipped() throws {
+        let text = Self.fixture("partial-limit-bad-straddles.mapfile.txt")
+        let snapshot = try #require(DdrescueMapfile.parse(text, limitBytes: Self.partialLimit))
+
+        #expect(snapshot.rescuedBytes == 1_073_741_824, "1 GiB rescued")
+        #expect(snapshot.badBytes == 2_147_483_648,
+                "the 4 GiB bad extent is clipped to the 2 GiB inside the 3 GiB limit")
+        #expect(snapshot.remainingBytes == 0, "limit - rescued - bad")
+        #expect(snapshot.remainingExtents.isEmpty)
+        #expect(snapshot.isComplete)
+        #expect(snapshot.extents.contains { $0.status == "-" && $0.size == 2_147_483_648 },
+                "the written extents are clipped too")
+        #expect(abs(snapshot.rescuedFraction - 1.0 / 3.0) < 0.0001)
+    }
 }

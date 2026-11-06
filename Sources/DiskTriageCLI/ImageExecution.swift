@@ -153,6 +153,7 @@ func runImaging(
             // about the image being written, so a partial run uses the limit
             // as its "device" size (REQ-0107).
             deviceSize: imageBytes ?? plan.source.sizeBytes ?? 0,
+            mapfileLimitBytes: partialLimitBytes,
             pollInterval: dependencies.pollInterval,
             signalGrace: dependencies.signalGrace,
             readMapfile: dependencies.readMapfile,
