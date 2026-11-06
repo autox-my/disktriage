@@ -1,0 +1,22 @@
++-o IOBlockStorageDriver  <class IOBlockStorageDriver, id 0x100004d8c, registered, matched, active, busy 0 (36 ms), retain 8>
+  | {
+  |   "IOClass" = "IOBlockStorageDriver"
+  |   "CFBundleIdentifier" = "com.apple.iokit.IOStorageFamily"
+  |   "IOProviderClass" = "IOBlockStorageDevice"
+  |   "IOPropertyMatch" = {"device-type"="Generic"}
+  |   "IOPowerManagement" = {"CapabilityFlags"=0,"CurrentPowerState"=0}
+  |   "IOProbeScore" = 0
+  |   "IOMatchedAtBoot" = Yes
+  |   "IOGeneralInterest" = "IOCommand is not serializable"
+  |   "IOMatchCategory" = "IODefaultMatchCategory"
+  |   "Statistics" = {"Operations (Write)"=0,"Latency Time (Write)"=0,"Bytes (Read)"=1053184,"Errors (Write)"=0,"Total Time (Read)"=48381679331,"Latency Time (Read)"=0,"Retries (Read)"=0,"Errors (Read)"=1,"Total Time (Write)"=0,"Bytes (Write)"=0,"Operations (Read)"=9,"Retries (Write)"=0}
+  |   "IOPersonalityPublisher" = "com.apple.iokit.IOStorageFamily"
+  |   "CFBundleIdentifierKernel" = "com.apple.iokit.IOStorageFamily"
+  | }
+  | 
+  +-o Generic External Media  <class IOMedia, id 0x100004d8e, registered, matched, active, busy 0 (34 ms), retain 14>
+    +-o IOMediaBSDClient  <class IOMediaBSDClient, id 0x100004d8f, registered, matched, active, busy 0 (0 ms), retain 6>
+    +-o IOFDiskPartitionScheme  <class IOFDiskPartitionScheme, id 0x100004d92, !registered, !matched, active, busy 0 (1 ms), retain 5>
+      +-o Partition 1@1  <class IOMedia, id 0x100004d95, registered, matched, active, busy 0 (1 ms), retain 13>
+        +-o IOMediaBSDClient  <class IOMediaBSDClient, id 0x100004d96, registered, matched, active, busy 0 (0 ms), retain 6>
+

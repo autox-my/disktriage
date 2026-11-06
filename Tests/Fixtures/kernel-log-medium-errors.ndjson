@@ -1,0 +1,69 @@
+{"timestamp": "2026-11-07 00:25:46.284031+0800", "processImagePath": "/System/Library/CoreServices/SystemUIServer.app/Contents/MacOS/SystemUIServer", "eventMessage": "received premount disk8s1 <private> returned: 0x0"}
+{"timestamp": "2026-11-07 00:25:48.327161+0800", "processImagePath": "/usr/libexec/storagekitd", "eventMessage": "<SKDisk: [44] { BSD Name: disk8s2, Mounted: No, Role: kSKDiskRoleUnknown, Type: kSKDiskType3rdPartyFilesystem, Valid: Yes, Volume UUID: 00000000-0000-0000-0000-000000000000, Media UUID: 00000000-0000-0000-0000-000000000000 }>"}
+{"timestamp": "2026-11-07 00:25:48.678000+0800", "processImagePath": "/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder", "eventMessage": "TNode::CFVolumeObserverCallback 1 <VOLUME>: file://<private> (/Volumes/<VOLUME>) disk8s2 (-123)"}
+{"timestamp": "2026-11-07 00:31:21.190837+0800", "processImagePath": "/kernel", "eventMessage": "[External] I/O error! Opcode 0x28, Service response 0x02, Task status 0x02, Sense Data 0x03, 0x11, 0x00"}
+{"timestamp": "2026-11-07 00:31:21.190855+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 1 ..."}
+{"timestamp": "2026-11-07 00:31:23.413256+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 2 ..."}
+{"timestamp": "2026-11-07 00:31:25.750579+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 3 ..."}
+{"timestamp": "2026-11-07 00:31:28.246693+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 4 ..."}
+{"timestamp": "2026-11-07 00:31:30.418941+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 5 ..."}
+{"timestamp": "2026-11-07 00:31:32.631987+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 6 ..."}
+{"timestamp": "2026-11-07 00:31:35.006716+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 7 ..."}
+{"timestamp": "2026-11-07 00:31:37.199750+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 8 ..."}
+{"timestamp": "2026-11-07 00:31:39.371820+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 9 ..."}
+{"timestamp": "2026-11-07 00:31:41.702379+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 10 ..."}
+{"timestamp": "2026-11-07 00:31:44.033068+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 11 ..."}
+{"timestamp": "2026-11-07 00:31:46.370461+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 12 ..."}
+{"timestamp": "2026-11-07 00:31:48.565710+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 13 ..."}
+{"timestamp": "2026-11-07 00:31:50.929313+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 14 ..."}
+{"timestamp": "2026-11-07 00:31:53.100362+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 15 ..."}
+{"timestamp": "2026-11-07 00:31:55.456956+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 16 ..."}
+{"timestamp": "2026-11-07 00:31:57.677355+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 17 ..."}
+{"timestamp": "2026-11-07 00:32:00.327751+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 18 ..."}
+{"timestamp": "2026-11-07 00:32:02.662111+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 19 ..."}
+{"timestamp": "2026-11-07 00:32:04.857563+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 20 ..."}
+{"timestamp": "2026-11-07 00:32:07.054493+0800", "processImagePath": "/kernel", "eventMessage": "disk8s1: I/O error."}
+{"timestamp": "2026-11-07 00:32:10.865086+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 1 ..."}
+{"timestamp": "2026-11-07 00:32:13.381229+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 2 ..."}
+{"timestamp": "2026-11-07 00:32:15.558764+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 3 ..."}
+{"timestamp": "2026-11-07 00:32:18.372151+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 4 ..."}
+{"timestamp": "2026-11-07 00:32:20.709169+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 5 ..."}
+{"timestamp": "2026-11-07 00:32:23.039391+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 6 ..."}
+{"timestamp": "2026-11-07 00:32:25.376957+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 7 ..."}
+{"timestamp": "2026-11-07 00:32:27.547996+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 8 ..."}
+{"timestamp": "2026-11-07 00:32:29.879503+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 9 ..."}
+{"timestamp": "2026-11-07 00:32:32.535023+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 10 ..."}
+{"timestamp": "2026-11-07 00:32:34.711992+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 11 ..."}
+{"timestamp": "2026-11-07 00:32:36.909177+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 12 ..."}
+{"timestamp": "2026-11-07 00:32:39.080441+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 13 ..."}
+{"timestamp": "2026-11-07 00:32:41.268462+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 14 ..."}
+{"timestamp": "2026-11-07 00:32:43.440559+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 15 ..."}
+{"timestamp": "2026-11-07 00:32:45.612644+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 16 ..."}
+{"timestamp": "2026-11-07 00:32:48.102510+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 17 ..."}
+{"timestamp": "2026-11-07 00:32:50.599558+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 18 ..."}
+{"timestamp": "2026-11-07 00:32:52.776795+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 19 ..."}
+{"timestamp": "2026-11-07 00:32:55.132479+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x20, retry 20 ..."}
+{"timestamp": "2026-11-07 00:32:57.302469+0800", "processImagePath": "/kernel", "eventMessage": "disk8s1: I/O error."}
+{"timestamp": "2026-11-07 00:34:06.522097+0800", "processImagePath": "/kernel", "eventMessage": "[External] I/O error! Opcode 0x28, Service response 0x02, Task status 0x02, Sense Data: 0x03, 0x11, 0x00, happened 42 times"}
+{"timestamp": "2026-11-07 00:34:39.222440+0800", "processImagePath": "/kernel", "eventMessage": "[External] I/O error! Opcode 0x28, Service response 0x02, Task status 0x02, Sense Data 0x03, 0x11, 0x00"}
+{"timestamp": "2026-11-07 00:34:39.222455+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 1 ..."}
+{"timestamp": "2026-11-07 00:34:41.886011+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 2 ..."}
+{"timestamp": "2026-11-07 00:34:44.248533+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 3 ..."}
+{"timestamp": "2026-11-07 00:34:46.612317+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 4 ..."}
+{"timestamp": "2026-11-07 00:34:48.790463+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 5 ..."}
+{"timestamp": "2026-11-07 00:34:50.970581+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 6 ..."}
+{"timestamp": "2026-11-07 00:34:53.150641+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 7 ..."}
+{"timestamp": "2026-11-07 00:34:55.330647+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 8 ..."}
+{"timestamp": "2026-11-07 00:34:57.535925+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 9 ..."}
+{"timestamp": "2026-11-07 00:34:59.715911+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 10 ..."}
+{"timestamp": "2026-11-07 00:35:01.896164+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 11 ..."}
+{"timestamp": "2026-11-07 00:35:04.259974+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 12 ..."}
+{"timestamp": "2026-11-07 00:35:06.782049+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 13 ..."}
+{"timestamp": "2026-11-07 00:35:09.284800+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 14 ..."}
+{"timestamp": "2026-11-07 00:35:11.464982+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 15 ..."}
+{"timestamp": "2026-11-07 00:35:13.643980+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 16 ..."}
+{"timestamp": "2026-11-07 00:35:16.200291+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 17 ..."}
+{"timestamp": "2026-11-07 00:35:18.754548+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 18 ..."}
+{"timestamp": "2026-11-07 00:35:20.933546+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 19 ..."}
+{"timestamp": "2026-11-07 00:35:23.163774+0800", "processImagePath": "/kernel", "eventMessage": "[External]: I/O error [0xe00002ca] dir 0x1 lba 0x800 count 0x100, retry 20 ..."}
+{"timestamp": "2026-11-07 00:35:25.342861+0800", "processImagePath": "/kernel", "eventMessage": "disk8: I/O error."}

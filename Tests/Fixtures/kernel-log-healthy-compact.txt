@@ -1,0 +1,4 @@
+2026-11-06 23:54:03.209 Df log[78555:7e1df] [com.apple.log:] log run noninteractively, parent: 78553 (zsh), args: '/usr/bin/log' 'show' '--last' '1m' '--predicate' 'eventMessage CONTAINS "medium error"'
+2026-11-07 00:06:29.359 Df ms_ntfs.util[94112:866a4] do_probe entry, rdev: /dev/rdisk8s2, removeable: 1, writeable: 1
+2026-11-07 00:06:35.481 Df storagekitd[304:8680f] [com.apple.storagekit:general] -[SKDisk(DaemonAdditions) _cacheInfoWithDiskDescription:]: Caching disk8, isValid=0
+2026-11-07 00:06:48.678 Df Finder[831:833e8] [com.apple.DesktopServices:General] TNode::CFVolumeObserverCallback 1 <VOLUME>: file://<private> (/Volumes/<VOLUME>) disk8s2 (-123)
