@@ -58,7 +58,7 @@ public struct KernelLogCollector: Sendable {
 
     /// `--log-window` uses `log show`'s own compact forms; the SignalSet keeps
     /// whole hours, rounded up so a 30m query cannot claim 0 h.
-    static func windowHours(_ window: String) -> Int? {
+    public static func windowHours(_ window: String) -> Int? {
         let trimmed = window.trimmingCharacters(in: .whitespaces)
         guard trimmed.count > 1, let value = Int(trimmed.dropLast()), value > 0 else {
             return nil

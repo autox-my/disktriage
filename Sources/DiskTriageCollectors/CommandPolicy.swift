@@ -28,7 +28,10 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
         case .diskutilInfo(let disk):
             return ["/usr/sbin/diskutil", "info", "-plist", disk]
         case .ioregStatistics:
-            return ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-k", "Statistics", "-d", "1", "-w", "0"]
+            // `-k Statistics` prunes the child IOMedia entry on macOS 27.2, and
+            // without that entry the driver cannot be associated with a disk.
+            // The unfiltered query still carries the `Statistics` property.
+            return ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-w", "0"]
         case .ioregMedia:
             return ["/usr/sbin/ioreg", "-r", "-c", "IOMedia", "-d", "1", "-w", "0"]
         case .logShow(let last, let predicate):
@@ -93,6 +96,7 @@ public struct CommandPolicy: Sendable {
             switch args {
             case ["-r", "-c", "IOBlockStorageDriver", "-k", "Statistics"],
                  ["-r", "-c", "IOBlockStorageDriver", "-k", "Statistics", "-d", "1", "-w", "0"],
+                 ["-r", "-c", "IOBlockStorageDriver", "-w", "0"],
                  ["-r", "-c", "IOMedia", "-d", "1", "-w", "0"]:
                 return .allowed
             default:

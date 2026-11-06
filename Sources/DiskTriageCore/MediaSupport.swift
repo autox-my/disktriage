@@ -13,10 +13,16 @@ public enum MediaSupport {
 
     /// The label to show for unsupported media, or nil when triage applies.
     public static func unsupportedLabel(for device: DeviceSignals?) -> String? {
-        if let media = device?.media?.lowercased(), unsupportedMedia.contains(media) {
+        unsupportedLabel(media: device?.media, bus: device?.bus)
+    }
+
+    /// The same rule for collectors that hold a `DeviceIdentity` rather than a
+    /// `DeviceSignals` (the `list` command).
+    public static func unsupportedLabel(media: String?, bus: String?) -> String? {
+        if let media = media?.lowercased(), unsupportedMedia.contains(media) {
             return media
         }
-        if let bus = device?.bus?.lowercased(), bus == "nvme" {
+        if let bus = bus?.lowercased(), bus == "nvme" {
             return "NVMe"
         }
         return nil

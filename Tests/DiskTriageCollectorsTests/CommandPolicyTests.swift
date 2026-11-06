@@ -13,6 +13,7 @@ struct CommandPolicyTests {
             ["/usr/sbin/diskutil", "info", "-plist", "disk0"],
             ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-k", "Statistics"],
             ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-k", "Statistics", "-d", "1", "-w", "0"],
+            ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-w", "0"],
             ["/usr/sbin/ioreg", "-r", "-c", "IOMedia", "-d", "1", "-w", "0"],
             ["/usr/bin/log", "show", "--last", "1m", "--predicate", #"eventMessage CONTAINS "medium error""#],
             ["/usr/bin/log", "show", "--last", "6h", "--style", "ndjson", "--predicate", #"eventMessage CONTAINS "medium error""#],
