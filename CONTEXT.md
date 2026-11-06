@@ -1,4 +1,4 @@
-# CONTEXT.md — DiskDoctor glossary
+# CONTEXT.md — disktriage glossary
 
 Vocabulary only. Rules live in `AGENTS.md` and `docs/sdlc.md`; scope lives in
 `diskdoctor.md`.

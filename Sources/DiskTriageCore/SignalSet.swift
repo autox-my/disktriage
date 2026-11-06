@@ -216,7 +216,7 @@ public extension JSONDecoder {
     /// The canonical decoder for a `SignalSet`: ISO-8601 timestamps, UTC only.
     /// Collectors, fixtures and the CLI share this so a date never changes
     /// meaning between them.
-    static func diskDoctor() -> JSONDecoder {
+    static func disktriage() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder

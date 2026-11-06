@@ -1,6 +1,6 @@
 import Foundation
 
-/// Entry point for `swift run DiskDoctorCoreTests`.
+/// Entry point for `swift run DiskTriageCoreTests`.
 ///
 /// Output is TAP-like and ends with `Executed N tests, M failures`;
 /// `scripts/check.sh` fails closed when that line is missing or N is zero.

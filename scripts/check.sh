@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DiskDoctor gate — three outcomes, and the third is never a pass:
+# disktriage gate — three outcomes, and the third is never a pass:
 #
 #   0  PASS
 #   1  FAIL            (yours to fix)
@@ -10,12 +10,12 @@
 #
 # Build system: this machine's toolchain cannot initialise the default
 # `swiftbuild` engine ("Unknown error parsing property list", CLT-only
-# install), so the gate pins `native`. Override with DISKDOCTOR_BUILD_SYSTEM
+# install), so the gate pins `native`. Override with DISKTRIAGE_BUILD_SYSTEM
 # only if you are testing that change deliberately.
 #
 # Test runner: `/usr/bin/swift` from the Command Line Tools ships without
 # XCTest and without Swift Testing, so `swift test` cannot execute a suite
-# here. The suite is a dependency-free executable (Tests/DiskDoctorCoreTests)
+# here. The suite is a dependency-free executable (Tests/DiskTriageCoreTests)
 # and `swift test` replaces it the day the toolchain provides a framework.
 # See docs/sdlc.md.
 set -uo pipefail
@@ -36,7 +36,7 @@ if [ -z "$SWIFT_BIN" ] || [ ! -x "$SWIFT_BIN" ]; then
     exit 3
 fi
 
-BUILD_SYSTEM="${DISKDOCTOR_BUILD_SYSTEM:-native}"
+BUILD_SYSTEM="${DISKTRIAGE_BUILD_SYSTEM:-native}"
 LOG_DIR="$(mktemp -d)" || {
     echo "UNVERIFIABLE  cannot create a temporary directory"
     exit 3
@@ -59,7 +59,7 @@ run_build() {
 
 run_tests() {
     echo "== test =="
-    "$SWIFT_BIN" run --build-system "$BUILD_SYSTEM" DiskDoctorCoreTests >"$TEST_LOG" 2>&1
+    "$SWIFT_BIN" run --build-system "$BUILD_SYSTEM" DiskTriageCoreTests >"$TEST_LOG" 2>&1
     local rc=$?
     cat "$TEST_LOG"
     if [ "$rc" -ne 0 ]; then

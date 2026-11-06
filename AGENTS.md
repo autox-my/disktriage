@@ -1,12 +1,12 @@
-# AGENTS.md — DiskDoctor
+# AGENTS.md — disktriage
 
-DiskDoctor triages a failing disk from hardware signals, images it, and hands
+disktriage triages a failing disk from hardware signals, images it, and hands
 off. The plan is [`diskdoctor.md`](diskdoctor.md) (v3) and is the only source of
 scope; the SDLC is [`docs/sdlc.md`](docs/sdlc.md); vocabulary is
 [`CONTEXT.md`](CONTEXT.md). Where this file and `scripts/check.sh` disagree, the
 gate wins and the disagreement is a finding.
 
-`DiskDoctorCore` is a pure, portable library: no OS calls, no subprocesses, no
+`DiskTriageCore` is a pure, portable library: no OS calls, no subprocesses, no
 filesystem access. Collectors and the CLI live outside it. The classifier is a
 pure function over a `SignalSet`; everything else is plumbing.
 
@@ -16,8 +16,8 @@ pure function over a `SignalSet`; everything else is plumbing.
 |---|---|
 | The gate — run before handing back | `bash scripts/check.sh` |
 | Build | `swift build --build-system native` |
-| Tests | `swift run --build-system native DiskDoctorCoreTests` |
-| CLI (skeleton; commands land in P1) | `swift run --build-system native diskdoctor` |
+| Tests | `swift run --build-system native DiskTriageCoreTests` |
+| CLI (skeleton; commands land in P1) | `swift run --build-system native disktriage` |
 
 **Never read an exit status through a pipeline.** `cmd | tail` reports `tail`'s
 status. Capture `$?` on the command itself.
@@ -77,7 +77,7 @@ code, and so is the check that reads it.
   Commits are the human's unless the brief says otherwise; the human merges.
 - Report findings; do not widen scope. A new feature starts as a change to
   `diskdoctor.md`, not as code in passing.
-- Keep `DiskDoctorCore` free of OS assumptions so Linux can be a collector, not
+- Keep `DiskTriageCore` free of OS assumptions so Linux can be a collector, not
   a rewrite.
 
 ## Where things live
@@ -86,8 +86,8 @@ code, and so is the check that reads it.
 |---|---|---|
 | `diskdoctor.md` | the plan, v3 — scope and phase gates | only when the brief says so |
 | `docs/` | SDLC and requirement workflow | yes |
-| `Sources/DiskDoctorCore/` | `SignalSet`, `Verdict`, exit codes — pure | yes, test first |
-| `Sources/diskdoctor/` | thin CLI target | yes, test first |
-| `Tests/DiskDoctorCoreTests/` | the dependency-free suite | yes, test first |
+| `Sources/DiskTriageCore/` | `SignalSet`, `Verdict`, exit codes — pure | yes, test first |
+| `Sources/disktriage/` | thin CLI target | yes, test first |
+| `Tests/DiskTriageCoreTests/` | the dependency-free suite | yes, test first |
 | `Tests/Fixtures/` | golden `SignalSet` JSON (redacted only) | yes, with the test |
 | `scripts/` | the gate | yes, with a probe that proves it bites |

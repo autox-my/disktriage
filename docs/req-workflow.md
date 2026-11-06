@@ -1,6 +1,6 @@
 # Requirements workflow (`req`)
 
-DiskDoctor's requirements are **claims**: one obligation per file in `claims/`, authored by a
+disktriage's requirements are **claims**: one obligation per file in `claims/`, authored by a
 human, identified by a content address derived from the statement at load. The plan
 (`diskdoctor.md`) is the source; a claim records the obligation, not the plan's prose. `req` reads
 `claims/` and `aliases/subjects.yml` (the subject registry) from the repository root.
@@ -61,15 +61,15 @@ Two records, with different jobs:
 2. **The claim's `tests:` list**, holding the exact JUnit id, copied from the report — never
    retyped.
 
-The suite is the dependency-free runner (`Tests/DiskDoctorCoreTests`, TAP-like `ok N - name`),
+The suite is the dependency-free runner (`Tests/DiskTriageCoreTests`, TAP-like `ok N - name`),
 because this toolchain ships without XCTest and Swift Testing (see `docs/sdlc.md`). The JUnit id
 is therefore defined by an adapter that `scripts/` must gain:
 
-- `classname` = `DiskDoctorCoreTests.<file stem>`, e.g. `DiskDoctorCoreTests.ExitCodeTests`,
-  `DiskDoctorCoreTests.SignalSetTests`.
+- `classname` = `DiskTriageCoreTests.<file stem>`, e.g. `DiskTriageCoreTests.ExitCodeTests`,
+  `DiskTriageCoreTests.SignalSetTests`.
 - `name` = the test's own name string, verbatim.
 - id = `classname::name`, e.g.
-  `DiskDoctorCoreTests.ExitCodeTests::REQ-0038 precedence picks the most severe code`.
+  `DiskTriageCoreTests.ExitCodeTests::REQ-0038 precedence picks the most severe code`.
 
 So a new test names its primary claim first, and the tag carries the rest:
 
@@ -82,7 +82,7 @@ test("REQ-0038 precedence picks the most severe code") {
 
 ```yaml
 tests:
-  - "DiskDoctorCoreTests.ExitCodeTests::REQ-0038 precedence picks the most severe code"
+  - "DiskTriageCoreTests.ExitCodeTests::REQ-0038 precedence picks the most severe code"
 ```
 
 - **Fixtures:** golden `SignalSet` JSON lives in `Tests/Fixtures/<case>.json` and is replayed by a
@@ -131,7 +131,7 @@ These are open decisions or P0 verification tasks, not obligations; they are tra
 |---|---|
 | Implementation language | Open in the plan; `Package.swift` chooses Swift outside the corpus |
 | FDA process identity (Terminal vs app vs helper) | P0 result decides; the claims encode only degraded mode and the broad-grant warning |
-| Final product name | Open (name collides); `DISKDOCTOR` is a corpus-local subject id, not the bundle name |
+| Final product name | Decided 2026-11-06: `disktriage` (plan §13); `DISKTRIAGE` is a corpus-local subject id, not the bundle name |
 | Per-file damage attribution | v1 is volume-level (claimed); the NTFS runlist parser is a v1.1 plan, not an obligation |
 | Keep `copy`? | Open until P3; if cut, delete `REQ-0092`–`REQ-0095` and the §8 copy rule deliberately |
 

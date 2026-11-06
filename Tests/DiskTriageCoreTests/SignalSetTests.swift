@@ -1,5 +1,5 @@
 import Foundation
-import DiskDoctorCore
+import DiskTriageCore
 
 /// The MiNaH fixture is the real case from diskdoctor.md §11: pending 131,
 /// reallocated 14, medium error @ LBA 2048, a third-party NTFS driver, and no
@@ -9,7 +9,7 @@ import DiskDoctorCore
 @MainActor
 func signalSetTests() {
     test("SignalSet decodes the MiNaH fixture (plan §3, §11)") {
-        let set = try JSONDecoder.diskDoctor().decode(SignalSet.self, from: try minahData())
+        let set = try JSONDecoder.disktriage().decode(SignalSet.self, from: try minahData())
 
         try expectEqual(set.schemaVersion, 1, "schema_version")
         let expectedCollectedAt = try require(
@@ -89,7 +89,7 @@ func signalSetTests() {
           "smart": { "status": "denied" }
         }
         """
-        let set = try JSONDecoder.diskDoctor().decode(SignalSet.self, from: Data(json.utf8))
+        let set = try JSONDecoder.disktriage().decode(SignalSet.self, from: Data(json.utf8))
         let smart = try require(set.smart, "smart section")
 
         try expectEqual(smart.status, .denied, "smart.status")
@@ -106,7 +106,7 @@ func signalSetTests() {
           "smart": { "status": "probably-fine" } }
         """
         try expectThrows(
-            { _ = try JSONDecoder.diskDoctor().decode(SignalSet.self, from: Data(json.utf8)) },
+            { _ = try JSONDecoder.disktriage().decode(SignalSet.self, from: Data(json.utf8)) },
             "unknown smart.status"
         )
     }
@@ -116,7 +116,7 @@ func signalSetTests() {
 /// outside the test target without being copied into a bundle.
 private func minahData() throws -> Data {
     let url = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()   // DiskDoctorCoreTests
+        .deletingLastPathComponent()   // DiskTriageCoreTests
         .deletingLastPathComponent()   // Tests
         .appendingPathComponent("Fixtures/minah.json")
     return try Data(contentsOf: url)

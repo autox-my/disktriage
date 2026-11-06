@@ -5,9 +5,8 @@
 schema: req.subject_registry/0
 version: 1
 subjects:
-  DISKDOCTOR:
-    label: DiskDoctor
+  DISKTRIAGE:
+    label: disktriage
     aliases:
-      - diskdoctor
-      - the tool
       - disktriage
+      - the tool

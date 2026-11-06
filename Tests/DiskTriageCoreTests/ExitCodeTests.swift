@@ -1,4 +1,4 @@
-import DiskDoctorCore
+import DiskTriageCore
 
 /// Exit codes and their precedence are a contract from diskdoctor.md §5.
 /// The expectations below are transcribed from the plan's table, not derived

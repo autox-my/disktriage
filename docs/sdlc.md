@@ -1,4 +1,4 @@
-# The DiskDoctor SDLC — solo human, agents, one gate
+# The disktriage SDLC — solo human, agents, one gate
 
 `diskdoctor.md` is the plan and the source of scope. This file is how a change
 gets made: the loop, the gate's contract, and what "done" means. It is short on
@@ -25,7 +25,7 @@ bash scripts/check.sh        # 0 PASS · 1 FAIL · 3 UNVERIFIABLE
 - Grey is a finding, not a bug. Report what could not run and why.
 
 The gate runs `swift build` and then the test suite, prints both logs in full,
-and chooses one outcome. `DISKDOCTOR_BUILD_SYSTEM` exists only for a deliberate
+and chooses one outcome. `DISKTRIAGE_BUILD_SYSTEM` exists only for a deliberate
 toolchain experiment.
 
 ### Commands
@@ -34,8 +34,8 @@ toolchain experiment.
 |---|---|
 | The gate | `bash scripts/check.sh` |
 | Build | `swift build --build-system native` |
-| Tests | `swift run --build-system native DiskDoctorCoreTests` |
-| CLI (skeleton; P1 adds commands) | `swift run --build-system native diskdoctor` |
+| Tests | `swift run --build-system native DiskTriageCoreTests` |
+| CLI (skeleton; P1 adds commands) | `swift run --build-system native disktriage` |
 
 The `native` engine is pinned because the default `swiftbuild` engine cannot
 initialise on this machine (CLT-only toolchain, "Unknown error parsing property
@@ -86,7 +86,7 @@ core. A fixture is code: it is reviewed like code.
 - [ ] The load-bearing rule was mutation-checked (red, then restored green).
 - [ ] Fixture and expectation changed together, with the reason in the commit.
 - [ ] No absent signal became a zero; unknown stays `null` plus a status.
-- [ ] `DiskDoctorCore` contains no OS calls, no subprocesses, no filesystem reads.
+- [ ] `DiskTriageCore` contains no OS calls, no subprocesses, no filesystem reads.
 - [ ] Scope came from `diskdoctor.md`; no feature was invented in passing.
 - [ ] Docs updated in the same change if a rule or contract changed.
 - [ ] Commit uses a conventional prefix, files were staged by name, no secrets.

@@ -1,4 +1,4 @@
-# DiskDoctor — disk triage & rescue CLI
+# disktriage — disk triage & rescue CLI
 
 **Status:** draft plan v3 (revised after two reviews — see §14)
 **Date:** 2026-11-06
@@ -181,7 +181,7 @@ Root cause and aggravating factors are separate. Confidence follows the rules in
       "note": "third-party NTFS driver claims the volume; may block on retrying reads" }
   ],
   "verdict": { "code": 10, "headline": "degrading, not dead; extent of loss unknown until imaged" },
-  "next": { "command": "diskdoctor image disk4 --to /Volumes/Scratch/minah.img",
+  "next": { "command": "disktriage image disk4 --to /Volumes/Scratch/minah.img",
             "why": "reading the platter once is the only step that cannot be lost to further degradation" }
 }
 ```
@@ -314,13 +314,13 @@ verdict can be formed; otherwise they are reported as signal statuses.
 ## 6. CLI
 
 ```
-diskdoctor list                      # devices, one health line each
-diskdoctor guard                     # hold mounts for new/attached disks; run BEFORE plugging in
-diskdoctor triage <disk>             # decision tree; --json; --symptom/--tried flags
-diskdoctor image <disk> --to <file>  # ddrescue wrapper: mapfile, resume, verify; --dry-run prints the command
-diskdoctor inspect <image>           # mount the IMAGE read-only, native driver
-diskdoctor copy <image> --to <dir>   # hashed copy + manifest; volume-level damage report
-diskdoctor check                     # permissions & tooling self-test
+disktriage list                      # devices, one health line each
+disktriage guard                     # hold mounts for new/attached disks; run BEFORE plugging in
+disktriage triage <disk>             # decision tree; --json; --symptom/--tried flags
+disktriage image <disk> --to <file>  # ddrescue wrapper: mapfile, resume, verify; --dry-run prints the command
+disktriage inspect <image>           # mount the IMAGE read-only, native driver
+disktriage copy <image> --to <dir>   # hashed copy + manifest; volume-level damage report
+disktriage check                     # permissions & tooling self-test
 ```
 
 Properties:
@@ -401,7 +401,7 @@ Deep link:
   before the first signed build.
 - **MDM path documented**, not built: PPPC payload with `kTCCServiceSystemPolicyAllFiles` for fleets.
 
-### Self-test (`diskdoctor check`)
+### Self-test (`disktriage check`)
 
 | Check | Expectation |
 |---|---|
@@ -617,9 +617,11 @@ produce it. Timestamps render in UTC unless `--local` is passed, so the test is 
 
 ## 13. Naming & distribution
 
-"DiskDoctor" collides with Norton Disk Doctor and several commercial tools — check before
-committing, and **before the first signed build**, since the bundle identifier is permanent for
-TCC. Candidates: `disktriage`, `sickdisk`, `fsck-before-mount`, `drd`.
+The original name, "DiskDoctor", collides with Norton Disk Doctor and an Amiga tool, which is why
+it was never committed to. Decision (2026-11-06): renamed to `disktriage`. Known overlap: three
+unrelated small GitHub repos are named DiskTriage; github.com/disktriage is unclaimed; Homebrew has
+no formula of that name. Bundle identifier is still not fixed and must be decided before the first
+signed build, since the bundle identifier is permanent for TCC.
 
 Distribution: Homebrew tap first, signed `.app` wrapper later. Triage depends on `smartctl`
 (smartmontools) and imaging on `ddrescue`; the formula declares both. A bootable Linux rescue image
@@ -629,6 +631,11 @@ product, and awkward on Apple Silicon.
 ---
 
 ## 14. Revision history
+
+**v3.1 (2026-11-06), naming:**
+
+- Renamed the product to `disktriage`; the CLI, library target and test runner follow. No plan
+  content changed beyond the name (§13).
 
 **v3 (2026-11-06), after second review:**
 
@@ -670,7 +677,7 @@ Rendered from the MiNaH fixture: first sight of the drive, so there is no histor
 trend line.
 
 ```
-$ diskdoctor triage disk4
+$ disktriage triage disk4
 
 DEVICE   disk4                              whole disk, 298.1 GiB
 MODEL    WDC WD3200BJKT-75F4T0
@@ -716,18 +723,18 @@ VERDICT
   has been imaged. Do not mount it again.
 
 NEXT  (~3–4 h, estimated from size and bus speed)
-  diskdoctor image disk4 --to /Volumes/Scratch/minah.img
+  disktriage image disk4 --to /Volumes/Scratch/minah.img
   (you will be asked to type the last four of the serial: 6789)
 
 THEN
-  diskdoctor inspect minah.img      # read-only, native, no third-party driver
-  diskdoctor copy   minah.img --to ~/Archive   # hashed copy + volume-level damage report
+  disktriage inspect minah.img      # read-only, native, no third-party driver
+  disktriage copy   minah.img --to ~/Archive   # hashed copy + volume-level damage report
 ```
 
 Degraded (no FDA):
 
 ```
-$ diskdoctor image disk4 --to ...
+$ disktriage image disk4 --to ...
   ! raw device access denied (TCC)
     Triage completed without it: verdict still MEDIA.
     Imaging needs Full Disk Access for the process that runs it
