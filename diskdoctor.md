@@ -397,7 +397,7 @@ that `ddrescue`, as a child process, inherits the grant under each option.
 ### State machine
 
 ```
-UNKNOWN ──probe(512B read)──▶ GRANTED ──probe──▶ VERIFIED
+UNKNOWN ──probe(4096B read)──▶ GRANTED ──probe──▶ VERIFIED
    │                              │
    └──────────────▶ DENIED ◀──────┘
                      │
@@ -414,7 +414,9 @@ Deep link:
 ### Rules
 
 - **Never claim granted.** Probe with a real read every run; a stale flag is worse than no flag.
-- **Probe without touching the suspect disk.** Read 512 B from the *internal* disk's raw node;
+- **Probe without touching the suspect disk.** Read **4096 B** (block-aligned; Apple's internal storage
+  has a 4096-byte block and a 512 B raw read can fail with `EINVAL` after access was granted, P0 phase A)
+  from the *internal* disk's raw node;
   fall back to the target only if that is not possible. (Verify in P0.)
 - **Distinguish the failure.** `EPERM` (TCC / FDA) and `EACCES` (Unix permissions → needs sudo)
   are different states with different instructions. (P0: confirm which errno TCC returns.)
@@ -714,6 +716,12 @@ product, and awkward on Apple Silicon.
 ---
 
 ## 14. Revision history
+
+**v3.6 (2026-11-07), after the `check` command:**
+
+- The FDA probe reads 4096 bytes, not 512 (measured in P0 phase A); REQ-0063 reworded to match.
+- Errno semantics in the state machine: EPERM = Full Disk Access missing, EACCES = access granted but
+  not root, EINVAL = access worked.
 
 **v3.5 (2026-11-07), after P0 row 11 (synthetic):**
 

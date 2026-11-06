@@ -2,14 +2,16 @@
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0063
-statement: "The permission probe shall read a 512-byte block from an internal disk raw node and touch the suspect disk only when that is not possible."
+statement: "The permission probe shall read a 4096-byte aligned block from an internal disk raw node and touch the suspect disk only when that is not possible."
 applicability: []
 relations: []
 rationale:
   source: diskdoctor.md#L390
   date: 2026-11-06
-  rejected_alternatives: []
-  assumptions: []
+  rejected_alternatives:
+    - "512-byte read: can fail with EINVAL on Apple's 4096-byte internal block after access was granted (P0 phase A)"
+  assumptions:
+    - "the internal disk's raw node is readable once Full Disk Access is granted and the caller is root"
 pins:
   value: "512"
   unit: "byte"

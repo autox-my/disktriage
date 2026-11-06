@@ -10,3 +10,9 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.CheckCommandTests::REQ0061_REQ0067_REQ0068_deniedExitsOne()"
+  - "DiskTriageCollectorsTests.CheckRunnerTests::REQ0061_REQ0062_deniedRunIsNotCached()"
+  - "DiskTriageCoreTests.CheckReportTests::REQ0061_jsonCarriesTheVerdict()"
+  - "DiskTriageCoreTests.FDAStateTests::REQ0061_REQ0067_REQ0068_EPERMIsDeniedAndNamesTheTerminal()"
+  - "DiskTriageCoreTests.FDAStateTests::REQ0061_noProbeIsNeverGranted()"

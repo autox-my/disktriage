@@ -12,3 +12,6 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.CheckCommandTests::REQ0062_runsAreReProbed()"
+  - "DiskTriageCollectorsTests.CheckRunnerTests::REQ0061_REQ0062_deniedRunIsNotCached()"
