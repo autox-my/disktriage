@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.RendererTests::`REQ-0059 the MiNaH tty transcript is byte-for-byte the Appendix`()"

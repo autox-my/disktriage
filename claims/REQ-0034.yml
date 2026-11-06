@@ -13,3 +13,6 @@ rationale:
 pins:
   value: "13"
   unit: "none"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0034 filesystem-only damage exits 13`()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0034 filesystem-only damage exits 13`()"

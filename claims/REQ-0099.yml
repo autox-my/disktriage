@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCoreTests.RendererTests::`REQ-0099 the tty says the loss extent is unknown, never a number`()"

@@ -14,3 +14,5 @@ pins:
   operator: "GE"
   value: "2"
   unit: "none"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0025 MiNaH is MEDIA at high confidence because two sources agree`()"

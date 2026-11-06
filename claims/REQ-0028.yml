@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0028 pending, reallocated and uncorrectable are one source, not three`()"

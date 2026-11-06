@@ -13,3 +13,6 @@ rationale:
 pins:
   value: "11"
   unit: "none"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0032 resets plus clicking is HEAD, exit 11`()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0032 resets plus clicking is HEAD, exit 11`()"

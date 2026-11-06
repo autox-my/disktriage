@@ -14,4 +14,6 @@ pins:
   value: "20"
   unit: "none"
 tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0035 all collectors timing out is UNKNOWN, not a zero and not a crash`()"
   - "DiskTriageCoreTests.ExitCodeTests::REQ0035_noFindingsIsInsufficientEvidence()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0035 all collectors timed out is UNKNOWN, exit 20`()"

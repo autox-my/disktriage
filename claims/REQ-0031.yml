@@ -13,3 +13,8 @@ rationale:
 pins:
   value: "10"
   unit: "none"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0031 a kernel medium error survives a hidden SMART and reaches MEDIA medium`()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0031 MiNaH is MEDIA high, DRIVER aggravator, exit 10`()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0031 a hidden SMART does not hide the kernel log: MEDIA medium, exit 10`()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0031 reallocated rising against a synthetic snapshot exits 10`()"

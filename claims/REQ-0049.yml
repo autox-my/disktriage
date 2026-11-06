@@ -10,3 +10,7 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0049 unsupported media is not classified but imaging stays offered`()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0049 NVMe is unsupported but imaging is still offered`()"
+  - "DiskTriageCoreTests.RendererTests::`REQ-0049 the tty states that unsupported media is not classified`()"

@@ -11,4 +11,5 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0041 a denied permission is a status, not the verdict, when a verdict exists`()"
   - "DiskTriageCoreTests.ExitCodeTests::REQ0041_aVerdictOutranksACollectionFailure()"

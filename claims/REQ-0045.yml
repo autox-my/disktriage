@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0045 an inconclusive result does not block imaging`()"

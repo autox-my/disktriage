@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0029 I/O statistics are displayed but not counted until P0 validates them`()"

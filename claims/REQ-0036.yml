@@ -14,4 +14,6 @@ pins:
   value: "21"
   unit: "none"
 tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0036 SMART denied and not root exits 21 only when no verdict exists`()"
   - "DiskTriageCoreTests.ExitCodeTests::REQ0036_REQ0037_aCollectionFailureIsUsedOnlyWhenNoVerdictExists()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0036 SMART denied and not root exits 21`()"

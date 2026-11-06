@@ -13,3 +13,6 @@ rationale:
 pins:
   value: "0"
   unit: "none"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0039 a low-confidence MEDIA exits 0 with a warning`()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0039 stable reallocated 5 with no history is MEDIA low, exit 0`()"

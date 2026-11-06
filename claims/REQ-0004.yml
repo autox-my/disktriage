@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0004 insufficient evidence is a verdict with a message and a prescription`()"

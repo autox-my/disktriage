@@ -13,3 +13,5 @@ rationale:
 pins:
   value: "2"
   unit: "none"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0026 one strong symptom is medium confidence, not high`()"

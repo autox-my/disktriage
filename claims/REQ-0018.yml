@@ -11,4 +11,5 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0018 a null history never fires the rising-reallocated rule`()"
   - "DiskTriageCoreTests.SignalSetTests::REQ0015_REQ0018_REQ0020_REQ0024_decodesTheMiNaHFixture()"

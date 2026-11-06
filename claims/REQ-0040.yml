@@ -10,3 +10,7 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0040 a clean exit still reports the third-party driver aggravator`()"
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0040 two faults keep both findings in the JSON whatever the exit code`()"
+  - "DiskTriageCoreTests.RendererTests::`REQ-0040 the JSON carries every finding whatever the exit code`()"

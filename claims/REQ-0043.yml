@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.RendererTests::`REQ-0043 the degraded no-FDA block matches the Appendix`()"

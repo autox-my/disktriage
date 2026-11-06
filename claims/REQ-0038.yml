@@ -11,6 +11,8 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0038 precedence keeps 11 above 10 when HEAD and MEDIA both apply`()"
   - "DiskTriageCoreTests.ExitCodeTests::REQ0038_precedenceDoesNotDependOnInputOrder()"
   - "DiskTriageCoreTests.ExitCodeTests::REQ0038_precedencePicksTheMostSevere()"
   - "DiskTriageCoreTests.ExitCodeTests::REQ0038_verdictAdoptsTheMostSevereCode()"
+  - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0038 MEDIA plus BRIDGE keeps both findings and exits 10`()"
