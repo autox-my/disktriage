@@ -384,14 +384,15 @@ TO 20  diskutil info -plist /dev/diskN | grep -A1 -E 'FilesystemType|MountPoint'
 ```
 
 ```sh
-TO 120 swiftc -O -framework DiskArbitration captures/dadissent.swift -o captures/dadissent
-TO 600 ./captures/dadissent > captures/q5-dissent.log 2>&1 &
+TO 120 ./tools/p0/build-dadissent.sh                     # -> captures/dadissent (ad-hoc signed)
+sudo -v                                                  # authenticate: the approval callback must run as root
+TO 600 sudo -n captures/dadissent --seconds 600 > captures/q5-dissent.log 2>&1 &
 # with it running, plug the control disk / attach the NTFS volume via E1
 TO 600  diskutil activity > captures/q5-da-activity.log 2>&1 &   # continuous; kill after
 TO 20  mount | grep -i ntfs > captures/q5-mount.txt; echo "rc=$?"
 TO 20  ioreg -r -c IOMedia -d 1 -w 0 | grep '"BSD Name"'
 ```
-Expect if row 5 is yes: `dissent diskN` lines, no `/Volumes/*` mount, and the
+Expect if row 5 is yes: `decision … verdict=dissent` lines, no `/Volumes/*` mount, and the
 driver's own mount attempt failing (`kDAReturnExclusiveAccess`) in the DA activity
 log. Expect if no: the volume appears mounted anyway — record which driver did it.
 
@@ -400,7 +401,7 @@ log. Expect if no: the volume appears mounted anyway — record which driver did
   disable-driver instructions or downgrade the principle honestly.
 
 Stop the listeners explicitly — killing the `TO` wrapper does not kill its child:
-`pkill -f 'captures/dadissent'; pkill -f 'diskutil activity'` — then eject.
+`sudo pkill -f 'captures/dadissent'; pkill -f 'diskutil activity'` — then eject.
 
 ### B4 — `F_LOG2PHYS_EXT` on the native read-only NTFS mount — row 4
 
@@ -610,9 +611,9 @@ raise the timeout, do not "try once more".
 | Host model, arch, `sw_vers` build | MacBook Air M1 (MacBookAir10,1), arm64, macOS 27.2 build 26B123 |
 | Xcode version | 27.2 (27B52), Swift 6.4.2 |
 | Terminal app + version | Ghostty 1.4.0 |
-| Control disk model / serial / size | |
+| Control disk model / serial / size | Seagate Expansion (USB bridge VID:PID 0bc2:231a), 5.0 TB, 512 B blocks, GPT, NTFS data partition; model and serial not readable (no SMART) |
 | Scratch volume, free space | |
-| E1 bridge name / VID:PID | |
+| E1 bridge name / VID:PID | Seagate Expansion built-in bridge, 0bc2:231a (only bridge available; E2 not tested) |
 | E2 bridge name / VID:PID | |
 | Third-party NTFS driver(s) (`listFilesystems`, `/Library/Filesystems`, `/Library/Extensions`) | `iboysoft_NTFS` personality; `/Library/Filesystems/iboysoft_NTFS.fs`; `/Library/Extensions/ms_ntfs.kext` (also CIJUSBLoad.kext, SoftRAID.kext) |
 | Native `mount_ntfs` present? (A2) | **No.** `man -w mount_ntfs` rc=1; `ntfs.fs/Contents/Resources` has `ntfs.util` and `BootCampFormatter`, no mount helper. Row 4 is answered by absence. |
@@ -622,16 +623,16 @@ raise the timeout, do not "try once more".
 
 | # | Question | Answer (yes / no / unproven) | Evidence file (`captures/…`) | Decision taken (quote the branch applied) |
 |---|---|---|---|---|
-| 1 | `smartctl -d sat` over USB; TCC/root needed? | | `q1-e1-*`, `q1-e2-*` | |
-| 2 | `ioreg` exposes real retries/timeouts for USB disks? | | `q2-before-e1.txt`, `q2-after-e1.txt`, `q2-before-e2.txt`, `q2-after-e2.txt` | |
-| 3 | Unified log retains medium errors with LBAs, and for how long? | | `q3-log-stats.txt`, `q3-medium-errors.ndjson`, `c3-medium-errors.ndjson` | |
+| 1 | `smartctl -d sat` over USB; TCC/root needed? | **no, and not because of TCC or root.** As root with Ghostty granted, every device type fails: `-d sat` and `-d scsi` give "Not a device of type 'scsi'", `-d auto` and `-d ata` give "Operation not supported by device" (smartctl exit 1 or 2). `diskutil` also reports `SMARTStatus: Not Supported`. | `phase-b/q1-*` | Branch applied (if-no, bridge or OS cause): `BRIDGE` / no-SMART is the common path; confidence loses the SMART source on such disks; FDA is NOT on the critical path for triage. Only one bridge tested, so "this bridge" vs "macOS-wide" is unresolved (E2 needed). |
+| 2 | `ioreg` exposes real retries/timeouts for USB disks? | **yes, counters are real, but there is no timeouts counter.** The Seagate's `IOBlockStorageDriver` Statistics tracked a 64 MiB read exactly: Bytes (Read) +67,108,864 and Operations (Read) +64. Available for Read and Write: Bytes, Operations, Total Time, Latency Time, **Retries**, **Errors**. Retries and Errors stayed 0 on a healthy disk; that they move on bad media is UNVERIFIED until the MiNaH capture. | `phase-b/q2-before.txt`, `q2-after.txt`, `q2-dd.txt` | Branch (if-yes) applied provisionally: Retries and Errors are a candidate independent source, but keep `p0_validated` off until MiNaH shows them moving. Drop "timeouts" from the I/O model or source it from the kernel log. |
+| 3 | Unified log retains medium errors with LBAs, and for how long? | **unproven** (a healthy disk has none). Side evidence: `log show` works without root; `log stats --overview` hung past the 60 s timeout (exit 124, empty output; the wrapper killed it and no process was left), so do not use it to measure retention. | `phase-b/q3-log-show.txt`, `q3-log-stats.txt` | Branch (if-no, provisional): re-query after the MiNaH capture; do not claim the no-SMART path has a log signal until then. |
 | 4 | `F_LOG2PHYS_EXT` works on the native read-only NTFS mount? | **no, by absence** (A2) | `a2.txt` | Branch applied: volume-level reporting in v1; NTFS runlist parser for v1.1. Also raises the plan question: no native NTFS reader exists on this macOS build (see below). |
 | 5 | DiskArbitration dissent blocks third-party driver mounts? | | `q5-dissent.log`, `q5-da-activity.log`, `q5-mount.txt` | |
-| 6 | ddrescue child inherits the TCC grant under option A? | **unproven** (B0 not run). Mechanism half answered in A4: a compiled, ad-hoc-signed `.app` holds its own grant (EPERM 1 -> EACCES 13 once granted) while Ghostty, ungranted, stays EPERM; a shell-script app executable holds no grant. | `fda-probe-app.txt`, `a3-errno.md` | Pending B0. |
+| 6 | ddrescue child inherits the TCC grant under option A? | **yes** for the sudo-launched path: `sudo ddrescue` run from Ghostty with Full Disk Access read `/dev/rdisk8` (16 MiB, 0 errors). Mechanism half answered in A4: a compiled, ad-hoc-signed `.app` holds its own grant (EPERM 1 -> EACCES 13 once granted) while Ghostty, ungranted, stays EPERM; a shell-script app executable holds no grant. | `phase-b/q6.*`, `fda-probe-app.txt`, `a3-errno.md` | Option A (Terminal) survives for sudo-launched children. Untested: a child of the signed `.app` helper (options B and C). |
 | 7 | TCC errno (`EPERM`) differs from Unix (`EACCES`)? | **no, as the runbook defined it**: ungranted, non-root and root both return EPERM (1). **But** once TCC passes, a non-root open returns EACCES (13) (app test). TCC is evaluated before Unix permissions. | `a3-errno.md`, `fda-probe-app.txt` | Branch applied (if-no): single `denied` state, both remedies. Refinement: EPERM => grant FDA first; EACCES => FDA is fine, run as root. |
 | 8 | Raw read of the internal disk works as an FDA probe? | **yes** (root + Ghostty granted: `read ok: 4096 bytes`; `dd bs=4096` ok) | `a3-errno.md` | Branch applied (if-yes): probe the internal node, off the suspect disk. Use a 4096-byte aligned read. |
-| 9 | ddrescue on macOS: direct I/O, sector size, `/dev/rdiskN`, `-O`, `-K`? | | `q9-*.img`, `q9-*.mapfile`, `ddrescue-help.txt` | |
-| 10 | `diskutil`/`smartctl` hang on a failing disk; timeout + kill work? | | `b5-timeout.log`, `c3-smart.txt`, `c3-diskutil.txt`, `c3-stats-after.txt`, `c5-session.md` | |
+| 9 | ddrescue on macOS: direct I/O, sector size, `/dev/rdiskN`, `-O`, `-K`? | **partly no:** `-d` (direct) fails ("Direct disc access not available", exit 1), so it must not be used. Plain, `-b 4096`, `-n -O -K 65536`, and the buffered `/dev/disk8` node all exit 0, and all four 16 MiB images are byte-identical to a `dd` reference (same SHA-256). | `phase-b/q9-*`, `ddrescue-help.txt` | Wrapper defaults: use `/dev/rdiskN`, no `-d`, `-b` = device block size; `-O` and `-K` are accepted. Reopen-on-bus-drop itself is UNVERIFIED (needs a real drop). |
+| 10 | `diskutil`/`smartctl` hang on a failing disk; timeout + kill work? | **unproven for the failing-disk case.** The apparatus works: the `TO` wrapper killed a real slow command (`log stats`, exit 124, no survivor). | `phase-b/q3-log-stats.txt` | Pending Phase C. |
 
 Closing decision (plan §9): process identity for FDA = A / B / C, plus the chosen
 implementation language. Write it here, with the row that forced it:
@@ -658,3 +659,17 @@ Open questions carried into P1: ______
   (`mount_ntfs`) need a decision: third-party reader on the image only, own parser, or NTFS
   inspection unsupported here.
 - **Raw reads need block alignment**: probes use 4096 bytes.
+
+
+### Phase B findings (2026-11-07, control disk: Seagate Expansion 5 TB)
+
+- **SMART is not reachable through smartctl on macOS 27.2 with this Seagate bridge**, even as root
+  with Full Disk Access. The cause is the OS or bridge path, not permissions. A third-party SAT SMART
+  driver is the known workaround and would conflict with the no-driver principle; not pursued.
+  Triage must therefore work without SMART (kernel log, ioreg I/O statistics, symptoms) and say so.
+- **ioreg Statistics are real and consistent** (a 64 MiB read moved Bytes (Read) by exactly 64 MiB
+  and Operations (Read) by 64), including Retries and Errors counters. There is no timeouts counter.
+- **At plug-in macOS runs the third-party driver's probe before any tool can act**:
+  `ms_ntfs.util -p disk8s2 removable readonly` and `SystemUIServer ... premount disk8s2` appear in
+  the log. Direct evidence that `guard` must already be running before connection (principle 1).
+- **ddrescue on macOS:** no `-d`; use the raw node; images match `dd` byte for byte.
