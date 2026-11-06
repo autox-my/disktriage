@@ -8,13 +8,17 @@ import DiskTriageCollectors
 /// P2a is dry-run only: it collects the live triage signals, checks the
 /// source identity and the destination, and prints the exact `ddrescue`
 /// command. It never executes ddrescue and never writes a file.
+/// `limitBytesOverride` is the test seam for the byte limit. The CLI exposes
+/// only whole GiB (`--limit`), so a test can drive a sub-GiB limit through the
+/// same code path without inventing a fractional CLI flag (REQ-0101).
 func image(
     _ arguments: [String],
     executor: any CommandExecuting,
     now: @escaping () -> Date,
     destinationProbe: (any ImageDestinationProbing)?,
     writeFile: (String, Data) throws -> Void,
-    imaging: ImagingDependencies?
+    imaging: ImagingDependencies?,
+    limitBytesOverride: Int64? = nil
 ) -> CLIResult {
     if arguments.contains("--help") || arguments.contains("-h") {
         return help(imageUsage)
@@ -51,6 +55,16 @@ func image(
                 return usageError("--confirm-size '\(value)' is not a positive integer of GiB")
             }
             options.confirmSize = size
+            index += 2
+        case "--limit":
+            guard index + 1 < arguments.count else {
+                return usageError("--limit needs a whole number of GiB")
+            }
+            let value = arguments[index + 1]
+            guard let gib = Int64(value), limitBytesForGiB(gib) != nil else {
+                return usageError("--limit '\(value)' is not a positive whole number of GiB")
+            }
+            options.limitGiB = gib
             index += 2
         case "--dry-run":
             options.sawDryRun = true
@@ -114,6 +128,20 @@ func image(
     }
     let source = ImageSource(identity: identity)
 
+    // The limit is resolved against the whole device: a limit at or above the
+    // device is the full device, never a partial image (REQ-0101). The test
+    // seam supplies bytes; the CLI supplies whole GiB.
+    let requestedLimitBytes = limitBytesOverride
+        ?? options.limitGiB.flatMap(limitBytesForGiB)
+    let partialLimitBytes = recordedLimitBytes(
+        deviceBytes: source.sizeBytes,
+        limitBytes: requestedLimitBytes
+    )
+    let imageBytes = effectiveImageBytes(
+        deviceBytes: source.sizeBytes,
+        limitBytes: requestedLimitBytes
+    )
+
     // A triage attempt is required, not a successful verdict (REQ-0044).
     // Inconclusive (exit 20) and hidden SMART never block (REQ-0045).
     var verdict: Verdict?
@@ -139,7 +167,11 @@ func image(
 
     let facts = (destinationProbe ?? SystemImageDestinationProbe(executor: executor))
         .probe(destination: destination, mapfile: mapfile)
-    let checks = assessDestination(facts: facts, source: source)
+    let checks = assessDestination(
+        facts: facts,
+        source: source,
+        limitBytes: requestedLimitBytes
+    )
 
     let confirmation = confirmationState(options: options, source: source)
 
@@ -151,11 +183,12 @@ func image(
             rawDevice: rawDeviceNode(for: source.bsd),
             image: destination,
             mapfile: mapfile,
-            blockSize: blockSize
+            blockSize: blockSize,
+            limitBytes: partialLimitBytes
         )
         let bus = assumedBusSpeed(bus: source.bus)
         eta = etaRange(
-            deviceBytes: size,
+            deviceBytes: imageBytes ?? size,
             lowBytesPerSecond: bus.lowBytesPerSecond,
             highBytesPerSecond: bus.highBytesPerSecond,
             basis: bus.basis
@@ -214,7 +247,9 @@ func image(
             noGuardCheck: options.noGuardCheck,
             override: options.override,
             confirmSerial: options.confirmSerial,
-            confirmSize: options.confirmSize
+            confirmSize: options.confirmSize,
+            limitBytes: requestedLimitBytes,
+            limitGiB: options.limitGiB
         )
         return runImaging(
             plan,
@@ -239,6 +274,7 @@ func image(
             confirmation: confirmation,
             eta: eta,
             passes: passes,
+            partialLimitBytes: partialLimitBytes,
             reasons: reasons
         )
         return CLIResult(
@@ -261,6 +297,7 @@ func image(
         confirmation: confirmation,
         eta: eta,
         passes: passes,
+        partialLimitBytes: partialLimitBytes,
         reasons: reasons
     )
     return CLIResult(
@@ -278,6 +315,7 @@ private struct ImageOptions {
     var mapfile: String?
     var confirmSerial: String?
     var confirmSize: Int64?
+    var limitGiB: Int64?
     var override = false
     var acceptRisk = false
     var noGuardCheck = false
@@ -348,6 +386,7 @@ private func renderTTY(
     confirmation: ConfirmationState,
     eta: ETARange?,
     passes: [DdrescuePass],
+    partialLimitBytes: Int64?,
     reasons: [String]
 ) -> String {
     var lines: [String] = []
@@ -358,6 +397,13 @@ private func renderTTY(
     lines.append(field("MODEL", source.model ?? "unknown"))
     lines.append(field("SERIAL", source.serial ?? "unreadable (confirm by size)"))
     lines.append(field("SIZE", sizeDetail(source.sizeBytes)))
+    if let limit = partialLimitBytes {
+        lines.append(field(
+            "LIMIT",
+            "PARTIAL (\(gib(limit)) of \(gib(source.sizeBytes))); "
+                + "ddrescue reads only the first \(gib(limit))"
+        ))
+    }
     if let bus = source.bus { lines.append(field("BUS", bus)) }
     if let media = source.media { lines.append(field("MEDIA", media)) }
 
@@ -419,11 +465,12 @@ private func renderTTY(
 
     if let eta {
         lines.append("")
-        lines.append(field(
-            "ETA",
-            "\(durationRange(low: eta.lowSeconds, high: eta.highSeconds)) pass 1 only, "
-                + "\(eta.basis); pass 2 adds time for unreadable regions."
-        ))
+        var text = "\(durationRange(low: eta.lowSeconds, high: eta.highSeconds)) pass 1 only, "
+            + "\(eta.basis); pass 2 adds time for unreadable regions."
+        if let limit = partialLimitBytes {
+            text += " Partial: the first \(gib(limit)) of \(gib(source.sizeBytes)) only."
+        }
+        lines.append(field("ETA", text))
     }
 
     lines.append("")
@@ -440,7 +487,11 @@ private func renderTTY(
 
     lines.append("")
     if status == "ok" {
-        lines.append("RESULT    ok; dry-run printed the plan and executed nothing")
+        var text = "ok"
+        if let limit = partialLimitBytes {
+            text += "; the image is PARTIAL (\(gib(limit)) of \(gib(source.sizeBytes)))"
+        }
+        lines.append("RESULT    \(text); dry-run printed the plan and executed nothing")
     } else {
         lines.append("RESULT    \(status) (\(reasons.count) reason\(reasons.count == 1 ? "" : "s")); "
             + "dry-run printed the plan and executed nothing")
@@ -490,6 +541,7 @@ private func renderJSON(
     confirmation: ConfirmationState,
     eta: ETARange?,
     passes: [DdrescuePass],
+    partialLimitBytes: Int64?,
     reasons: [String]
 ) -> String {
     struct Document: Encodable {
@@ -501,12 +553,25 @@ private func renderJSON(
         let destination: Destination
         let confirmation: Confirmation
         let eta: ETA?
+        let limit: Limit?
         let passes: [String]
         let reasons: [String]
 
         enum CodingKeys: String, CodingKey {
             case dryRun = "dry_run"
-            case status, source, triage, caveat, destination, confirmation, eta, passes, reasons
+            case status, source, triage, caveat, destination, confirmation, eta, limit, passes, reasons
+        }
+
+        struct Limit: Encodable {
+            let bytes: Int64
+            let partial: Bool
+            let deviceBytes: Int64
+            let description: String
+
+            enum CodingKeys: String, CodingKey {
+                case bytes, partial, description
+                case deviceBytes = "device_bytes"
+            }
         }
 
         struct Source: Encodable {
@@ -610,6 +675,15 @@ private func renderJSON(
             satisfied: confirmation.satisfied
         ),
         eta: eta.map { Document.ETA(lowSeconds: $0.lowSeconds, highSeconds: $0.highSeconds, basis: $0.basis) },
+        limit: {
+            guard let limit = partialLimitBytes, let device = source.sizeBytes else { return nil }
+            return Document.Limit(
+                bytes: limit,
+                partial: true,
+                deviceBytes: device,
+                description: "PARTIAL (\(gib(limit)) of \(gib(device)))"
+            )
+        }(),
         passes: passes.map(\.line),
         reasons: reasons
     )
@@ -634,6 +708,8 @@ private let imageUsage = "usage: disktriage image <disk> --to <file> [options]\n
     + "  --mapfile <path>        ddrescue mapfile, default <image>.mapfile\n"
     + "  --confirm-serial <4>    the last four characters of the serial\n"
     + "  --confirm-size <GiB>    the size, when the serial is unreadable\n"
+    + "  --limit <GiB>           image only the first N GiB (partial); the\n"
+    + "                          confirmation still names the whole device\n"
     + "  --override              skip the triage-attempt requirement explicitly\n"
     + "  --dry-run               print the command; do not execute (default)\n"
     + "  --no-dry-run            run the two passes; needs root and --accept-risk\n"

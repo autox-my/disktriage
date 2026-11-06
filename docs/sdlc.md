@@ -126,6 +126,28 @@ written and flushed when it is made, because a guard runs for minutes.
 - "Complete" means both passes exited 0. Bad sectors can remain (`-` extents);
   they are reported as bad bytes and are zero-filled in the image, not treated
   as an incomplete run.
+- **`image --limit <GiB>` is partial imaging.** The value is a positive whole
+  number of GiB (2^30 bytes); zero, a fraction, a negative number, a non-number
+  or a missing value is a **usage error (2)**. A limit at or above the device
+  size is the full device, so it is not labelled partial and carries no `-s`.
+  When partial, both ddrescue passes get `-s <bytes>`; the human plan and the
+  JSON plan say `PARTIAL (N GiB of M GiB)`; the free-space gate checks the
+  limit while still naming the whole device; and the ETA is for the limit.
+- The **size confirmation is still the whole device** (`--confirm-size <GiB>` or
+  the serial's last four), never the limit: the limit is how much is read, not
+  which disk it is.
+- The sidecar records `limit_bytes` (absent for a full image). It is part of the
+  resume authority: a different limit, or a full-versus-partial change, is
+  refused with **exit 30** and a message naming both the recorded and requested
+  extent, before any read.
+- A partial run that finishes is reported as **`partial image complete (first N
+  GiB)`** in the human summary and in JSON (`status` and `stopped`), never as a
+  complete image of the device. The exit codes are unchanged: 0 complete, 1
+  incomplete-resumable, 30 precondition. The pass-2 stop rule's 0.01% threshold
+  and remaining-time projection use the limited size.
+- The limit is whole GiB on the CLI. The byte value is injectable at
+  `image(..., limitBytesOverride:)`, the seam the tests use for a sub-GiB file
+  smoke; no fractional CLI flag exists.
 
 ### The test report is the evidence
 

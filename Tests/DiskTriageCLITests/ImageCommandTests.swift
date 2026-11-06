@@ -197,6 +197,106 @@ struct ImageCommandTests {
         #expect(result.stderr.contains("finish the drive off"))
     }
 
+    // MARK: - Partial imaging (--limit)
+
+    // REQ-0101: only a positive whole number of GiB is a limit; zero, a
+    // fraction, a negative number and a non-number are usage errors.
+    @Test("REQ0101 --limit takes only a positive whole number of GiB")
+    func REQ0101_limitTakesAPositiveWholeNumberOfGiB() {
+        for invalid in ["0", "-1", "1.5", "eight", "8GiB", ""] {
+            let result = serialRun(["--confirm-serial", "ABCD", "--limit", invalid])
+            #expect(result.exitCode == 2, "--limit '\(invalid)' is a usage error")
+        }
+
+        let missing = serialRun(["--confirm-serial", "ABCD", "--limit"])
+        #expect(missing.exitCode == 2, "--limit without a value is a usage error")
+    }
+
+    // REQ-0101: a limit at or above the device size is the full device: no
+    // PARTIAL label and no `-s`, because nothing would be truncated.
+    @Test("REQ0101 a limit at or above the device size is the full device")
+    func REQ0101_limitAtOrAboveTheDeviceIsTheFullDevice() {
+        // The synthetic USB fixture is exactly 1 GiB.
+        for limit in ["1", "2", "1000"] {
+            let result = serialRun(["--confirm-serial", "ABCD", "--limit", limit])
+            #expect(result.exitCode == 0, "--limit \(limit) is allowed")
+            #expect(!result.stdout.contains("PARTIAL"), "--limit \(limit) is not partial")
+            #expect(!result.stdout.contains(" -s "), "--limit \(limit) adds no -s")
+        }
+    }
+
+    // REQ-0102: a partial plan puts `-s <bytes>` in both passes, and the human
+    // plan and JSON say PARTIAL (N GiB of M GiB).
+    @Test("REQ0102 a partial plan carries -s in both passes and says PARTIAL")
+    func REQ0102_partialPlanCarriesDashS() throws {
+        // 251,000,193,024 B = 233.7601 GiB, formatted 233.8 GiB.
+        let result = internalRun(["--confirm-size", "233", "--limit", "8"])
+
+        #expect(result.exitCode == 0)
+        #expect(result.stdout.contains(
+            "ddrescue -n -b 4096 -O -K 65536 -T 90 -s 8589934592 /dev/rdisk0 /tmp/x.img /tmp/x.img.mapfile"
+        ), "pass 1 carries the byte limit")
+        #expect(result.stdout.contains(
+            "ddrescue -r3 -b 4096 -O -K 65536 -T 90 -s 8589934592 /dev/rdisk0 /tmp/x.img /tmp/x.img.mapfile"
+        ), "pass 2 carries the byte limit")
+        #expect(result.stdout.contains("PARTIAL (8.0 GiB of 233.8 GiB)"),
+                "the plan says how much of the device is imaged")
+
+        let json = internalRun(["--confirm-size", "233", "--limit", "8", "--json"])
+        let object = try #require(
+            try JSONSerialization.jsonObject(with: Data(json.stdout.utf8)) as? [String: Any]
+        )
+        let limit = try #require(object["limit"] as? [String: Any])
+        #expect(limit["bytes"] as? Int64 == 8_589_934_592 || limit["bytes"] as? Int == 8_589_934_592)
+        #expect(limit["partial"] as? Bool == true)
+        #expect(limit["description"] as? String == "PARTIAL (8.0 GiB of 233.8 GiB)")
+        let passes = try #require(object["passes"] as? [String])
+        #expect(passes.allSatisfy { $0.contains("-s 8589934592") })
+    }
+
+    // REQ-0103: the free-space gate uses the limit when partial, and a refusal
+    // still names both the limit and the whole device.
+    @Test("REQ0103 free space is checked against the limit when partial")
+    func REQ0103_freeSpaceUsesTheLimitWhenPartial() {
+        let tenGiB: Int64 = 10 * 1_073_741_824
+        let facts = DestinationFacts(
+            destinationExists: false,
+            mapfileExists: false,
+            freeBytes: tenGiB,
+            containerFilesystem: "apfs",
+            parentIsWritable: true,
+            backingWholeDisk: "disk8"
+        )
+
+        let partial = internalRun(["--confirm-size", "233", "--limit", "8"], facts: facts)
+        #expect(partial.exitCode == 0, "8 GiB fits in 10 GiB free")
+        #expect(partial.stdout.contains("10.0 GiB free"))
+        #expect(partial.stdout.contains("8.0 GiB needed"))
+        #expect(partial.stdout.contains("233.8 GiB"), "the whole device is still named")
+
+        let full = internalRun(["--confirm-size", "233"], facts: facts)
+        #expect(full.exitCode == 2, "the full 233.8 GiB does not fit in 10 GiB")
+        #expect(full.stdout.contains("free"))
+        #expect(full.stdout.contains("10.0 GiB"))
+        #expect(full.stdout.contains("233.8 GiB"))
+    }
+
+    // REQ-0104: the size confirmation is the whole device, never the limit.
+    @Test("REQ0104 the size confirmation names the whole device, not the limit")
+    func REQ0104_confirmationNamesTheWholeDevice() {
+        let limitAsConfirmation = internalRun(["--confirm-size", "8", "--limit", "8"])
+        #expect(limitAsConfirmation.exitCode == 2, "the limit is not the identity")
+        #expect(limitAsConfirmation.stdout.contains("--confirm-size 233"),
+                "the instruction still names the 233 GiB device")
+
+        let deviceAsConfirmation = internalRun(["--confirm-size", "233", "--limit", "8"])
+        #expect(deviceAsConfirmation.exitCode == 0)
+        #expect(deviceAsConfirmation.stdout.contains("size confirmed (233 GiB)"))
+
+        let serialConfirmation = serialRun(["--confirm-serial", "ABCD", "--limit", "1"])
+        #expect(serialConfirmation.exitCode == 0)
+    }
+
     // MARK: - Destination checks
 
     // REQ-0079: on the source disk.

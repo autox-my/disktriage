@@ -438,6 +438,175 @@ struct ImagingExecutionTests {
         #expect(secondLauncher.launches.filter { !$0.sidecarExisted }.isEmpty)
     }
 
+    // MARK: - Partial imaging
+
+    // REQ-0105: the recorded limit is part of the resume authority. A partial
+    // image is not resumed as a full one (or with another limit).
+    @Test("REQ0105 resuming with a different limit or full versus partial exits 30")
+    func REQ0105_resumingWithADifferentLimitIsRefused() throws {
+        let directory = try temporaryDirectory()
+        let image = directory + "/disk8.img"
+        let mapfile = image + ".mapfile"
+        let limit: Int64 = 536_870_912 // 512 MiB, below the 1 GiB device
+
+        FileManager.default.createFile(atPath: image, contents: Data())
+        try "# Mapfile. Created by GNU ddrescue version 1.30\n"
+            .write(toFile: mapfile, atomically: true, encoding: .utf8)
+        let sidecar = ImageSidecar(
+            schema: "disktriage.image/1",
+            device: ImageSidecarDevice(
+                model: "Synthetic Bridge Disk",
+                serialSHA256: Self.serialHash,
+                sizeBytes: Self.size
+            ),
+            createdAt: "2026-11-07T01:00:00Z",
+            command: ["caffeinate -dimsu ddrescue -n -s \(limit) /dev/rdisk8"],
+            limitBytes: limit
+        )
+        try JSONEncoder().encode(sidecar).write(
+            to: URL(fileURLWithPath: image + ".disktriage.json")
+        )
+
+        // The same image and mapfile, requested as a full image now.
+        let refusedLauncher = FakeDdrescueLauncher()
+        let refused = execute(
+            image: image,
+            mapfile: mapfile,
+            environment: FakeImagingEnvironment(),
+            launcher: refusedLauncher,
+            probe: DiskDestinationProbe()
+        )
+        #expect(refused.exitCode == 30, "a limit-state mismatch is a precondition error")
+        #expect(refused.stderr.contains("limit"), "the refusal names the limit")
+        #expect(refused.stderr.contains("partial"), "the refusal names the partial image")
+        #expect(refusedLauncher.launches.isEmpty, "nothing is read before the refusal")
+
+        // The same limit still resumes.
+        let launcher = FakeDdrescueLauncher()
+        let pass1 = FakeDdrescueProcess()
+        pass1.ticks = [
+            { writeMapfile(mapfile, rescued: limit, total: limit, pass: 1, finished: true); return 0 },
+        ]
+        let pass2 = FakeDdrescueProcess()
+        pass2.ticks = [
+            { writeMapfile(mapfile, rescued: limit, total: limit, pass: 2, finished: true); return 0 },
+        ]
+        launcher.handles = [pass1, pass2]
+        let resumed = execute(
+            image: image,
+            mapfile: mapfile,
+            environment: FakeImagingEnvironment(),
+            launcher: launcher,
+            probe: DiskDestinationProbe(),
+            limitBytes: limit
+        )
+        #expect(resumed.exitCode == 0, "the same limit is a valid resume")
+        #expect(launcher.launches.count == 2)
+    }
+
+    // REQ-0106: a partial run that finished is a partial image, never a
+    // complete image of the device, in both renderings.
+    @Test("REQ0106 a partial run is never reported as a complete image of the device")
+    func REQ0106_partialCompleteIsNeverCalledComplete() throws {
+        let limit: Int64 = 8 * 1_048_576 // 8 MiB, injected at the byte seam
+
+        func runPartial(asJSON: Bool) throws -> CLIResult {
+            let directory = try temporaryDirectory()
+            let image = directory + "/disk8.img"
+            let mapfile = image + ".mapfile"
+            let launcher = FakeDdrescueLauncher()
+            let pass1 = FakeDdrescueProcess()
+            pass1.ticks = [
+                { writeMapfile(mapfile, rescued: limit, total: limit, pass: 1, finished: true); return 0 },
+            ]
+            let pass2 = FakeDdrescueProcess()
+            pass2.ticks = [
+                { writeMapfile(mapfile, rescued: limit, total: limit, pass: 2, finished: true); return 0 },
+            ]
+            launcher.handles = [pass1, pass2]
+            return execute(
+                image: image,
+                mapfile: mapfile,
+                environment: FakeImagingEnvironment(),
+                launcher: launcher,
+                probe: FakeImageProbe(facts: emptyDestination()),
+                extra: asJSON ? ["--json"] : [],
+                limitBytes: limit
+            )
+        }
+
+        let text = try runPartial(asJSON: false)
+        #expect(text.exitCode == 0, "hitting the limit with both passes is exit 0")
+        #expect(text.stdout.contains("partial image complete (first 8388608 bytes)"))
+        #expect(text.stdout.contains("STOPPED   partial image complete (first 8388608 bytes)"),
+                "the outcome wording is partial, not complete")
+        #expect(!text.stdout.contains("complete image of the device"))
+        #expect(text.stdout.contains("RESUME") == false)
+
+        let json = try runPartial(asJSON: true)
+        let object = try #require(
+            try JSONSerialization.jsonObject(with: Data(json.stdout.utf8)) as? [String: Any]
+        )
+        #expect(object["status"] as? String == "partial image complete (first 8388608 bytes)")
+        #expect(object["stopped"] as? String == "partial image complete (first 8388608 bytes)")
+        #expect(object["partial"] as? Bool == true)
+        #expect((object["limit_bytes"] as? Int64) == limit || (object["limit_bytes"] as? Int) == Int(limit))
+        #expect(object["exit_code"] as? Int == 0)
+        #expect(object["resume_command"] == nil)
+    }
+
+    // REQ-0107: the stop rule's threshold and remaining bytes are computed from
+    // the limited image size. With a 1 GiB device but an 8 MiB limit, a 2,000 B
+    // yield in the window is above 0.01% of 8 MiB, so the rule must not fire;
+    // computing against the 1 GiB device would stop the run.
+    @Test("REQ0107 the pass-2 stop rule uses the limited image size")
+    func REQ0107_stopRuleUsesTheLimitedImageSize() throws {
+        let limit: Int64 = 8 * 1_048_576
+        let directory = try temporaryDirectory()
+        let image = directory + "/disk8.img"
+        let mapfile = image + ".mapfile"
+        let clock = TestClock()
+        let launcher = FakeDdrescueLauncher()
+
+        // Pass 1 leaves 200,000 B unread; pass 2 rescues 1,000 B per two-minute
+        // tick, so every ten-minute window yields 5,000–6,000 B. That is well
+        // above 0.01% of the 8 MiB limit (838.86 B) but well below 0.01% of the
+        // 1 GiB device (107,374 B): only the limited-size math keeps going.
+        let pass1 = FakeDdrescueProcess()
+        pass1.ticks = [
+            { writeMapfile(mapfile, rescued: limit - 200_000, total: limit, pass: 1, finished: true); return 0 },
+        ]
+        let pass2 = FakeDdrescueProcess()
+        pass2.ticks = (0..<12).map { index in
+            {
+                writeMapfile(
+                    mapfile,
+                    rescued: limit - 200_000 + Int64(index + 1) * 1_000,
+                    total: limit,
+                    pass: 2
+                )
+                return nil
+            }
+        }
+        pass2.exitOnInterrupt = 130
+        launcher.handles = [pass1, pass2]
+
+        let result = execute(
+            image: image,
+            mapfile: mapfile,
+            environment: FakeImagingEnvironment(),
+            launcher: launcher,
+            probe: FakeImageProbe(facts: emptyDestination()),
+            now: { clock.date },
+            pollInterval: 120,
+            sleep: { clock.date = clock.date.addingTimeInterval($0) },
+            limitBytes: limit
+        )
+
+        #expect(result.exitCode == 0, "the limited-size threshold is not met")
+        #expect(pass2.signals.isEmpty, "the stop rule must not interrupt this run")
+    }
+
     // MARK: - Helpers
 
     private func execute(
@@ -451,7 +620,8 @@ struct ImagingExecutionTests {
         pollInterval: TimeInterval = 0.01,
         signalGrace: TimeInterval = 0.2,
         sleep: @escaping (TimeInterval) -> Void = { _ in },
-        interruptRequested: @escaping () -> Bool = { false }
+        interruptRequested: @escaping () -> Bool = { false },
+        limitBytes: Int64? = nil
     ) -> CLIResult {
         let destination = image ?? "/tmp/disktriage-test-\(UUID().uuidString).img"
         let destinationProbe = probe ?? FakeImageProbe(facts: emptyDestination())
@@ -465,15 +635,17 @@ struct ImagingExecutionTests {
             readMapfile: { path in try? String(contentsOfFile: path, encoding: .utf8) },
             interruptRequested: interruptRequested
         )
-        return run(
-            arguments: [
-                "image", "disk8", "--to", destination, "--no-dry-run",
+        return DiskTriageCLI.image(
+            [
+                "disk8", "--to", destination, "--no-dry-run",
                 "--accept-risk", "--confirm-serial", "ABCD",
             ] + extra,
             executor: scriptedExecutor(),
             now: now,
             destinationProbe: destinationProbe,
-            imaging: dependencies
+            writeFile: { path, data in try data.write(to: URL(fileURLWithPath: path)) },
+            imaging: dependencies,
+            limitBytesOverride: limitBytes
         )
     }
 

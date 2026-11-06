@@ -21,6 +21,12 @@ struct ImagingPlan {
     let override: Bool
     let confirmSerial: String?
     let confirmSize: Int64?
+    /// The requested byte limit, before it is resolved against the device; a
+    /// value at or above the device is the full device (REQ-0101).
+    let limitBytes: Int64?
+    /// The whole-GiB form for the printed resume command, `nil` when the limit
+    /// came from the byte seam rather than `--limit`.
+    let limitGiB: Int64?
 }
 
 /// The final summary: stdout and `--json` are two renderings of this value.
@@ -39,8 +45,20 @@ struct ImagingSummary {
     let stopped: PassStopReason
     let resumeCommand: String?
     let stop: Pass2Stop?
+    /// The effective partial limit, `nil` for a full image (REQ-0106).
+    let partialLimitBytes: Int64?
+    let deviceBytes: Int64?
 
     var isComplete: Bool { exitCode == 0 }
+    var isPartial: Bool { partialLimitBytes != nil }
+
+    /// `complete` is only honest for a full image. A partial run that finished
+    /// says so, and never claims the whole device (REQ-0106).
+    var stoppedDisplay: String {
+        status == "complete" || status.hasPrefix("partial image complete")
+            ? status
+            : stopped.rawValue
+    }
 }
 
 /// Runs the preconditions, writes the sidecar, supervises both passes, and
@@ -92,6 +110,14 @@ func runImaging(
     }
 
     let startedAt = now()
+    let partialLimitBytes = recordedLimitBytes(
+        deviceBytes: plan.source.sizeBytes,
+        limitBytes: plan.limitBytes
+    )
+    let imageBytes = effectiveImageBytes(
+        deviceBytes: plan.source.sizeBytes,
+        limitBytes: plan.limitBytes
+    )
     let sidecarPath = plan.image + ".disktriage.json"
     let sidecar = ImageSidecar(
         schema: "disktriage.image/1",
@@ -101,7 +127,8 @@ func runImaging(
             sizeBytes: plan.source.sizeBytes ?? 0
         ),
         createdAt: iso8601String(startedAt),
-        command: plan.passes.map(\.line)
+        command: plan.passes.map(\.line),
+        limitBytes: partialLimitBytes
     )
     do {
         let encoder = JSONEncoder()
@@ -122,7 +149,10 @@ func runImaging(
         configuration: .init(
             mapfilePath: plan.mapfile,
             devicePath: plan.rawDevice,
-            deviceSize: plan.source.sizeBytes ?? 0,
+            // The stop rule's 0.01% threshold and remaining-time projection are
+            // about the image being written, so a partial run uses the limit
+            // as its "device" size (REQ-0107).
+            deviceSize: imageBytes ?? plan.source.sizeBytes ?? 0,
             pollInterval: dependencies.pollInterval,
             signalGrace: dependencies.signalGrace,
             readMapfile: dependencies.readMapfile,
@@ -156,9 +186,19 @@ func runImaging(
         progress.append("disktriage: pass 2 \(result.reason.rawValue)")
     }
 
+    let status: String
+    if result.reason == .launchFailed {
+        status = "tool-error"
+    } else if result.reason == .complete {
+        status = partialLimitBytes.map {
+            "partial image complete (first \(partialExtentLabel($0)))"
+        } ?? "complete"
+    } else {
+        status = "incomplete"
+    }
+
     let summary = ImagingSummary(
-        status: result.reason == .launchFailed ? "tool-error"
-            : result.reason == .complete ? "complete" : "incomplete",
+        status: status,
         exitCode: result.reason == .launchFailed ? 30
             : result.reason == .complete ? 0 : 1,
         image: plan.image,
@@ -172,7 +212,9 @@ func runImaging(
         passReached: passReached,
         stopped: result.reason,
         resumeCommand: result.reason == .complete ? nil : resumeCommand(plan),
-        stop: result.stop
+        stop: result.stop,
+        partialLimitBytes: partialLimitBytes,
+        deviceBytes: plan.source.sizeBytes
     )
 
     if let launchError = result.launchError {
@@ -229,7 +271,11 @@ private func renderImagingTTY(_ summary: ImagingSummary) -> String {
     lines.append(pad("REMAINING", 10) + "\(remaining) in \(extents) extents")
     lines.append(pad("ELAPSED", 10) + String(format: "%.1f s", summary.elapsedSeconds))
     lines.append(pad("PASS", 10) + "reached \(summary.passReached)")
-    lines.append(pad("STOPPED", 10) + summary.stopped.rawValue)
+    if let limit = summary.partialLimitBytes {
+        lines.append(pad("LIMIT", 10)
+            + "first \(gib(limit)) of \(gib(summary.deviceBytes)) — PARTIAL image")
+    }
+    lines.append(pad("STOPPED", 10) + summary.stoppedDisplay)
     if let stop = summary.stop {
         lines.append(pad("YIELD", 10)
             + "\(bytes(stop.marginalYieldBytes)) in the trailing 10 minutes; "
@@ -253,7 +299,8 @@ private func renderImagingJSON(_ summary: ImagingSummary) -> String {
         "sidecar": summary.sidecar,
         "elapsed_seconds": summary.elapsedSeconds,
         "pass_reached": summary.passReached,
-        "stopped": summary.stopped.rawValue,
+        "stopped": summary.stoppedDisplay,
+        "partial": summary.isPartial,
         "zero_filled": "unreadable regions are zero-filled in the image; "
             + "a volume-level damage report is the next step",
     ]
@@ -261,6 +308,8 @@ private func renderImagingJSON(_ summary: ImagingSummary) -> String {
     if let bad = summary.badBytes { object["bad_bytes"] = bad }
     if let remaining = summary.remainingBytes { object["remaining_bytes"] = remaining }
     if let extents = summary.remainingExtents { object["remaining_extents"] = extents }
+    if let limit = summary.partialLimitBytes { object["limit_bytes"] = limit }
+    if let device = summary.deviceBytes { object["device_bytes"] = device }
     if let resume = summary.resumeCommand { object["resume_command"] = resume }
     if let stop = summary.stop {
         object["stop_rule"] = [
@@ -295,6 +344,9 @@ private func resumeCommand(_ plan: ImagingPlan) -> String {
     }
     if let size = plan.confirmSize {
         parts += ["--confirm-size", String(size)]
+    }
+    if let limit = plan.limitGiB {
+        parts += ["--limit", String(limit)]
     }
     if plan.override { parts.append("--override") }
     if plan.noGuardCheck { parts.append("--no-guard-check") }

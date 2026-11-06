@@ -1,0 +1,18 @@
+# REQ-0101 — diskdoctor.md §8 imaging `--limit`
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0101
+statement: "The image command shall parse --limit as a positive whole number of gib, with a limit at or above the device size meaning the full device."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L477
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0101_limitAtOrAboveTheDeviceIsTheFullDevice()"
+  - "DiskTriageCLITests.ImageCommandTests::REQ0101_limitTakesAPositiveWholeNumberOfGiB()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0101_limitIsGiBAndFullAtOrAboveTheDevice()"

@@ -18,17 +18,24 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
     public let createdAt: String?
     /// The exact argv of both passes, so the record says how the image was made.
     public let command: [String]?
+    /// The byte limit of a partial image, and `nil` for a full image. It is
+    /// part of the resume authority: a partial image is never continued as a
+    /// full one, or with another limit (diskdoctor.md §8). Optional so a
+    /// sidecar written before `--limit` existed still decodes as full.
+    public let limitBytes: Int64?
 
     public init(
         schema: String,
         device: ImageSidecarDevice,
         createdAt: String? = nil,
-        command: [String]? = nil
+        command: [String]? = nil,
+        limitBytes: Int64? = nil
     ) {
         self.schema = schema
         self.device = device
         self.createdAt = createdAt
         self.command = command
+        self.limitBytes = limitBytes
     }
 
     enum CodingKeys: String, CodingKey {
@@ -36,6 +43,7 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
         case device
         case command
         case createdAt = "created_at"
+        case limitBytes = "limit_bytes"
     }
 }
 
@@ -181,10 +189,45 @@ func destinationSharesSourceDisk(backingWholeDisk: String?, sourceDisk: String?)
     return backingWholeDisk == sourceDisk
 }
 
-/// Free space must cover the whole device, boundary included (REQ-0079).
+/// Free space must cover the image being written, boundary included
+/// (REQ-0079). For a partial image the number that must fit is the limit
+/// (REQ-0103); the caller decides which size to pass.
 func freeSpaceCoversDevice(freeBytes: Int64?, deviceBytes: Int64?) -> Bool? {
     guard let freeBytes, let deviceBytes else { return nil }
     return freeBytes >= deviceBytes
+}
+
+// MARK: - The `--limit` seam
+
+/// GiB is 2^30 bytes (diskdoctor.md §8). `nil` is not a positive limit, and an
+/// unrepresentable one is refused rather than wrapped.
+func limitBytesForGiB(_ giB: Int64) -> Int64? {
+    guard giB > 0 else { return nil }
+    let (bytes, overflow) = giB.multipliedReportingOverflow(by: 1_073_741_824)
+    return overflow ? nil : bytes
+}
+
+/// The number of bytes the image will contain: the limit when it is strictly
+/// below the device, otherwise the whole device. `nil` when the device size is
+/// unknown, because then "partial" cannot be established (REQ-0101).
+func effectiveImageBytes(deviceBytes: Int64?, limitBytes: Int64?) -> Int64? {
+    guard let deviceBytes else { return nil }
+    guard let limitBytes else { return deviceBytes }
+    return min(deviceBytes, limitBytes)
+}
+
+/// True only when a limit was asked for and is strictly below a known device
+/// size. A limit at or above the device is the full device, not a partial
+/// image (REQ-0101).
+func imageIsPartial(deviceBytes: Int64?, limitBytes: Int64?) -> Bool {
+    guard let deviceBytes, let limitBytes else { return false }
+    return limitBytes > 0 && limitBytes < deviceBytes
+}
+
+/// The limit a sidecar records: the effective partial limit, or `nil` for a
+/// full image (including a limit at or above the device).
+func recordedLimitBytes(deviceBytes: Int64?, limitBytes: Int64?) -> Int64? {
+    imageIsPartial(deviceBytes: deviceBytes, limitBytes: limitBytes) ? limitBytes : nil
 }
 
 /// MS-DOS/FAT32 has a 4 GiB single-file limit; exFAT and the native
@@ -204,17 +247,21 @@ func existingImageNeedsMapfile(imageExists: Bool, mapfileExists: Bool) -> Bool {
     imageExists && !mapfileExists
 }
 
-/// The sidecar is the resume authority: size, serial hash and model must agree
-/// with the device in front of us (REQ-0077). `nil` means no sidecar was read.
+/// The sidecar is the resume authority: size, serial hash, model and the
+/// partial limit must agree with the device in front of us (REQ-0077,
+/// REQ-0105). `limitBytes` is the effective partial limit, `nil` for a full
+/// image. `nil` as the answer means no sidecar was read.
 func sidecarMatchesDevice(
     _ sidecar: ImageSidecar?,
     model: String?,
     serialHash: String?,
-    sizeBytes: Int64?
+    sizeBytes: Int64?,
+    limitBytes: Int64? = nil
 ) -> Bool? {
     guard let sidecar else { return nil }
     guard let sizeBytes else { return nil }
     guard sidecar.device.sizeBytes == sizeBytes else { return false }
+    guard sidecar.limitBytes == limitBytes else { return false }
     guard sidecar.device.model == model else { return false }
     guard let serialHash else {
         // The current read has no serial, so only a sidecar that recorded no
@@ -225,10 +272,26 @@ func sidecarMatchesDevice(
     return sidecar.device.serialSHA256 == serialHash
 }
 
+/// True when the sidecar records a different limit than this run would use,
+/// including full versus partial. It is split out from `sidecarMatchesDevice`
+/// so the refusal can name what the sidecar records and what was requested
+/// (REQ-0105).
+func sidecarLimitMismatch(_ sidecar: ImageSidecar?, limitBytes: Int64?) -> Bool {
+    guard let sidecar else { return false }
+    return sidecar.limitBytes != limitBytes
+}
+
 /// Every destination check, in the plan's order. Any `refuse` or `unknown`
 /// blocks the plan; unknown is not a pass (diskdoctor.md §2.3).
-func assessDestination(facts: DestinationFacts, source: ImageSource) -> [DestinationCheck] {
+func assessDestination(
+    facts: DestinationFacts,
+    source: ImageSource,
+    limitBytes: Int64? = nil
+) -> [DestinationCheck] {
     var checks: [DestinationCheck] = []
+    let imageBytes = effectiveImageBytes(deviceBytes: source.sizeBytes, limitBytes: limitBytes)
+    let isPartial = imageIsPartial(deviceBytes: source.sizeBytes, limitBytes: limitBytes)
+    let recordedLimit = recordedLimitBytes(deviceBytes: source.sizeBytes, limitBytes: limitBytes)
 
     switch destinationSharesSourceDisk(
         backingWholeDisk: facts.backingWholeDisk,
@@ -255,18 +318,23 @@ func assessDestination(facts: DestinationFacts, source: ImageSource) -> [Destina
         ))
     }
 
-    switch freeSpaceCoversDevice(freeBytes: facts.freeBytes, deviceBytes: source.sizeBytes) {
+    // A partial image only needs room for the limit (REQ-0103); the detail
+    // still names the whole device, so neither number is hidden.
+    let partialNote = isPartial
+        ? " (partial limit of the \(gib(source.sizeBytes)) device)"
+        : ""
+    switch freeSpaceCoversDevice(freeBytes: facts.freeBytes, deviceBytes: imageBytes) {
     case .some(true):
         checks.append(DestinationCheck(
             name: "free space",
             outcome: .pass,
-            detail: "\(gib(facts.freeBytes)) free ≥ \(gib(source.sizeBytes)) needed"
+            detail: "\(gib(facts.freeBytes)) free ≥ \(gib(imageBytes)) needed\(partialNote)"
         ))
     case .some(false):
         checks.append(DestinationCheck(
             name: "free space",
             outcome: .refuse,
-            detail: "\(gib(facts.freeBytes)) free, \(gib(source.sizeBytes)) needed"
+            detail: "\(gib(facts.freeBytes)) free, \(gib(imageBytes)) needed\(partialNote)"
         ))
     case .none:
         checks.append(DestinationCheck(
@@ -336,13 +404,25 @@ func assessDestination(facts: DestinationFacts, source: ImageSource) -> [Destina
             outcome: .refuse,
             detail: "cannot read the sidecar: \(error)"
         ))
+    } else if sidecarLimitMismatch(facts.sidecar, limitBytes: recordedLimit) {
+        let recorded = facts.sidecar?.limitBytes.map { "a \(gib($0)) partial limit" }
+            ?? "a full image"
+        let requested = recordedLimit.map { "a \(gib($0)) partial limit" }
+            ?? "a full image"
+        checks.append(DestinationCheck(
+            name: "resume metadata",
+            outcome: .refuse,
+            detail: "the sidecar records \(recorded); this run is \(requested); "
+                + "refusing to mix a partial image with a full one or to change the limit"
+        ))
     } else {
         let serialHash = source.serial.map(imageSerialHash)
         switch sidecarMatchesDevice(
             facts.sidecar,
             model: source.model,
             serialHash: serialHash,
-            sizeBytes: source.sizeBytes
+            sizeBytes: source.sizeBytes,
+            limitBytes: recordedLimit
         ) {
         case .some(true):
             checks.append(DestinationCheck(
@@ -570,23 +650,30 @@ func rawDeviceNode(for bsd: String) -> String {
 /// Pass 1 (`-n`, fast sweep) then pass 2 (`-r3`, scrape), with the measured
 /// wrapper defaults: `-b` = device block size, `-O` reopen, `-K 65536` skip
 /// size, `-T` timeout, and `caffeinate` to stop the Mac sleeping (REQ-0083).
+/// A partial image adds `-s <bytes>` to **both** passes, because pass 2 must
+/// still be bounded by the same limit (REQ-0102).
 func ddrescuePasses(
     rawDevice: String,
     image: String,
     mapfile: String,
     blockSize: Int64,
-    timeoutSeconds: Int = 90
+    timeoutSeconds: Int = 90,
+    limitBytes: Int64? = nil
 ) -> [DdrescuePass] {
     func argv(_ mode: String) -> [String] {
-        [
+        var arguments = [
             "caffeinate", "-dimsu",
             "ddrescue", mode,
             "-b", String(blockSize),
             "-O",
             "-K", "65536",
             "-T", String(timeoutSeconds),
-            rawDevice, image, mapfile,
         ]
+        if let limitBytes {
+            arguments += ["-s", String(limitBytes)]
+        }
+        arguments += [rawDevice, image, mapfile]
+        return arguments
     }
     return [
         DdrescuePass(pass: 1, argv: argv("-n")),
@@ -651,6 +738,16 @@ func physicalBackingDisk(fromInfoPList data: Data, current: String) -> String? {
 func gib(_ bytes: Int64?) -> String {
     guard let bytes else { return "unknown" }
     return String(format: "%.1f GiB", Double(bytes) / 1_073_741_824)
+}
+
+/// The extent a partial image covers, for the "partial image complete (first
+/// N GiB)" wording (REQ-0106). Whole GiB reads as "8 GiB"; anything smaller
+/// (the test seam) reads in bytes rather than a misleading "0.0 GiB".
+func partialExtentLabel(_ bytes: Int64) -> String {
+    if bytes > 0, bytes % 1_073_741_824 == 0 {
+        return "\(bytes / 1_073_741_824) GiB"
+    }
+    return "\(bytes) bytes"
 }
 
 func imageSerialHash(_ value: String) -> String {
