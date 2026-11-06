@@ -123,14 +123,31 @@ public struct SmartHistory: Codable, Equatable, Sendable {
 public struct IOSignals: Codable, Equatable, Sendable {
     public let status: SignalStatus
     public let retries: Int?
+    /// `Errors (Read)` from ioreg. P0 phase C measured this moving 0 -> 1 while
+    /// `Retries` stayed 0, so the two are distinct signals (diskdoctor.md §4).
+    public let errors: Int?
     public let timeouts: Int?
     /// P0 item 2: only a validated counter set may count as an independent
     /// evidence source (diskdoctor.md §5). Absent or false means displayed,
     /// not counted.
     public let p0Validated: Bool?
 
+    public init(
+        status: SignalStatus,
+        retries: Int? = nil,
+        errors: Int? = nil,
+        timeouts: Int? = nil,
+        p0Validated: Bool? = nil
+    ) {
+        self.status = status
+        self.retries = retries
+        self.errors = errors
+        self.timeouts = timeouts
+        self.p0Validated = p0Validated
+    }
+
     enum CodingKeys: String, CodingKey {
-        case status, retries, timeouts
+        case status, retries, errors, timeouts
         case p0Validated = "p0_validated"
     }
 }
@@ -139,6 +156,12 @@ public struct LogSignals: Codable, Equatable, Sendable {
     public let status: SignalStatus
     public let windowHours: Int?
     public let events: [LogEvent]?
+
+    public init(status: SignalStatus, windowHours: Int? = nil, events: [LogEvent]? = nil) {
+        self.status = status
+        self.windowHours = windowHours
+        self.events = events
+    }
 
     enum CodingKeys: String, CodingKey {
         case status, events
@@ -154,6 +177,14 @@ public struct LogEvent: Codable, Equatable, Sendable {
     public let kind: String?
     public let lba: Int?
     public let count: Int?
+
+    public init(time: Date?, firstTime: Date? = nil, kind: String? = nil, lba: Int? = nil, count: Int? = nil) {
+        self.time = time
+        self.firstTime = firstTime
+        self.kind = kind
+        self.lba = lba
+        self.count = count
+    }
 
     enum CodingKeys: String, CodingKey {
         case time, kind, lba, count
