@@ -2,6 +2,7 @@ import Foundation
 import CryptoKit
 import DiskTriageCore
 import DiskTriageCollectors
+import DiskTriageGuard
 
 /// What the CLI produced: the two streams and the process exit code. Nothing
 /// is printed here, so a test can assert both streams exactly.
@@ -50,7 +51,10 @@ public func run(
         return image(rest, executor: executor, now: now, destinationProbe: destinationProbe)
     case "check":
         return runCheck(arguments: rest)
-    case "inspect", "copy", "guard":
+    case "guard":
+        let result = runGuard(arguments: rest)
+        return CLIResult(stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode)
+    case "inspect", "copy":
         return planned(command, rest)
     default:
         return usageError("unknown command '\(command)'")
@@ -405,7 +409,7 @@ private func rootHelp() -> CLIResult {
             + "  inspect  inspect an image read-only         (planned P2)\n"
             + "  copy     copy an image with a manifest      (planned P3)\n"
             + "  check    permissions and tooling self-test\n"
-            + "  guard    hold mounts for attached disks     (planned P2)\n"
+            + "  guard    hold mounts; start it before connecting the disk\n"
             + "\n"
             + "Run 'disktriage <command> --help' for options.\n"
     )

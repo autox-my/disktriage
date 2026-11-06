@@ -19,7 +19,7 @@ let package = Package(
         ),
         .target(
             name: "DiskTriageCLI",
-            dependencies: ["DiskTriageCore", "DiskTriageCollectors"],
+            dependencies: ["DiskTriageCore", "DiskTriageCollectors", "DiskTriageGuard"],
             path: "Sources/DiskTriageCLI"
         ),
         .executableTarget(
@@ -39,7 +39,7 @@ let package = Package(
         ),
         .testTarget(
             name: "DiskTriageCLITests",
-            dependencies: ["DiskTriageCLI", "DiskTriageCollectors", "DiskTriageCore"],
+            dependencies: ["DiskTriageCLI", "DiskTriageCollectors", "DiskTriageCore", "DiskTriageGuard"],
             path: "Tests/DiskTriageCLITests"
         ),
         // P1c: the collector framework. OS calls, subprocesses and filesystem
