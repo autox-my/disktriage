@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-11-06T01:10:00Z",
+  "device": {
+    "status": "ok",
+    "bsd": "disk8", "size_bytes": 320072933376,
+    "model": "WDC WD3200BJKT-75F4T0", "serial": "REDACTED0004",
+    "media": "hdd", "bus": "usb", "bridge": "generic-sata", "sat_passthrough": "none",
+    "removable": true
+  },
+  "smart": { "status": "unsupported", "history": null },
+  "io": { "status": "ok", "retries": 0, "errors": 1, "timeouts": null },
+  "log": {
+    "status": "ok", "window_hours": 6,
+    "events": [{
+      "time": "2026-11-06T00:35:25Z", "first_time": "2026-11-06T00:34:39Z",
+      "kind": "medium_error", "lba": 2048, "count": 1,
+      "sense_key": 3, "retry": 20
+    }]
+  },
+  "permissions": { "root": true, "raw_read": "granted", "removable_volumes": "granted" },
+  "symptoms": { "source": "user", "clicking": false }
+}

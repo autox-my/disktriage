@@ -67,6 +67,10 @@ public struct IORegCounters: Equatable, Sendable {
 public struct IORegDriver: Equatable, Sendable {
     public let nodeID: String?
     public let mediaName: String?
+    /// The registry id of the first child `IOMedia` line. The `IOMedia` query
+    /// carries both this id and the `BSD Name`, so it is the association key
+    /// (see `IORegMediaParser`).
+    public let childMediaID: String?
     public let bsdName: String?
     public let counters: IORegCounters
 }
@@ -86,6 +90,21 @@ public struct IORegStatistics: Equatable, Sendable {
     /// for a plain `-k Statistics` capture, where the BSD name is not present.
     public func driver(forBSD bsd: String) -> IORegDriver? {
         drivers.first { $0.bsdName == bsd }
+    }
+
+    /// Associates a driver with a BSD disk using the two recorded outputs:
+    /// the `IOMedia` query maps `BSD Name` -> IOMedia node id, and this
+    /// Statistics capture maps its child IOMedia node id -> driver.
+    ///
+    /// If either half is missing the association is unknown: the method
+    /// returns nil instead of guessing from a media name.
+    public func driver(forBSD bsd: String, media: [IORegMedia]) -> IORegDriver? {
+        guard let entry = media.first(where: { $0.bsdName == bsd }),
+              let mediaID = entry.nodeID
+        else {
+            return nil
+        }
+        return drivers.first { $0.childMediaID == mediaID }
     }
 
     /// Counter movement between two snapshots, matched by IORegistry node id
@@ -130,6 +149,7 @@ public enum IORegStatisticsParser {
                 IORegDriver(
                     nodeID: firstMatch(#"id (0x[0-9a-fA-F]+)"#, in: block).flatMap { $0[1] },
                     mediaName: firstMatch(#"(?m)^\s+\+-o (.+?)  <class IOMedia,"#, in: block).flatMap { $0[1] },
+                    childMediaID: firstMatch(#"(?m)^\s+\+-o .+?<class IOMedia, id (0x[0-9a-fA-F]+)"#, in: block).flatMap { $0[1] },
                     bsdName: firstMatch(#""BSD Name" = "([^"]+)""#, in: block).flatMap { $0[1] },
                     counters: counters
                 )

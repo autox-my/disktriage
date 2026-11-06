@@ -186,7 +186,7 @@ public func classify(_ signals: SignalSet, context: TriageContext = TriageContex
 
     // [2] media supported? SSD/NVMe/flash/SD are not classified; imaging stays
     // available with a caveat (diskdoctor.md §5, §12).
-    if let media = device?.media?.lowercased(), ["ssd", "nvme", "flash", "sd", "sdcard"].contains(media) {
+    if let media = MediaSupport.unsupportedLabel(for: device) {
         return Verdict(
             code: .insufficientEvidence,
             headline: "triage not applicable: unsupported media",
@@ -195,21 +195,6 @@ public func classify(_ signals: SignalSet, context: TriageContext = TriageContex
             evidenceUnavailable: unavailable,
             imagingOffered: true,
             unsupportedNote: "UNSUPPORTED: \(media) is not covered by HDD triage; no health classification applies. Imaging remains available with that caveat.",
-            next: NextStep(
-                command: imageCommand(device, context),
-                why: "imaging stays available for unsupported media; no health classification applies"
-            )
-        )
-    }
-    if let bus = device?.bus?.lowercased(), bus == "nvme" {
-        return Verdict(
-            code: .insufficientEvidence,
-            headline: "triage not applicable: unsupported media",
-            aggravators: aggravators,
-            evidenceAvailable: available,
-            evidenceUnavailable: unavailable,
-            imagingOffered: true,
-            unsupportedNote: "UNSUPPORTED: NVMe is not covered by HDD triage; no health classification applies. Imaging remains available with that caveat.",
             next: NextStep(
                 command: imageCommand(device, context),
                 why: "imaging stays available for unsupported media; no health classification applies"
