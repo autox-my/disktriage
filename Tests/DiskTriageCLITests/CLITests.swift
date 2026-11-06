@@ -125,7 +125,7 @@ struct CLITests {
 
     @Test
     func `planned commands are not implemented and exit 30`() {
-        for command in ["image", "inspect", "copy", "check", "guard"] {
+        for command in ["inspect", "copy", "check", "guard"] {
             let result = run(arguments: [command])
             #expect(result.exitCode == 30, "\(command): tool error, not a verdict")
             #expect(result.stdout.isEmpty, "\(command): nothing on stdout")

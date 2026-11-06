@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SYNTHETIC: model, serial and size are fabricated for the confirmation
+     test. Never a real capture; real serials are not committed. -->
+<plist version="1.0">
+<dict>
+	<key>BusProtocol</key>
+	<string>USB</string>
+	<key>DeviceBlockSize</key>
+	<integer>512</integer>
+	<key>DeviceIdentifier</key>
+	<string>disk8</string>
+	<key>DeviceNode</key>
+	<string>/dev/disk8</string>
+	<key>Ejectable</key>
+	<false/>
+	<key>Internal</key>
+	<false/>
+	<key>IOKitSize</key>
+	<integer>1073741824</integer>
+	<key>MediaName</key>
+	<string>Synthetic Bridge Disk</string>
+	<key>OSInternalMedia</key>
+	<false/>
+	<key>ParentWholeDisk</key>
+	<string>disk8</string>
+	<key>Removable</key>
+	<false/>
+	<key>RemovableMedia</key>
+	<false/>
+	<key>RemovableMediaOrExternalDevice</key>
+	<true/>
+	<key>Serial</key>
+	<string>SYNTH0000ABCD</string>
+	<key>Size</key>
+	<integer>1073741824</integer>
+	<key>SolidState</key>
+	<false/>
+	<key>TotalSize</key>
+	<integer>1073741824</integer>
+	<key>VirtualOrPhysical</key>
+	<string>Physical</string>
+	<key>VolumeSize</key>
+	<integer>0</integer>
+</dict>
+</plist>
