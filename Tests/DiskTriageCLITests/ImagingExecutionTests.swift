@@ -607,6 +607,163 @@ struct ImagingExecutionTests {
         #expect(pass2.signals.isEmpty, "the stop rule must not interrupt this run")
     }
 
+    // REQ-0108: the live summary and progress use the same clamped accounting
+    // as the parser: rescued/bad/remaining/extents/percent are inside the limit.
+    // The device fixture is 1 GiB, so the partial limit is 512 MiB and
+    // ddrescue's untried tail still runs to Int64.max.
+    @Test("REQ0108 a partial run reports rescued, remaining, extents and percent inside the limit")
+    func REQ0108_partialSummaryAndProgressStayInsideTheLimit() throws {
+        let limit: Int64 = 536_870_912 // 512 MiB of a 1 GiB device
+        let rescued: Int64 = 268_435_456 // 256 MiB
+
+        func runPartial(asJSON: Bool) throws -> CLIResult {
+            let directory = try temporaryDirectory()
+            let image = directory + "/disk8.img"
+            let mapfile = image + ".mapfile"
+            let launcher = FakeDdrescueLauncher()
+            let flag = Box(false)
+            let pass1 = FakeDdrescueProcess()
+            pass1.ticks = [
+                {
+                    writeMapfile(mapfile, rescued: rescued, total: Int64.max, pass: 1)
+                    flag.value = true
+                    return nil
+                },
+            ]
+            pass1.exitOnInterrupt = 130
+            launcher.handles = [pass1]
+            return execute(
+                image: image,
+                mapfile: mapfile,
+                environment: FakeImagingEnvironment(),
+                launcher: launcher,
+                probe: FakeImageProbe(facts: emptyDestination()),
+                extra: asJSON ? ["--json"] : [],
+                interruptRequested: { flag.value },
+                limitBytes: limit
+            )
+        }
+
+        let text = try runPartial(asJSON: false)
+        #expect(text.exitCode == 1, "the interrupted run is incomplete and resumable")
+        #expect(text.stdout.contains("256.0 MiB (268435456 bytes) in 1 extents"),
+                "remaining is 512 MiB - 256 MiB rescued, not Int64.max - rescued")
+        #expect(!text.stdout.contains("922337203"), "the unbounded tail is not printed")
+        #expect(text.stderr.contains("50.0% rescued"),
+                "the percentage is of the limit, not of the tail")
+        #expect(!text.stderr.contains("GiB"), "progress remaining is inside the limit")
+
+        let json = try runPartial(asJSON: true)
+        let object = try #require(
+            try JSONSerialization.jsonObject(with: Data(json.stdout.utf8)) as? [String: Any]
+        )
+        #expect((object["rescued_bytes"] as? Int64) == rescued
+            || (object["rescued_bytes"] as? Int) == Int(rescued))
+        #expect((object["remaining_bytes"] as? Int64) == 268_435_456
+            || (object["remaining_bytes"] as? Int) == 268_435_456)
+        #expect(object["remaining_extents"] as? Int == 1)
+        #expect(object["status"] as? String == "incomplete")
+        #expect(object["stopped"] as? String == "interrupted")
+    }
+
+    // REQ-0109: completion is ddrescue's exit code, never the mapfile tail. A
+    // pass that exits 0 starts pass 2 even though an untried tail exists past
+    // the limit; if the decision read the unclamped extent, pass 2 would not run.
+    @Test("REQ0109 a partial pass exiting 0 is complete without reading the huge tail")
+    func REQ0109_partialCompletionUsesDdrescueExitNotTheUnclampedTail() throws {
+        let limit: Int64 = 536_870_912 // 512 MiB of a 1 GiB device
+        let directory = try temporaryDirectory()
+        let image = directory + "/disk8.img"
+        let mapfile = image + ".mapfile"
+        let launcher = FakeDdrescueLauncher()
+
+        let pass1 = FakeDdrescueProcess()
+        pass1.ticks = [
+            {
+                writeMapfile(mapfile, rescued: limit, total: Int64.max, pass: 1, finished: true)
+                return nil
+            },
+            { return 0 },
+        ]
+        let pass2 = FakeDdrescueProcess()
+        pass2.ticks = [
+            {
+                writeMapfile(mapfile, rescued: limit, total: Int64.max, pass: 2, finished: true)
+                return nil
+            },
+            { return 0 },
+        ]
+        launcher.handles = [pass1, pass2]
+
+        let result = execute(
+            image: image,
+            mapfile: mapfile,
+            environment: FakeImagingEnvironment(),
+            launcher: launcher,
+            probe: FakeImageProbe(facts: emptyDestination()),
+            limitBytes: limit
+        )
+
+        #expect(result.exitCode == 0)
+        #expect(launcher.launches.count == 2,
+                "pass 1 exited 0, so pass 2 runs; the unbounded tail is not consulted")
+        #expect(result.stdout.contains("partial image complete (first 536870912 bytes)"))
+        #expect(result.stdout.contains("0 bytes in 0 extents"),
+                "nothing remains to try inside the limit")
+    }
+
+    // REQ-0110: the stop rule's projection uses the remaining bytes inside the
+    // limit. A 500 B yield over the window keeps the run going because only a
+    // few hundred bytes remain; reading the Int64.max tail would project
+    // centuries and stop it.
+    @Test("REQ0110 the pass-2 stop rule measures remaining inside the limit")
+    func REQ0110_stopRuleUsesClampedRemaining() throws {
+        let limit: Int64 = 536_870_912 // 512 MiB of a 1 GiB device
+        let directory = try temporaryDirectory()
+        let image = directory + "/disk8.img"
+        let mapfile = image + ".mapfile"
+        let clock = TestClock()
+        let launcher = FakeDdrescueLauncher()
+
+        let pass1 = FakeDdrescueProcess()
+        pass1.ticks = [
+            {
+                writeMapfile(mapfile, rescued: limit - 1_200, total: Int64.max, pass: 1, finished: true)
+                return 0
+            },
+        ]
+        let pass2 = FakeDdrescueProcess()
+        pass2.ticks = (0..<12).map { index in
+            {
+                writeMapfile(
+                    mapfile,
+                    rescued: limit - 1_200 + Int64(index + 1) * 100,
+                    total: Int64.max,
+                    pass: 2
+                )
+                return nil
+            }
+        }
+        pass2.exitOnInterrupt = 130
+        launcher.handles = [pass1, pass2]
+
+        let result = execute(
+            image: image,
+            mapfile: mapfile,
+            environment: FakeImagingEnvironment(),
+            launcher: launcher,
+            probe: FakeImageProbe(facts: emptyDestination()),
+            now: { clock.date },
+            pollInterval: 120,
+            sleep: { clock.date = clock.date.addingTimeInterval($0) },
+            limitBytes: limit
+        )
+
+        #expect(pass2.signals.isEmpty,
+                "the projection is 100s of bytes, not the Int64.max tail")
+        #expect(result.exitCode == 0, "the run finishes normally")
+    }
+
     // MARK: - Helpers
 
     private func execute(

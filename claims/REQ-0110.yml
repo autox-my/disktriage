@@ -1,0 +1,16 @@
+# REQ-0110 — diskdoctor.md §8 pass-2 stop rule
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0110
+statement: "The image command shall compute the pass-2 stop rule's projected remaining time from bytes inside the partial limit."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0110_stopRuleUsesClampedRemaining()"

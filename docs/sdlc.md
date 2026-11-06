@@ -148,6 +148,15 @@ written and flushed when it is made, because a guard runs for minutes.
 - The limit is whole GiB on the CLI. The byte value is injectable at
   `image(..., limitBytesOverride:)`, the seam the tests use for a sub-GiB file
   smoke; no fractional CLI flag exists.
+- **Mapfile accounting for a partial image is clamped to `[0, limit)`.** GNU
+  ddrescue 1.30 with `-s` leaves the untried tail ending at `Int64.max`
+  (`0x7FFFFFFFFFFFFFFF`), so an unclamped mapfile reports ~8.6 billion GiB
+  remaining. Every extent is clipped to the range, an extent starting at or
+  after the limit is dropped, and `rescued`, `bad`, `remaining`, the extent
+  count and the percentage are computed inside it (`remaining = limit - rescued
+  - bad`). A full image keeps the mapfile's own extents exactly as before. The
+  pass-2 stop rule and the complete/incomplete decision use the limited size,
+  clamped numbers and ddrescue's exit code — never the unbounded tail.
 
 ### The test report is the evidence
 

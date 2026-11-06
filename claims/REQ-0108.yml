@@ -1,0 +1,19 @@
+# REQ-0108 — diskdoctor.md §8 imaging `--limit`
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0108
+statement: "The image command shall clamp every partial-image mapfile extent and figure to the limit."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L477
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0108_partialSummaryAndProgressStayInsideTheLimit()"
+  - "DiskTriageCLITests.ImagingMapfileTests::REQ0108_badExtentStraddlingTheLimitIsClipped()"
+  - "DiskTriageCLITests.ImagingMapfileTests::REQ0108_fullyRescuedToTheLimitIsComplete()"
+  - "DiskTriageCLITests.ImagingMapfileTests::REQ0108_partialMapfileClipsTheUnboundedTail()"

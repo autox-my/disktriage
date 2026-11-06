@@ -1,0 +1,16 @@
+# REQ-0109 — diskdoctor.md §8 imaging `--limit`
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0109
+statement: "The image command shall decide pass completion from the ddrescue exit code rather than from an untried extent beyond the partial limit."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L477
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0109_partialCompletionUsesDdrescueExitNotTheUnclampedTail()"

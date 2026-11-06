@@ -1,0 +1,9 @@
+# Mapfile. Created by GNU ddrescue version 1.30
+# Command line: /opt/homebrew/bin/ddrescue -n -b 512 -O -K 65536 -T 90 -s 3221225472 /dev/rdiskN out.img out.map
+# Start time:   2026-11-07 03:12:00
+# Current time: 2026-11-07 03:29:00
+# current_pos  current_status  current_pass
+0x8F650000     +               1
+#      pos        size  status
+0x00000000  0x8F650000  +
+0x8F650000  0x7FFFFFFF709AFFFF  ?

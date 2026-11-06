@@ -200,6 +200,10 @@ public struct DdrescueSupervisor {
         public let mapfilePath: String
         public let devicePath: String
         public let deviceSize: Int64
+        /// The partial image's limit, `nil` for a full image. The mapfile's
+        /// accounting is clipped to this range so ddrescue's unbounded `-s`
+        /// tail never reaches the summary or the stop rule (REQ-0108).
+        public let mapfileLimitBytes: Int64?
         public let pollInterval: TimeInterval
         public let signalGrace: TimeInterval
         public let readMapfile: (String) -> String?
@@ -213,6 +217,7 @@ public struct DdrescueSupervisor {
             mapfilePath: String,
             devicePath: String,
             deviceSize: Int64,
+            mapfileLimitBytes: Int64? = nil,
             pollInterval: TimeInterval,
             signalGrace: TimeInterval,
             readMapfile: @escaping (String) -> String?,
@@ -225,6 +230,7 @@ public struct DdrescueSupervisor {
             self.mapfilePath = mapfilePath
             self.devicePath = devicePath
             self.deviceSize = deviceSize
+            self.mapfileLimitBytes = mapfileLimitBytes
             self.pollInterval = pollInterval
             self.signalGrace = signalGrace
             self.readMapfile = readMapfile
@@ -332,7 +338,7 @@ public struct DdrescueSupervisor {
 
     private func snapshot() -> MapfileSnapshot? {
         guard let text = configuration.readMapfile(configuration.mapfilePath) else { return nil }
-        return DdrescueMapfile.parse(text)
+        return DdrescueMapfile.parse(text, limitBytes: configuration.mapfileLimitBytes)
     }
 
     /// SIGINT first so ddrescue saves its mapfile; SIGTERM after the grace
