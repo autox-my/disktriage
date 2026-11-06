@@ -13,10 +13,29 @@ import DiskTriageCollectors
 public struct ImageSidecar: Codable, Equatable, Sendable {
     public let schema: String
     public let device: ImageSidecarDevice
+    /// When this attempt started (ISO-8601). Optional so a sidecar written by
+    /// the dry-run-era schema still decodes.
+    public let createdAt: String?
+    /// The exact argv of both passes, so the record says how the image was made.
+    public let command: [String]?
 
-    public init(schema: String, device: ImageSidecarDevice) {
+    public init(
+        schema: String,
+        device: ImageSidecarDevice,
+        createdAt: String? = nil,
+        command: [String]? = nil
+    ) {
         self.schema = schema
         self.device = device
+        self.createdAt = createdAt
+        self.command = command
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case schema
+        case device
+        case command
+        case createdAt = "created_at"
     }
 }
 

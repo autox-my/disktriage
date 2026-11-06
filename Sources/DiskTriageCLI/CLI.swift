@@ -31,8 +31,9 @@ public func run(
         try data.write(to: URL(fileURLWithPath: path))
     },
     executor: any CommandExecuting = ProcessRunner(timeout: 30),
-    now: () -> Date = Date.init,
-    destinationProbe: (any ImageDestinationProbing)? = nil
+    now: @escaping () -> Date = Date.init,
+    destinationProbe: (any ImageDestinationProbing)? = nil,
+    imaging: ImagingDependencies? = nil
 ) -> CLIResult {
     guard let command = arguments.first else {
         return rootHelp()
@@ -47,7 +48,14 @@ public func run(
     case "list":
         return list(rest, executor: executor)
     case "image":
-        return image(rest, executor: executor, now: now, destinationProbe: destinationProbe)
+        return image(
+            rest,
+            executor: executor,
+            now: now,
+            destinationProbe: destinationProbe,
+            writeFile: writeFile,
+            imaging: imaging
+        )
     case "check":
         return runCheck(arguments: rest)
     case "inspect", "copy", "guard":
@@ -401,7 +409,7 @@ private func rootHelp() -> CLIResult {
             + "commands:\n"
             + "  triage <disk>   classify a device, or --from <signalset.json>\n"
             + "  list            list whole disks; no health judgement\n"
-            + "  image    image a device to a file (dry-run)\n"
+            + "  image    image a device to a file (dry-run default)\n"
             + "  inspect  inspect an image read-only         (planned P2)\n"
             + "  copy     copy an image with a manifest      (planned P3)\n"
             + "  check    permissions and tooling self-test\n"

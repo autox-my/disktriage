@@ -11,8 +11,10 @@ import DiskTriageCollectors
 func image(
     _ arguments: [String],
     executor: any CommandExecuting,
-    now: () -> Date,
-    destinationProbe: (any ImageDestinationProbing)?
+    now: @escaping () -> Date,
+    destinationProbe: (any ImageDestinationProbing)?,
+    writeFile: (String, Data) throws -> Void,
+    imaging: ImagingDependencies?
 ) -> CLIResult {
     if arguments.contains("--help") || arguments.contains("-h") {
         return help(imageUsage)
@@ -59,6 +61,12 @@ func image(
         case "--override":
             options.override = true
             index += 1
+        case "--accept-risk":
+            options.acceptRisk = true
+            index += 1
+        case "--no-guard-check":
+            options.noGuardCheck = true
+            index += 1
         case "--json":
             options.asJSON = true
             index += 1
@@ -88,14 +96,6 @@ func image(
     }
     guard let destination = options.to else {
         return usageError("image needs --to <file>")
-    }
-
-    if !dryRun {
-        return CLIResult(
-            stdout: "",
-            stderr: "disktriage: execution arrives with the guard and FDA check (P2/P3)\n",
-            exitCode: 30
-        )
     }
 
     let mapfile = options.mapfile ?? destination + ".mapfile"
@@ -191,6 +191,40 @@ func image(
         exitCode = 2
     }
 
+    if !dryRun {
+        if let toolError {
+            return CLIResult(
+                stdout: "",
+                stderr: "disktriage: \(toolError)\n",
+                exitCode: 30
+            )
+        }
+        let plan = ImagingPlan(
+            disk: disk,
+            rawDevice: rawDeviceNode(for: source.bsd),
+            image: destination,
+            mapfile: mapfile,
+            source: source,
+            passes: passes,
+            destinationChecks: checks,
+            triageAttempted: triageAttempted || triageSkipped,
+            confirmationInstruction: confirmation.satisfied ? nil : confirmation.instruction,
+            asJSON: options.asJSON,
+            acceptRisk: options.acceptRisk,
+            noGuardCheck: options.noGuardCheck,
+            override: options.override,
+            confirmSerial: options.confirmSerial,
+            confirmSize: options.confirmSize
+        )
+        return runImaging(
+            plan,
+            dependencies: imaging,
+            executor: executor,
+            writeFile: writeFile,
+            now: now
+        )
+    }
+
     if options.asJSON {
         let output = renderJSON(
             status: status,
@@ -245,6 +279,8 @@ private struct ImageOptions {
     var confirmSerial: String?
     var confirmSize: Int64?
     var override = false
+    var acceptRisk = false
+    var noGuardCheck = false
     var asJSON = false
     var sawDryRun = false
     var sawNoDryRun = false
@@ -591,8 +627,8 @@ private func renderJSON(
 private let imageUsage = "usage: disktriage image <disk> --to <file> [options]\n"
     + "\n"
     + "Prints the exact ddrescue command without executing it. Dry-run is the\n"
-    + "default in this release; ddrescue execution arrives with the guard and\n"
-    + "the FDA check (P2/P3).\n"
+    + "default; --no-dry-run runs the two supervised passes with a mapfile and\n"
+    + "resume.\n"
     + "\n"
     + "  --to <file>             image destination (never a device node)\n"
     + "  --mapfile <path>        ddrescue mapfile, default <image>.mapfile\n"
@@ -600,5 +636,10 @@ private let imageUsage = "usage: disktriage image <disk> --to <file> [options]\n
     + "  --confirm-size <GiB>    the size, when the serial is unreadable\n"
     + "  --override              skip the triage-attempt requirement explicitly\n"
     + "  --dry-run               print the command; do not execute (default)\n"
-    + "  --no-dry-run            refuse: execution is not implemented yet (P2/P3)\n"
-    + "  --json                  print the plan as JSON\n"
+    + "  --no-dry-run            run the two passes; needs root and --accept-risk\n"
+    + "  --accept-risk           read a failing drive anyway; that can finish the\n"
+    + "                          drive off (plan §12)\n"
+    + "  --no-guard-check        proceed without a stopped diskarbitrationd or a\n"
+    + "                          running 'disktriage guard'; a probe read may\n"
+    + "                          already have happened\n"
+    + "  --json                  print the plan or summary as JSON\n"
