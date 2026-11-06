@@ -606,17 +606,17 @@ raise the timeout, do not "try once more".
 
 | Item | Value |
 |---|---|
-| Date / operator | |
-| Host model, arch, `sw_vers` build | |
-| Xcode version | |
-| Terminal app + version | |
+| Date / operator | 2026-11-06 / fd (Phase A only) |
+| Host model, arch, `sw_vers` build | MacBook Air M1 (MacBookAir10,1), arm64, macOS 27.2 build 26B123 |
+| Xcode version | 27.2 (27B52), Swift 6.4.2 |
+| Terminal app + version | Ghostty 1.4.0 |
 | Control disk model / serial / size | |
 | Scratch volume, free space | |
 | E1 bridge name / VID:PID | |
 | E2 bridge name / VID:PID | |
-| Third-party NTFS driver(s) (`listFilesystems`, `/Library/Filesystems`, `/Library/Extensions`) | |
-| Native `mount_ntfs` present? (A2) | |
-| `smartctl --version` / `ddrescue --version` | |
+| Third-party NTFS driver(s) (`listFilesystems`, `/Library/Filesystems`, `/Library/Extensions`) | `iboysoft_NTFS` personality; `/Library/Filesystems/iboysoft_NTFS.fs`; `/Library/Extensions/ms_ntfs.kext` (also CIJUSBLoad.kext, SoftRAID.kext) |
+| Native `mount_ntfs` present? (A2) | **No.** `man -w mount_ntfs` rc=1; `ntfs.fs/Contents/Resources` has `ntfs.util` and `BootCampFormatter`, no mount helper. Row 4 is answered by absence. |
+| `smartctl --version` / `ddrescue --version` | smartctl 7.5 2025-04-30 r5714 / GNU ddrescue 1.30 |
 
 ### Decision table — one row per P0 question
 
@@ -625,11 +625,11 @@ raise the timeout, do not "try once more".
 | 1 | `smartctl -d sat` over USB; TCC/root needed? | | `q1-e1-*`, `q1-e2-*` | |
 | 2 | `ioreg` exposes real retries/timeouts for USB disks? | | `q2-before-e1.txt`, `q2-after-e1.txt`, `q2-before-e2.txt`, `q2-after-e2.txt` | |
 | 3 | Unified log retains medium errors with LBAs, and for how long? | | `q3-log-stats.txt`, `q3-medium-errors.ndjson`, `c3-medium-errors.ndjson` | |
-| 4 | `F_LOG2PHYS_EXT` works on the native read-only NTFS mount? | | `q4-attach.txt`, `q4-mount.txt`, `q4-l2p.txt`, `l2p.c` | |
+| 4 | `F_LOG2PHYS_EXT` works on the native read-only NTFS mount? | **no, by absence** (A2) | `a2.txt` | Branch applied: volume-level reporting in v1; NTFS runlist parser for v1.1. Also raises the plan question: no native NTFS reader exists on this macOS build (see below). |
 | 5 | DiskArbitration dissent blocks third-party driver mounts? | | `q5-dissent.log`, `q5-da-activity.log`, `q5-mount.txt` | |
-| 6 | ddrescue child inherits the TCC grant under option A? | | `q6-e1.img`, `q6-e1.mapfile`, `fda-probe-app.txt` | |
-| 7 | TCC errno (`EPERM`) differs from Unix (`EACCES`)? | | `a3-errno.md` | |
-| 8 | Raw read of the internal disk works as an FDA probe? | | `a3-errno.md` | |
+| 6 | ddrescue child inherits the TCC grant under option A? | **unproven** (B0 not run). Mechanism half answered in A4: a compiled, ad-hoc-signed `.app` holds its own grant (EPERM 1 -> EACCES 13 once granted) while Ghostty, ungranted, stays EPERM; a shell-script app executable holds no grant. | `fda-probe-app.txt`, `a3-errno.md` | Pending B0. |
+| 7 | TCC errno (`EPERM`) differs from Unix (`EACCES`)? | **no, as the runbook defined it**: ungranted, non-root and root both return EPERM (1). **But** once TCC passes, a non-root open returns EACCES (13) (app test). TCC is evaluated before Unix permissions. | `a3-errno.md`, `fda-probe-app.txt` | Branch applied (if-no): single `denied` state, both remedies. Refinement: EPERM => grant FDA first; EACCES => FDA is fine, run as root. |
+| 8 | Raw read of the internal disk works as an FDA probe? | **yes** (root + Ghostty granted: `read ok: 4096 bytes`; `dd bs=4096` ok) | `a3-errno.md` | Branch applied (if-yes): probe the internal node, off the suspect disk. Use a 4096-byte aligned read. |
 | 9 | ddrescue on macOS: direct I/O, sector size, `/dev/rdiskN`, `-O`, `-K`? | | `q9-*.img`, `q9-*.mapfile`, `ddrescue-help.txt` | |
 | 10 | `diskutil`/`smartctl` hang on a failing disk; timeout + kill work? | | `b5-timeout.log`, `c3-smart.txt`, `c3-diskutil.txt`, `c3-stats-after.txt`, `c5-session.md` | |
 
@@ -641,3 +641,20 @@ Process identity: ______   (forced by rows ____)
 Language: ______
 Open questions carried into P1: ______
 ```
+
+
+### Phase A findings (2026-11-06)
+
+- **Row 7 / 8:** EPERM (1) = TCC denied, regardless of root. EACCES (13) = TCC passed, Unix
+  permissions denied. So a non-root probe can tell "FDA granted" (EACCES) from "FDA missing"
+  (EPERM) without sudo. Untested: Ghostty granted + non-root; do it once to confirm.
+- **A4 attribution:** the grant follows the responsible `.app`, not the terminal. Ad-hoc signed
+  rebuilds with **identical bits keep the grant** (same cdhash). The plan's "ad-hoc builds lose
+  the grant on every rebuild" is true only when the bits change; re-test with
+  `sh captures/p0-a4-build.sh <new-id>`.
+- **Script executables carry no TCC identity** (the process is `/bin/sh`): any helper must be
+  a Mach-O.
+- **No native NTFS reader** on macOS 27.2 build 26B123. Plan §2 principle 4 and §8 inspection
+  (`mount_ntfs`) need a decision: third-party reader on the image only, own parser, or NTFS
+  inspection unsupported here.
+- **Raw reads need block alignment**: probes use 4096 bytes.
