@@ -31,7 +31,8 @@ public func run(
         try data.write(to: URL(fileURLWithPath: path))
     },
     executor: any CommandExecuting = ProcessRunner(timeout: 30),
-    now: () -> Date = Date.init
+    now: () -> Date = Date.init,
+    destinationProbe: (any ImageDestinationProbing)? = nil
 ) -> CLIResult {
     guard let command = arguments.first else {
         return rootHelp()
@@ -45,7 +46,9 @@ public func run(
         return triage(rest, readFile: readFile, writeFile: writeFile, executor: executor, now: now)
     case "list":
         return list(rest, executor: executor)
-    case "image", "inspect", "copy", "check", "guard":
+    case "image":
+        return image(rest, executor: executor, now: now, destinationProbe: destinationProbe)
+    case "inspect", "copy", "check", "guard":
         return planned(command, rest)
     default:
         return usageError("unknown command '\(command)'")
@@ -204,7 +207,7 @@ private func triage(
 /// Collects every section in a deterministic order. Each collector returns a
 /// status instead of throwing, so one timeout, denial or parse failure never
 /// stops the sections after it (REQ-0011, REQ-0012).
-private func collectLive(
+func collectLive(
     disk: String,
     window: String,
     executor: any CommandExecuting,
@@ -385,7 +388,7 @@ private func planned(_ command: String, _ arguments: [String]) -> CLIResult {
 
 // MARK: - Help and usage
 
-private func help(_ text: String) -> CLIResult {
+func help(_ text: String) -> CLIResult {
     CLIResult(stdout: text, stderr: "", exitCode: 0)
 }
 
@@ -396,7 +399,7 @@ private func rootHelp() -> CLIResult {
             + "commands:\n"
             + "  triage <disk>   classify a device, or --from <signalset.json>\n"
             + "  list            list whole disks; no health judgement\n"
-            + "  image    image a device to a file           (planned P2)\n"
+            + "  image    image a device to a file (dry-run)\n"
             + "  inspect  inspect an image read-only         (planned P2)\n"
             + "  copy     copy an image with a manifest      (planned P3)\n"
             + "  check    permissions and tooling self-test  (planned P2)\n"
@@ -424,7 +427,7 @@ private let listUsage = "usage: disktriage list [--json]\n"
     + "Unsupported media are labelled 'triage not applicable'; list never makes a\n"
     + "health judgement.\n"
 
-private func usageError(_ message: String) -> CLIResult {
+func usageError(_ message: String) -> CLIResult {
     CLIResult(
         stdout: "",
         stderr: "disktriage: \(message)\n"
@@ -440,7 +443,7 @@ private func fileStem(_ path: String) -> String {
     return name.isEmpty ? "image" : name
 }
 
-private func isWholeDiskName(_ name: String) -> Bool {
+func isWholeDiskName(_ name: String) -> Bool {
     guard name.hasPrefix("disk") else { return false }
     let digits = name.dropFirst(4)
     return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
