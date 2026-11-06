@@ -13,5 +13,5 @@ rationale:
   assumptions:
     - "the internal disk's raw node is readable once Full Disk Access is granted and the caller is root"
 pins:
-  value: "512"
+  value: "4096"
   unit: "byte"
