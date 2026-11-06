@@ -11,4 +11,5 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0043_deniedFDABlocks()"
   - "DiskTriageCoreTests.RendererTests::`REQ-0043 the degraded no-FDA block matches the Appendix`()"

@@ -12,4 +12,5 @@ rationale:
   assumptions: []
 tests:
   - "DiskTriageCLITests.ImageCommandTests::REQ0078_existingImageWithoutMapfileIsRefused()"
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0078_existingImageWithoutMapfileIsRefusedBeforeLaunch()"
   - "DiskTriageCLITests.ImagingRulesTests::REQ0078_existingImageWithoutMapfileIsRefused()"

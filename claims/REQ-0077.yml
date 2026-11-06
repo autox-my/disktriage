@@ -12,4 +12,6 @@ rationale:
   assumptions: []
 tests:
   - "DiskTriageCLITests.ImageCommandTests::REQ0077_resumeRequiresMatchingSidecar()"
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0076_REQ0077_REQ0083_sidecarBeforeReadAndTwoPasses()"
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0077_resumeAfterInterrupt()"
   - "DiskTriageCLITests.ImagingRulesTests::REQ0077_sidecarMustMatchTheDevice()"
