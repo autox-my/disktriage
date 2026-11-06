@@ -41,5 +41,17 @@ let package = Package(
             dependencies: ["DiskTriageCLI"],
             path: "Tests/DiskTriageCLITests"
         ),
+        // P1c: the collector framework. OS calls, subprocesses and filesystem
+        // reads live here, never in DiskTriageCore (diskdoctor.md §3).
+        .target(
+            name: "DiskTriageCollectors",
+            dependencies: ["DiskTriageCore"],
+            path: "Sources/DiskTriageCollectors"
+        ),
+        .testTarget(
+            name: "DiskTriageCollectorsTests",
+            dependencies: ["DiskTriageCollectors", "DiskTriageCore"],
+            path: "Tests/DiskTriageCollectorsTests"
+        ),
     ]
 )
