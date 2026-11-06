@@ -14,3 +14,11 @@ pins:
   operator: "LT"
   value: "4"
   unit: "gib"
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0079_destinationOnSourceDiskIsRefused()"
+  - "DiskTriageCLITests.ImageCommandTests::REQ0079_fat32AndUnwritableAreRefused()"
+  - "DiskTriageCLITests.ImageCommandTests::REQ0079_insufficientFreeSpaceIsRefused()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0079_destinationOnSourceDiskIsDetected()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0079_fat32IsRefused()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0079_freeSpaceCoversTheWholeDevice()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0079_writableIsRequired()"

@@ -10,3 +10,6 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0078_existingImageWithoutMapfileIsRefused()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0078_existingImageWithoutMapfileIsRefused()"

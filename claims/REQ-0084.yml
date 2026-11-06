@@ -14,3 +14,9 @@ pins:
   operator: "LT"
   value: "0.0001"
   unit: "none"
+tests:
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0084_lowYieldButShortProjectionKeepsGoing()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0084_lowYieldLongProjectionStops()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0084_pass2StopReferenceCase()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0084_shortHistoryKeepsGoing()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0084_yieldAtTheThresholdKeepsGoing()"

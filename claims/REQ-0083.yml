@@ -10,3 +10,7 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0047_REQ0048_REQ0076_REQ0083_dryRunPrintsTheCommand()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0083_blockSizeComesFromTheDevice()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0083_twoPassesUseTheRawNodeAndNoDirectIO()"

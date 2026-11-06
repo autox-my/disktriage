@@ -13,3 +13,5 @@ rationale:
 pins:
   value: "4"
   unit: "none"
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0050_REQ0051_serialConfirmationIsRequired()"

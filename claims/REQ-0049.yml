@@ -11,6 +11,7 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0045_REQ0049_unsupportedMediaStillImagesWithCaveat()"
   - "DiskTriageCoreTests.ClassifierTests::`REQ-0049 unsupported media is not classified but imaging stays offered`()"
   - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0049 NVMe is unsupported but imaging is still offered`()"
   - "DiskTriageCoreTests.RendererTests::`REQ-0049 the tty states that unsupported media is not classified`()"

@@ -13,4 +13,5 @@ rationale:
 pins:
   modality: "SHALL-NOT"
 tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0045_REQ0049_unsupportedMediaStillImagesWithCaveat()"
   - "DiskTriageCoreTests.ClassifierTests::`REQ-0045 an inconclusive result does not block imaging`()"
