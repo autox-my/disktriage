@@ -125,6 +125,11 @@ public struct SmartSelfTest: Codable, Equatable, Sendable {
     public let last: String?
     public let ageHours: Int?
 
+    public init(last: String? = nil, ageHours: Int? = nil) {
+        self.last = last
+        self.ageHours = ageHours
+    }
+
     enum CodingKeys: String, CodingKey {
         case last
         case ageHours = "age_hours"
