@@ -36,17 +36,22 @@ public enum CheckTool: String, CaseIterable, Sendable, Equatable {
 public struct TerminalIdentity: Equatable, Sendable {
     public let name: String
     public let bundlePath: String?
+    /// True for a terminal application. A host app (an IDE or the app that
+    /// spawned the CLI) is named but is not called a terminal.
+    public let isTerminal: Bool
 
-    public init(name: String, bundlePath: String? = nil) {
+    public init(name: String, bundlePath: String? = nil, isTerminal: Bool = true) {
         self.name = name
         self.bundlePath = bundlePath
+        self.isTerminal = isTerminal
     }
 
     /// Used when no `.app` ancestor can be identified: still names what the
     /// user must grant, without inventing a terminal name.
     public static let unidentified = TerminalIdentity(
         name: "the terminal application you ran this from",
-        bundlePath: nil
+        bundlePath: nil,
+        isTerminal: true
     )
 }
 
@@ -127,7 +132,8 @@ public struct CheckRunner: Sendable {
                 guidance: FDAGuidance.grantInstructions(
                     state: .denied,
                     terminal: terminal.name,
-                    terminalPath: terminal.bundlePath
+                    terminalPath: terminal.bundlePath,
+                    responsibleIsTerminal: terminal.isTerminal
                 )
             )
         case .unknown:
@@ -139,7 +145,8 @@ public struct CheckRunner: Sendable {
                 guidance: FDAGuidance.grantInstructions(
                     state: .unknown,
                     terminal: terminal.name,
-                    terminalPath: terminal.bundlePath
+                    terminalPath: terminal.bundlePath,
+                    responsibleIsTerminal: terminal.isTerminal
                 )
             )
         }

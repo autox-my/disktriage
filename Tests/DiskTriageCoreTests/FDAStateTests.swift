@@ -106,6 +106,20 @@ struct FDAStateTests {
         #expect(empty.state == .unknown, "a zero-byte read is not evidence of access")
     }
 
+    @Test("a non-terminal responsible app gets the broad-grant warning without the terminal claim")
+    func aNonTerminalAppIsDescribedHonestly() {
+        let joined = FDAGuidance.grantInstructions(
+            state: .denied,
+            terminal: "T3 Code (Beta)",
+            terminalPath: "/Applications/T3 Code (Beta).app",
+            responsibleIsTerminal: false
+        ).joined(separator: "\n")
+
+        #expect(!joined.contains("terminal application"), "does not mislabel a host app")
+        #expect(joined.lowercased().contains("broad grant"), "still warns about the broad grant")
+        #expect(joined.contains("T3 Code (Beta)"), "still names the responsible app")
+    }
+
     @Test("UNKNOWN still tells the user what to grant and that it re-probes next run")
     func unknownStillCarriesTheOnboarding() {
         let instructions = FDAGuidance.grantInstructions(

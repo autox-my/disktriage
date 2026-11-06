@@ -191,7 +191,8 @@ public enum FDAGuidance {
     public static func grantInstructions(
         state: FDAState,
         terminal: String,
-        terminalPath: String? = nil
+        terminalPath: String? = nil,
+        responsibleIsTerminal: Bool = true
     ) -> [String] {
         guard FDAStateMachine.blocksImaging(state) else { return [] }
 
@@ -199,10 +200,13 @@ public enum FDAGuidance {
         let reason = state == .denied
             ? "Full Disk Access is denied for \(process)."
             : "Full Disk Access could not be verified for \(process)."
+        let broadGrant = responsibleIsTerminal
+            ? "\(terminal) is a terminal application: granting it is a broad grant — every command run in \(terminal) gets raw-device access."
+            : "\(terminal) is the application responsible for this process: granting it is a broad grant — every command it runs gets raw-device access."
 
         return [
             reason,
-            "\(terminal) is a terminal application: granting it is a broad grant — every command run in \(terminal) gets raw-device access.",
+            broadGrant,
             fullDiskAccessDeepLink,
             "relaunch required — the grant applies at launch; re-probing happens on the next run (nothing is cached).",
         ]

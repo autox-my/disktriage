@@ -10,27 +10,42 @@ public enum TerminalDetector {
 
     /// `ancestors` is nearest-first: the parent, then its parent, and so on.
     public static func identity(ancestors: [String], termProgram: String?) -> TerminalIdentity {
+        let termProgramPresent = !(termProgram ?? "").isEmpty
         for path in ancestors {
-            if let identity = appBundleIdentity(path: path) {
+            if let identity = appBundleIdentity(path: path, termProgramPresent: termProgramPresent) {
                 return identity
             }
         }
         if let termProgram, !termProgram.isEmpty {
-            return TerminalIdentity(name: displayName(for: termProgram), bundlePath: nil)
+            return TerminalIdentity(name: displayName(for: termProgram), bundlePath: nil, isTerminal: true)
         }
         return .unidentified
     }
 
     /// `/Applications/Ghostty.app/Contents/MacOS/ghostty` →
     /// name `Ghostty`, bundle `/Applications/Ghostty.app`.
-    public static func appBundleIdentity(path: String) -> TerminalIdentity? {
+    public static func appBundleIdentity(
+        path: String,
+        termProgramPresent: Bool = false
+    ) -> TerminalIdentity? {
         guard let range = path.range(of: ".app/") else { return nil }
         let bundle = String(path[..<range.lowerBound]) + ".app"
         let name = (bundle as NSString).lastPathComponent
         let display = name.hasSuffix(".app") ? String(name.dropLast(4)) : name
         guard !display.isEmpty else { return nil }
-        return TerminalIdentity(name: display, bundlePath: bundle)
+        return TerminalIdentity(
+            name: display,
+            bundlePath: bundle,
+            isTerminal: termProgramPresent || terminalNames.contains(display)
+        )
     }
+
+    /// Terminal applications whose bundle name is unambiguous. A GUI host that
+    /// merely spawned the CLI is not in this set.
+    private static let terminalNames: Set<String> = [
+        "Terminal", "iTerm", "Ghostty", "WezTerm", "kitty", "Hyper",
+        "Alacritty", "Tabby", "Visual Studio Code",
+    ]
 
     /// The values `TERM_PROGRAM` actually takes on macOS.
     public static func displayName(for termProgram: String) -> String {

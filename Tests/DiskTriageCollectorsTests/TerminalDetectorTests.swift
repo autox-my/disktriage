@@ -50,6 +50,25 @@ struct TerminalDetectorTests {
         }
     }
 
+    @Test("a non-terminal host app is named but not called a terminal")
+    func aNonTerminalAppIsNotCalledATerminal() {
+        let identity = TerminalDetector.identity(
+            ancestors: ["/Applications/T3 Code (Beta).app/Contents/MacOS/T3 Code (Beta)"],
+            termProgram: nil
+        )
+        #expect(identity.name == "T3 Code (Beta)", "the responsible app")
+        #expect(identity.isTerminal == false, "it is not a terminal application")
+    }
+
+    @Test("a known terminal bundle is a terminal even without TERM_PROGRAM")
+    func aKnownTerminalBundleIsATerminal() {
+        let identity = TerminalDetector.identity(
+            ancestors: ["/Applications/Ghostty.app/Contents/MacOS/ghostty"],
+            termProgram: nil
+        )
+        #expect(identity.isTerminal, "Ghostty is a terminal")
+    }
+
     @Test("no evidence is an honest fallback, not an invented terminal")
     func noEvidenceFallsBack() {
         let identity = TerminalDetector.identity(ancestors: ["/bin/zsh"], termProgram: nil)
