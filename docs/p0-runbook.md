@@ -647,11 +647,11 @@ Open questions carried into P1: ______
 
 - **Row 7 / 8:** EPERM (1) = TCC denied, regardless of root. EACCES (13) = TCC passed, Unix
   permissions denied. So a non-root probe can tell "FDA granted" (EACCES) from "FDA missing"
-  (EPERM) without sudo. Untested: Ghostty granted + non-root; do it once to confirm.
+  (EPERM) without sudo. **Confirmed** with Ghostty granted + non-root: errno 13.
 - **A4 attribution:** the grant follows the responsible `.app`, not the terminal. Ad-hoc signed
   rebuilds with **identical bits keep the grant** (same cdhash). The plan's "ad-hoc builds lose
-  the grant on every rebuild" is true only when the bits change; re-test with
-  `sh captures/p0-a4-build.sh <new-id>`.
+  the grant on every rebuild" is true only when the bits change. **Confirmed:** a rebuild with a new build id (new cdhash)
+  returned errno 1 again, so the grant was lost.
 - **Script executables carry no TCC identity** (the process is `/bin/sh`): any helper must be
   a Mach-O.
 - **No native NTFS reader** on macOS 27.2 build 26B123. Plan §2 principle 4 and §8 inspection
