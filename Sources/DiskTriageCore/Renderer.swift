@@ -7,9 +7,14 @@ public enum Renderer {
 
     // MARK: - TTY
 
-    /// The day-one transcript. Timestamps are UTC (REQ-0059); no local timezone
-    /// leaks in.
-    public static func tty(_ signals: SignalSet, _ verdict: Verdict) -> String {
+    /// The day-one transcript. Timestamps are UTC (REQ-0059) unless a caller
+    /// passes the local zone for `--local`; no local timezone leaks in by
+    /// default.
+    public static func tty(
+        _ signals: SignalSet,
+        _ verdict: Verdict,
+        timeZone: TimeZone = TimeZone(secondsFromGMT: 0)!
+    ) -> String {
         var lines: [String] = []
         let device = signals.device
 
@@ -47,7 +52,7 @@ public enum Renderer {
             }
         }
 
-        let errorRows = errorSignalRows(signals)
+        let errorRows = errorSignalRows(signals, timeZone: timeZone)
         if !errorRows.isEmpty {
             lines.append("")
             lines.append(section("ERROR SIGNALS"))
@@ -301,7 +306,7 @@ public enum Renderer {
         return "\(comma(hours)) power-on hours · \(reallocated) reallocated \(events)"
     }
 
-    private static func errorSignalRows(_ signals: SignalSet) -> [String] {
+    private static func errorSignalRows(_ signals: SignalSet, timeZone: TimeZone) -> [String] {
         var rows: [String] = []
         if let io = signals.io, io.status == .ok, io.retries != nil || io.timeouts != nil {
             var parts: [String] = []
@@ -315,9 +320,9 @@ public enum Renderer {
             if let count = event.count {
                 var window = ""
                 if let first = event.firstTime, let last = event.time {
-                    window = ", \(hhmm(first))–\(hhmm(last))"
+                    window = ", \(hhmm(first, timeZone))–\(hhmm(last, timeZone))"
                 } else if let last = event.time {
-                    window = ", \(hhmm(last))"
+                    window = ", \(hhmm(last, timeZone))"
                 }
                 let occurrences = count == 1 ? "occurrence" : "occurrences"
                 value += "  (\(count) \(occurrences)\(window))"
@@ -472,11 +477,13 @@ public enum Renderer {
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
-    private static func hhmm(_ date: Date) -> String {
+    private static func hhmm(_ date: Date, _ timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "HH:mm'Z'"
+        formatter.timeZone = timeZone
+        // UTC keeps the explicit Z the Appendix shows; a local render must not
+        // claim to be Zulu.
+        formatter.dateFormat = timeZone.secondsFromGMT() == 0 ? "HH:mm'Z'" : "HH:mm"
         return formatter.string(from: date)
     }
 

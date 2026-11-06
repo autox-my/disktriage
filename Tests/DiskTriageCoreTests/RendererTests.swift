@@ -21,6 +21,19 @@ struct RendererTests {
     }
 
     @Test
+    func `REQ-0059 --local renders the log window in the supplied zone`() throws {
+        let signals = try fixture("minah.json")
+        let verdict = classify(
+            signals,
+            context: TriageContext(imageDestination: "/Volumes/Scratch/minah.img")
+        )
+
+        #expect(Renderer.tty(signals, verdict).contains("23:51Z–00:12Z"), "default is UTC")
+        let plusOne = Renderer.tty(signals, verdict, timeZone: TimeZone(secondsFromGMT: 3600)!)
+        #expect(plusOne.contains("00:51–01:12"), "the supplied zone, not UTC")
+    }
+
+    @Test
     func `REQ-0043 the degraded no-FDA block matches the Appendix`() throws {
         let signals = try fixture("minah.json")
         let verdict = classify(signals)

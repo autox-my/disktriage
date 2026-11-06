@@ -18,7 +18,7 @@ pure function over a `SignalSet`; everything else is plumbing.
 | Build | `swift build` |
 | Tests | `swift test` |
 | Tests + the JUnit report the gate reads | `swift test --xunit-output .build/test-results/junit.xml` |
-| CLI (skeleton; commands land in P1) | `swift run disktriage` |
+| CLI (triage a recorded SignalSet) | `swift run disktriage triage --from Tests/Fixtures/minah.json` |
 
 **Never read an exit status through a pipeline.** `cmd | tail` reports `tail`'s
 status. Capture `$?` on the command itself.

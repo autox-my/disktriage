@@ -16,9 +16,14 @@ let package = Package(
             name: "DiskTriageCore",
             path: "Sources/DiskTriageCore"
         ),
+        .target(
+            name: "DiskTriageCLI",
+            dependencies: ["DiskTriageCore"],
+            path: "Sources/DiskTriageCLI"
+        ),
         .executableTarget(
             name: "disktriage",
-            dependencies: ["DiskTriageCore"],
+            dependencies: ["DiskTriageCore", "DiskTriageCLI"],
             path: "Sources/disktriage"
         ),
         // A regular test target: full Xcode (27.2, Swift 6.4.2) ships Swift
@@ -30,6 +35,11 @@ let package = Package(
             name: "DiskTriageCoreTests",
             dependencies: ["DiskTriageCore"],
             path: "Tests/DiskTriageCoreTests"
+        ),
+        .testTarget(
+            name: "DiskTriageCLITests",
+            dependencies: ["DiskTriageCLI"],
+            path: "Tests/DiskTriageCLITests"
         ),
     ]
 )
