@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.LiveCLITests::REQ0053_REQ0054_listLabelsUnsupportedMedia()"

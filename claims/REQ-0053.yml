@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.LiveCLITests::REQ0053_REQ0054_listLabelsUnsupportedMedia()"

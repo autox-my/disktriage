@@ -11,4 +11,5 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
+  - "DiskTriageCLITests.LiveCLITests::REQ0011_REQ0012_aSmartTimeoutDoesNotStopTheOthers()"
   - "DiskTriageCollectorsTests.ProcessRunnerTests::REQ0011_REQ0012_timeoutIsAResultAndKillsTheProcessGroup()"

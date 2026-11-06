@@ -11,4 +11,5 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
+  - "DiskTriageCLITests.LiveCLITests::REQ0023_unsupportedSmartKeepsNilCounters()"
   - "DiskTriageCollectorsTests.SignalSetBuilderTests::REQ0023_unsupportedHasNoCounters()"
