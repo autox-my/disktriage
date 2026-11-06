@@ -617,7 +617,7 @@ raise the timeout, do not "try once more".
 | Control disk model / serial / size | Seagate Expansion (USB bridge VID:PID 0bc2:231a), 5.0 TB, 512 B blocks, GPT, NTFS data partition; model and serial not readable (no SMART) |
 | Scratch volume, free space | |
 | E1 bridge name / VID:PID | Seagate Expansion built-in bridge, 0bc2:231a (only bridge available; E2 not tested) |
-| E2 bridge name / VID:PID | |
+| E2 bridge name / VID:PID | VLI (VIA Labs) USB-SATA bridge, 2109:0715, with a Samsung SSD 850 EVO 250 GB (`SolidState` absent in diskutil, `SMARTStatus: Not Supported`) |
 | Third-party NTFS driver(s) (`listFilesystems`, `/Library/Filesystems`, `/Library/Extensions`) | `iboysoft_NTFS` personality; `/Library/Filesystems/iboysoft_NTFS.fs`; `/Library/Extensions/ms_ntfs.kext` (also CIJUSBLoad.kext, SoftRAID.kext) |
 | Native `mount_ntfs` present? (A2) | **No.** `man -w mount_ntfs` rc=1; `ntfs.fs/Contents/Resources` has `ntfs.util` and `BootCampFormatter`, no mount helper. Row 4 is answered by absence. |
 | `smartctl --version` / `ddrescue --version` | smartctl 7.5 2025-04-30 r5714 / GNU ddrescue 1.30 |
@@ -626,7 +626,7 @@ raise the timeout, do not "try once more".
 
 | # | Question | Answer (yes / no / unproven) | Evidence file (`captures/…`) | Decision taken (quote the branch applied) |
 |---|---|---|---|---|
-| 1 | `smartctl -d sat` over USB; TCC/root needed? | **no, and not because of TCC or root.** As root with Ghostty granted, every device type fails: `-d sat` and `-d scsi` give "Not a device of type 'scsi'", `-d auto` and `-d ata` give "Operation not supported by device" (smartctl exit 1 or 2). `diskutil` also reports `SMARTStatus: Not Supported`. | `phase-b/q1-*` | Branch applied (if-no, bridge or OS cause): `BRIDGE` / no-SMART is the common path; confidence loses the SMART source on such disks; FDA is NOT on the critical path for triage. Only one bridge tested, so "this bridge" vs "macOS-wide" is unresolved (E2 needed). |
+| 1 | `smartctl -d sat` over USB; TCC/root needed? | **no, and not because of TCC or root.** As root with Ghostty granted, every device type fails: `-d sat` and `-d scsi` give "Not a device of type 'scsi'", `-d auto` and `-d ata` give "Operation not supported by device" (smartctl exit 1 or 2). `diskutil` also reports `SMARTStatus: Not Supported`. | `phase-b/q1-*` | Branch applied (if-no, bridge or OS cause): `BRIDGE` / no-SMART is the common path; confidence loses the SMART source on such disks; FDA is NOT on the critical path for triage. **Second bridge tested (VLI 2109:0715 + Samsung SSD 850 EVO): all 11 device types fail the same way, so this is macOS-wide for USB mass storage on this build, not bridge-specific.** |
 | 2 | `ioreg` exposes real retries/timeouts for USB disks? | **yes, counters are real, but there is no timeouts counter.** The Seagate's `IOBlockStorageDriver` Statistics tracked a 64 MiB read exactly: Bytes (Read) +67,108,864 and Operations (Read) +64. Available for Read and Write: Bytes, Operations, Total Time, Latency Time, **Retries**, **Errors**. Retries and Errors stayed 0 on a healthy disk; that they move on bad media is UNVERIFIED until the MiNaH capture. | `phase-b/q2-before.txt`, `q2-after.txt`, `q2-dd.txt` | Branch (if-yes) applied provisionally: Retries and Errors are a candidate independent source, but keep `p0_validated` off until MiNaH shows them moving. Drop "timeouts" from the I/O model or source it from the kernel log. |
 | 3 | Unified log retains medium errors with LBAs, and for how long? | **unproven** (a healthy disk has none). Side evidence: `log show` works without root; `log stats --overview` hung past the 60 s timeout (exit 124, empty output; the wrapper killed it and no process was left), so do not use it to measure retention. | `phase-b/q3-log-show.txt`, `q3-log-stats.txt` | Branch (if-no, provisional): re-query after the MiNaH capture; do not claim the no-SMART path has a log signal until then. |
 | 4 | `F_LOG2PHYS_EXT` works on the native read-only NTFS mount? | **no, by absence** (A2) | `a2.txt` | Branch applied: volume-level reporting in v1; NTFS runlist parser for v1.1. Also raises the plan question: no native NTFS reader exists on this macOS build (see below). |
@@ -682,3 +682,14 @@ Open questions carried into P1: ______
   hang occurred at probe time, `guard` alone would not have prevented it. Plan principle 1 and the
   `guard` description should say "never mount", not "never touch"; the only way to avoid probe
   reads is not to have the disk visible to macOS (Linux rescue image, or a different host).
+
+### Second bridge (2026-11-07): VLI 2109:0715 + Samsung SSD 850 EVO 250 GB
+
+- `smartctl -i` as root with Full Disk Access, 11 device types (`sat`, `auto`, `scsi`, `ata`,
+  `sntasmedia`, `sntjmicron`, `sntrealtek`, `usbjmicron`, `usbsunplus`, `usbcypress`, `nvme`):
+  every one failed ("Not a device of type 'scsi'" or "Operation not supported by device").
+  Two unrelated bridges and two different drives behave identically, so smartctl cannot reach USB
+  mass-storage SMART on macOS 27.2 here. Row 1 stays "no", now with the cause attributed to the OS.
+- `diskutil` reports no `SolidState` key for either USB disk (the HDD and the SSD), so media type over
+  USB is `unknown`; the collector already maps an absent `SolidState` to `unknown`. Triage must not
+  assume HDD or SSD from diskutil alone over USB.

@@ -227,8 +227,10 @@ branch.
 **Measured (P0 phase B, Seagate Expansion bridge 0bc2:231a, macOS 27.2):** `smartctl` cannot reach
 SMART through this bridge even as root with Full Disk Access ("Not a device of type 'scsi'" /
 "Operation not supported by device"), and `diskutil` reports `SMARTStatus: Not Supported`. The cause
-is the OS/bridge path, not permissions. Only one bridge was tested, so "this bridge" versus
-"macOS-wide" is open. Consequences: the no-SMART path carries triage; `io.timeouts` is **not**
+is the OS/bridge path, not permissions. Two unrelated bridges (Seagate Expansion built-in, and a VLI bridge with a Samsung SSD 850 EVO) fail
+identically on all 11 smartctl device types, so this is macOS-wide for USB mass storage, not
+bridge-specific. Over USB, `diskutil` also gives no `SolidState` key for HDD or SSD, so media type is
+`unknown`. Consequences: the no-SMART path carries triage; `io.timeouts` is **not**
 available from ioreg (which exposes Retries and Errors) and must come from the kernel log or the
 collector's own timeouts.
 
@@ -640,7 +642,7 @@ produce it. Timestamps render in UTC unless `--local` is passed, so the test is 
 
 | Risk | Mitigation |
 |---|---|
-| SMART over USB doesn't work on modern macOS | **Measured: not reachable via smartctl through the Seagate bridge on macOS 27.2 (P0 row 1).** The no-SMART path (kernel log, ioreg Retries/Errors, symptoms) carries triage; a second bridge would show whether this is bridge-specific |
+| SMART over USB doesn't work on modern macOS | **Measured: not reachable via smartctl through the Seagate bridge on macOS 27.2 (P0 row 1).** The no-SMART path (kernel log, ioreg Retries/Errors, symptoms) carries triage; a second, unrelated bridge fails identically, so it is macOS-wide rather than bridge-specific |
 | USB-SATA bridges hide SMART entirely | Explicit `BRIDGE` branch; publish a known-good bridge list; never fake a verdict |
 | TCC behaviour changes between macOS releases | Probe every run; keep the permission layer one module |
 | Granting Terminal FDA is a broad privilege | State it explicitly; offer the app/helper options |
@@ -698,6 +700,8 @@ product, and awkward on Apple Silicon.
 - Measured: SMART unreachable via smartctl through the Seagate bridge; ioreg exposes real
   Retries/Errors counters but no timeouts; `ddrescue -d` unavailable on macOS.
 - Fixed a misplaced table row: P0 row 11 had been inserted into the exit-code table.
+- A second, unrelated USB bridge (VLI + Samsung SSD) fails smartctl identically: SMART over USB is
+  unavailable on this macOS, not bridge-specific. Media type over USB is `unknown`.
 
 **v3.2 (2026-11-06), after P0 phase A and the NTFS spike:**
 
