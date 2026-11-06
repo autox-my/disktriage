@@ -1,0 +1,6 @@
+$ disktriage image disk4 --to ...
+  ! raw device access denied (TCC)
+    Triage completed without it: verdict still MEDIA.
+    Imaging needs Full Disk Access for the process that runs it
+    (Terminal, if you launched this from Terminal).
+    → System Settings open · relaunch required (grant applies at launch)
