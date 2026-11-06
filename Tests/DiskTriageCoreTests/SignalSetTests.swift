@@ -102,6 +102,32 @@ struct SignalSetTests {
         #expect(set.device == nil, "device section")
     }
 
+    @Test("the contract carries the log window start, the P0 I/O flag and the synthetic label")
+    func theContractCarriesTheRenderInputs() throws {
+        let json = """
+        {
+          "schema_version": 1,
+          "collected_at": "2026-11-06T00:14:02Z",
+          "synthetic": true,
+          "io": { "status": "ok", "retries": 4, "p0_validated": true },
+          "log": { "status": "ok", "window_hours": 72,
+                   "events": [{ "time": "2026-11-06T00:12:31Z",
+                                "first_time": "2026-11-05T23:51:00Z",
+                                "kind": "medium_error", "lba": 2048, "count": 6 }] }
+        }
+        """
+        let set = try JSONDecoder.disktriage().decode(SignalSet.self, from: Data(json.utf8))
+
+        #expect(set.synthetic == true, "synthetic")
+        #expect(set.io?.p0Validated == true, "io.p0_validated")
+
+        let event = try #require(set.log?.events?.first, "log.events[0]")
+        #expect(event.firstTime == ISO8601DateFormatter().date(from: "2026-11-05T23:51:00Z"),
+                "log.events[0].first_time")
+        #expect(event.time == ISO8601DateFormatter().date(from: "2026-11-06T00:12:31Z"),
+                "log.events[0].time")
+    }
+
     @Test("an unrecognised signal status fails closed")
     func REQ0020_anUnrecognisedSignalStatusFailsClosed() {
         let json = """

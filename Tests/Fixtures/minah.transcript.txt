@@ -1,0 +1,52 @@
+$ disktriage triage disk4
+
+DEVICE   disk4                              whole disk, 298.1 GiB
+MODEL    WDC WD3200BJKT-75F4T0
+SERIAL   WD-WX0123456789
+BUS      USB — generic SATA bridge (SAT passthrough: partial)
+AGE      4,531 power-on hours · 14 reallocated events
+
+SMART ─────────────────────────────────────────────────────────────
+  overall            PASSED            ← threshold-based; ignore on its own
+  pending sectors    131               ← at least 67 KB the drive cannot currently read
+  reallocated        14
+  uncorrectable      0
+  raw read errors    21,545
+
+ERROR SIGNALS ─────────────────────────────────────────────────────
+  IORegistry         retries 1,204 · timeouts 3
+  unified log        medium error, LBA 2048  (6 occurrences, 23:51Z–00:12Z)
+
+FILESYSTEM DRIVERS ────────────────────────────────────────────────
+  /Library/Filesystems/iboysoft-ntfs.fs    ← third-party, claims NTFS volumes
+  NTFS inspection: ntfs-3g tools on the image (no mount)
+
+DIFFERENTIAL ──────────────────────────────────────────────────────
+  1. MEDIA DEGRADATION                          confidence: HIGH
+     pending=131, reallocated>0, medium errors pinned to one LBA
+     (two independent sources agree: SMART and the kernel log;
+     I/O statistics corroborate).
+     That LBA (2048) is the NTFS boot sector — every mount reads it
+     first, which is why the volume dies before it can say anything.
+
+  2. ENCLOSURE / LINK                           confidence: LOW
+     3 timeouts could be the bridge, but pending sectors are
+     drive-internal. The bridge cannot explain them.
+
+  AGGRAVATING FACTOR
+     DRIVER HANG                                confidence: MEDIUM
+     A third-party FS driver may block on a retrying read, which makes
+     a slow disk look dead.
+
+VERDICT
+  The disk is degrading, not dead. The pending-sector count is a floor,
+  not an estimate: the real extent of loss is unknown until the device
+  has been imaged. Do not mount it again.
+
+NEXT  (~3–4 h, estimated from size and bus speed)
+  disktriage image disk4 --to /Volumes/Scratch/minah.img
+  (you will be asked to type the last four of the serial: 6789)
+
+THEN
+  disktriage inspect minah.img      # read-only, ntfs-3g tools on the image, no mount, no third-party driver
+  disktriage copy   minah.img --to ~/Archive   # hashed copy + volume-level damage report

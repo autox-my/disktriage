@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-11-06T02:20:00Z",
+  "synthetic": true,
+  "device": {
+    "status": "ok",
+    "bsd": "disk7", "size_bytes": 320072933376,
+    "model": "WDC WD3200BEVT-22ZCT0", "serial": "REDACTED0005",
+    "media": "hdd", "bus": "sata", "removable": false
+  },
+  "smart": {
+    "status": "ok", "overall": "PASSED",
+    "pending": 0, "reallocated": 8, "uncorrectable": 0,
+    "power_on_hours": 32024, "raw_read_errors": 14,
+    "history": { "recorded_at": "2026-10-06T00:00:00Z", "pending": 0, "reallocated": 5 }
+  },
+  "io": { "status": "ok", "retries": 0, "timeouts": 0 },
+  "log": { "status": "ok", "window_hours": 72, "events": [] },
+  "permissions": { "root": true, "raw_read": "granted", "removable_volumes": "granted" },
+  "fs": { "status": "ok", "type": "hfs+", "mounted": false, "readable": true },
+  "symptoms": { "source": "user", "clicking": false }
+}

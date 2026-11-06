@@ -19,7 +19,7 @@
   "io": { "status": "ok", "retries": 1204, "timeouts": 3 },
   "log": {
     "status": "ok", "window_hours": 72,
-    "events": [{ "time": "2026-11-06T00:12:31Z", "kind": "medium_error", "lba": 2048, "count": 6 }]
+    "events": [{ "time": "2026-11-06T00:12:31Z", "first_time": "2026-11-05T23:51:00Z", "kind": "medium_error", "lba": 2048, "count": 6 }]
   },
   "drivers": {
     "status": "ok",

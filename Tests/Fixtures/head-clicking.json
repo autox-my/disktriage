@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-11-06T03:10:00Z",
+  "device": {
+    "status": "ok",
+    "bsd": "disk9", "size_bytes": 2000398934016,
+    "model": "ST2000DM001-1CH164", "serial": "REDACTED0007",
+    "media": "hdd", "bus": "usb", "bridge": "generic-sata", "sat_passthrough": "partial",
+    "removable": true
+  },
+  "smart": {
+    "status": "ok", "overall": "PASSED",
+    "pending": 0, "reallocated": 0, "uncorrectable": 0,
+    "power_on_hours": 21000, "raw_read_errors": 3,
+    "history": null
+  },
+  "io": { "status": "ok", "retries": 40, "timeouts": 5 },
+  "log": {
+    "status": "ok", "window_hours": 72,
+    "events": [{ "time": "2026-11-06T03:08:00Z", "kind": "reset", "count": 2 }]
+  },
+  "permissions": { "root": true, "raw_read": "granted", "removable_volumes": "granted" },
+  "fs": { "status": "timeout" },
+  "symptoms": { "source": "user", "clicking": true, "disappears": true }
+}

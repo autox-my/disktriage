@@ -37,11 +37,14 @@ public struct SignalSet: Codable, Equatable, Sendable {
     public let fs: FileSystemSignals?
     public let symptoms: SymptomSignals?
     public let collectorNotes: [CollectorNote]?
+    /// True for a fixture that carries a prior SMART snapshot that was not
+    /// recorded from a real drive. Never true for a live capture.
+    public let synthetic: Bool?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case collectedAt = "collected_at"
-        case device, smart, io, log, drivers, permissions, fs, symptoms
+        case device, smart, io, log, drivers, permissions, fs, symptoms, synthetic
         case collectorNotes = "collector_notes"
     }
 }
@@ -121,6 +124,15 @@ public struct IOSignals: Codable, Equatable, Sendable {
     public let status: SignalStatus
     public let retries: Int?
     public let timeouts: Int?
+    /// P0 item 2: only a validated counter set may count as an independent
+    /// evidence source (diskdoctor.md §5). Absent or false means displayed,
+    /// not counted.
+    public let p0Validated: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case status, retries, timeouts
+        case p0Validated = "p0_validated"
+    }
 }
 
 public struct LogSignals: Codable, Equatable, Sendable {
@@ -136,9 +148,17 @@ public struct LogSignals: Codable, Equatable, Sendable {
 
 public struct LogEvent: Codable, Equatable, Sendable {
     public let time: Date?
+    /// First occurrence in the same burst, when the collector can supply it;
+    /// the renderer shows the window as `first–last`.
+    public let firstTime: Date?
     public let kind: String?
     public let lba: Int?
     public let count: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case time, kind, lba, count
+        case firstTime = "first_time"
+    }
 }
 
 public struct DriverSignals: Codable, Equatable, Sendable {

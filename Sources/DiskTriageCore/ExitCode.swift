@@ -58,15 +58,46 @@ public extension ExitCode {
     }
 }
 
-/// Root cause and aggravators stay separate; the verdict carries the exit code
-/// and the one-line headline (diskdoctor.md §3, §5).
+/// Root cause and aggravators stay separate; the verdict carries the exit code,
+/// the one-line headline and every finding (diskdoctor.md §3, §5).
+///
+/// `causes` and `aggravators` are always both reported, whatever exit code wins
+/// the precedence rule. `imagingOffered` is true even when no classification was
+/// possible: an inconclusive triage never blocks imaging (REQ-0045).
 public struct Verdict: Codable, Equatable, Sendable {
     public let code: ExitCode
     public let headline: String
+    public let causes: [Cause]
+    public let aggravators: [Aggravator]
+    public let evidenceAvailable: [String]
+    public let evidenceUnavailable: [String]
+    public let imagingOffered: Bool
+    public let unsupportedNote: String?
+    public let warnings: [String]
+    public let next: NextStep?
 
-    public init(code: ExitCode, headline: String) {
+    public init(
+        code: ExitCode,
+        headline: String,
+        causes: [Cause] = [],
+        aggravators: [Aggravator] = [],
+        evidenceAvailable: [String] = [],
+        evidenceUnavailable: [String] = [],
+        imagingOffered: Bool = true,
+        unsupportedNote: String? = nil,
+        warnings: [String] = [],
+        next: NextStep? = nil
+    ) {
         self.code = code
         self.headline = headline
+        self.causes = causes
+        self.aggravators = aggravators
+        self.evidenceAvailable = evidenceAvailable
+        self.evidenceUnavailable = evidenceUnavailable
+        self.imagingOffered = imagingOffered
+        self.unsupportedNote = unsupportedNote
+        self.warnings = warnings
+        self.next = next
     }
 
     /// Builds a verdict from every finding that applies, using the §5
