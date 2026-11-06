@@ -9,7 +9,7 @@ import DiskTriageCore
 /// decoder computes them.
 struct SignalSetTests {
     @Test("SignalSet decodes the MiNaH fixture (plan §3, §11)")
-    func decodesTheMiNaHFixture() throws {
+    func REQ0015_REQ0018_REQ0020_REQ0024_decodesTheMiNaHFixture() throws {
         let set = try JSONDecoder.disktriage().decode(SignalSet.self, from: try minahData())
 
         #expect(set.schemaVersion == 1, "schema_version")
@@ -83,7 +83,7 @@ struct SignalSetTests {
     }
 
     @Test("absent counters stay nil, never zero")
-    func absentCountersStayNil() throws {
+    func REQ0021_REQ0022_absentCountersStayNil() throws {
         let json = """
         {
           "schema_version": 1,
@@ -103,7 +103,7 @@ struct SignalSetTests {
     }
 
     @Test("an unrecognised signal status fails closed")
-    func anUnrecognisedSignalStatusFailsClosed() {
+    func REQ0020_anUnrecognisedSignalStatusFailsClosed() {
         let json = """
         { "schema_version": 1, "collected_at": "2026-11-06T00:14:02Z",
           "smart": { "status": "probably-fine" } }

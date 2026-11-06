@@ -93,8 +93,27 @@ tests:
 ```
 
 A hyphen cannot appear in a Swift identifier, so the tag is `REQ0038_…` in code while the claim id
-stays `REQ-0038`. The existing ten tests predate this convention and are unlinked; they keep their
-names until a human links them, and renaming a test is a requirement edit either way.
+stays `REQ-0038`. A test that proves several claims carries several tags, joined with underscores:
+`REQ0015_REQ0018_REQ0020_REQ0024_decodesTheMiNaHFixture()`. A test that proves no claim stays
+untagged — the exit-code constant table is one, because a claim about *when* a code is returned is
+not proven by its numeric value alone.
+
+**`scripts/req-link.sh` writes the `tests:` lists** from the report, so the ids are copied by
+machine and never retyped:
+
+```bash
+./scripts/req-link.sh            # write: set each claim's tests: list from the tags
+./scripts/req-link.sh --check    # 0 match · 1 drift · 3 report missing/empty/unparsable
+```
+
+It reads every `*.xml` under `.build/test-results/`, extracts each `REQ-NNNN` tag from each
+`testcase` **name**, and rewrites only the top-level `tests:` block of the matching
+`claims/REQ-NNNN.yml` — sorted, de-duplicated, every other byte preserved. It is idempotent. A
+stale id (the test was renamed or removed) is dropped in write mode and reported as drift by
+`--check`; a tag naming a claim that does not exist is a definite finding (exit 1) and nothing is
+written. The report is the evidence: a missing, empty or unparsable report is exit 3, never a
+pass. The script is **not** part of `scripts/check.sh`: linking edits the corpus, and the gate
+stays read-only and non-blocking on `req`.
 
 **Parameterised tests collapse.** `@Test(arguments: [1, 2]) func probeParam(_ value: Int)` yields
 **one** `<testcase classname="…ProbeParameterisedTests" name="probeParam(_:)">`, not
@@ -123,8 +142,8 @@ is XML-escaped by SwiftPM, and the trailing `()` is accepted verbatim — no nam
 missing `classname`, nothing that needs a `req` change or a Forgejo issue. Two limits are SwiftPM's,
 not `req`'s, and are handled in `scripts/`: the report is at a sibling path, and a parameterised test
 has no per-argument ids. On the real corpus `req check --test-report
-.build/test-results/junit-swift-testing.xml` is still **3** — because all 100 claims are **unlinked**,
-not because the report is unreadable.
+.build/test-results/junit-swift-testing.xml` is still **3** — because 89 of the 100 claims are
+**unlinked**, not because the report is unreadable.
 
 - **Fixtures:** golden `SignalSet` JSON lives in `Tests/Fixtures/<case>.json` and is replayed by a
   test whose display name begins `REQ-NNNN fixture <case>` (the id keeps the function name, as
@@ -146,12 +165,17 @@ not because the report is unreadable.
 claim (statement + pin)     →  req canon              # parse; 0 flagged pins is authoring green
 failing test + // REQ tag   →  bash scripts/check.sh   # red (the project's gate, exit 1)
                             →  .build/test-results/junit-swift-testing.xml
+./scripts/req-link.sh       # write the tests: lists from the tags (idempotent)
+./scripts/req-link.sh --check
+                                                       # 0 match; 1 drift; 3 no usable report
 req gate --test-report .build/test-results/junit-swift-testing.xml
                                                        # 1: a linked test failed; 3: link missing/stale
 implement                   →  bash scripts/check.sh   # green
 req check --test-report .build/test-results/junit-swift-testing.xml
                                                        # 0: every variant and projection confirmed
 ```
+
+`req-link.sh --check` is advisory in this loop, not a gate: `scripts/check.sh` does not call it.
 
 Exit codes are tri-state: **0** settled affirmatively, **1** a definite finding, **3**
 UNVERIFIABLE (cannot be told; blocks and is never a pass), **2** usage. `req check` folds one
@@ -184,10 +208,13 @@ only if that is impossible).
 
 - 100 claims, all structured, 51 pins held, 0 lints (`req canon --fail-on-flag` → 0).
 - The suite runs under Swift Testing and writes a JUnit report that `req` reads (measured above).
-  Every claim is nonetheless **unlinked** — deliberately: linking is a human judgement about
-  evidence, and this change only made the evidence available. `req check --test-report
-  .build/test-results/junit-swift-testing.xml` is therefore exit 3 (*no linked test*), which is
-  not a pass. Link a claim when its test's id is copied from a report.
+  Eleven claims are linked to the ten existing tests by a `REQ` tag in the test function name:
+  `REQ-0015`, `REQ-0018`, `REQ-0020`, `REQ-0021`, `REQ-0022`, `REQ-0024`, `REQ-0035`, `REQ-0036`,
+  `REQ-0037`, `REQ-0038`, `REQ-0041`. The other 89 have no linked test — linking is a judgement
+  about evidence, and only a test that demonstrably proves the obligation is linked. `req check
+  --test-report .build/test-results/junit-swift-testing.xml` is therefore still exit 3 (*no linked
+  test* on the 89), which is not a pass. `scripts/req-link.sh --check` reports 0 drift for the
+  eleven; `req-link.sh` keeps them in step with the report.
 - No `.req/variants` and no `.req/projections` are committed yet; `req check` therefore runs the
   default variant and checks no projection. Add a variant line in the commit that first uses
   `applicability`, and pin `docs/spec.md` only when a projection is a deliverable. Those two

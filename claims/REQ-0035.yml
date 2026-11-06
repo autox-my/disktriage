@@ -13,3 +13,5 @@ rationale:
 pins:
   value: "20"
   unit: "none"
+tests:
+  - "DiskTriageCoreTests.ExitCodeTests::REQ0035_noFindingsIsInsufficientEvidence()"

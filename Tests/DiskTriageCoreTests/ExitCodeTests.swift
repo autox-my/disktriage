@@ -18,7 +18,7 @@ struct ExitCodeTests {
     }
 
     @Test("precedence picks the most severe: 11 > 10 > 12 > 13 > 20 > 0")
-    func precedencePicksTheMostSevere() {
+    func REQ0038_precedencePicksTheMostSevere() {
         let all: [ExitCode] = [
             .noActionableFault, .mediaRisk, .failing,
             .bridgeLinkPower, .filesystemOnly, .insufficientEvidence,
@@ -45,31 +45,31 @@ struct ExitCodeTests {
     }
 
     @Test("precedence does not depend on input order")
-    func precedenceDoesNotDependOnInputOrder() {
+    func REQ0038_precedenceDoesNotDependOnInputOrder() {
         let codes: [ExitCode] = [.filesystemOnly, .failing, .noActionableFault, .bridgeLinkPower]
         #expect(ExitCode.mostSevere(codes) == .failing, "forward order")
         #expect(ExitCode.mostSevere(codes.reversed()) == .failing, "reverse order")
     }
 
     @Test("a verdict outranks a collection failure")
-    func aVerdictOutranksACollectionFailure() {
+    func REQ0041_aVerdictOutranksACollectionFailure() {
         #expect(ExitCode.mostSevere([.permissionDenied, .mediaRisk]) == .mediaRisk, "denied + media")
         #expect(ExitCode.mostSevere([.toolError, .failing]) == .failing, "tool error + failing")
     }
 
     @Test("a collection failure is used only when no verdict exists")
-    func aCollectionFailureIsUsedOnlyWhenNoVerdictExists() {
+    func REQ0036_REQ0037_aCollectionFailureIsUsedOnlyWhenNoVerdictExists() {
         #expect(ExitCode.mostSevere([.permissionDenied]) == .permissionDenied, "denied alone")
         #expect(ExitCode.mostSevere([.permissionDenied, .toolError]) == .toolError, "denied + tool error")
     }
 
     @Test("no findings is insufficient evidence, never success")
-    func noFindingsIsInsufficientEvidence() {
+    func REQ0035_noFindingsIsInsufficientEvidence() {
         #expect(ExitCode.mostSevere([]) == .insufficientEvidence, "empty finding list")
     }
 
     @Test("Verdict adopts the most severe code")
-    func verdictAdoptsTheMostSevereCode() {
+    func REQ0038_verdictAdoptsTheMostSevereCode() {
         let verdict = Verdict(
             adopting: [.noActionableFault, .mediaRisk, .bridgeLinkPower],
             headline: "degrading, not dead; extent of loss unknown until imaged"

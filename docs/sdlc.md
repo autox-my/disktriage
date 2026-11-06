@@ -89,6 +89,13 @@ were inconvenient:
    and confirm green. A rule removable without a failing test was never covered.
 6. **Fixture and expectation move together**, in the same commit, with the
    reason stated. A re-baselined expectation with no reason is a defect.
+7. **Keep the requirement link in step with the report (advisory).** After
+   the suite writes `.build/test-results/junit-swift-testing.xml`, run
+   `./scripts/req-link.sh --check`: **0** the claims' `tests:` lists match the
+   `REQ` tags in the report, **1** drift, **3** the report is missing, empty or
+   unparsable. `./scripts/req-link.sh` writes the lists from the tags. This is
+   deliberately not part of `scripts/check.sh` — the gate does not depend on
+   `req` — so drift is a finding to fix, not a gate failure.
 
 One change = one small diff. Red, green and refactor are commit-sized units,
 not one giant commit at the end.

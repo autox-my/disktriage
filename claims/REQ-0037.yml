@@ -13,3 +13,5 @@ rationale:
 pins:
   value: "30"
   unit: "none"
+tests:
+  - "DiskTriageCoreTests.ExitCodeTests::REQ0036_REQ0037_aCollectionFailureIsUsedOnlyWhenNoVerdictExists()"

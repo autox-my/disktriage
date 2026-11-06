@@ -10,3 +10,6 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.SignalSetTests::REQ0015_REQ0018_REQ0020_REQ0024_decodesTheMiNaHFixture()"
+  - "DiskTriageCoreTests.SignalSetTests::REQ0020_anUnrecognisedSignalStatusFailsClosed()"

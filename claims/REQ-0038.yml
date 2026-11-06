@@ -10,3 +10,7 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.ExitCodeTests::REQ0038_precedenceDoesNotDependOnInputOrder()"
+  - "DiskTriageCoreTests.ExitCodeTests::REQ0038_precedencePicksTheMostSevere()"
+  - "DiskTriageCoreTests.ExitCodeTests::REQ0038_verdictAdoptsTheMostSevereCode()"
