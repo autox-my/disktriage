@@ -511,9 +511,17 @@ Deep link:
   every mapfile-to-cluster conversion. Raw images may still be probed by DiskArbitration; testing
   attach with a third-party driver installed is an explicit P3 test, not an assumption.
 - **Boot-sector damage (the MiNaH case):** the ntfs-3g tools do **not** fall back to the backup boot
-  sector; every command fails. Planned, **UNVERIFIED** (P0 row 11): on a **working copy** of the
-  image, never the original, and only when explicitly requested, restore the backup boot sector
-  (last sector of the volume) over the primary, then retry.
+  sector; every command fails. **Verified on synthetic images (P0 row 11, `docs/ntfs-spike.md`):** on a
+  **working copy** of the image, never the original, and only when explicitly requested, copy the
+  backup boot sector over the primary with `dd conv=notrunc`, then re-open. The backup is the last
+  sector of the **partition**: `backup_offset = partition_offset + partition_length_bytes - 512`
+  (take the length from the MBR/GPT, not from the BPB `total_sectors`, which `mkntfs` leaves one
+  sector short; the disk's last sector is wrong). Before copying, validate the backup: OEM ID
+  `"NTFS    "`, bytes per sector in {512, 1024, 2048, 4096}, power-of-two sectors per cluster, `55 AA`;
+  afterwards confirm with `ntfsinfo`. Do **not** use `ntfsfix` for this: it also sets the dirty flag
+  and empties `$LogFile`. If the backup is bad too, report that the volume cannot be restored and
+  fall back to a volume-level damage report. Not tested: Windows-formatted volumes, 4Kn sectors, the
+  real MiNaH backup sector (the old image was deleted).
 - **Failure behaviour to design around:** metadata damage fails loud (nonzero exit), but *data*
   damage is silent (exit 0, correct length, zero bytes) and `ntfsls` exits 0 on a partial listing.
   So every `inspect` and `copy` output carries mapfile-derived damage notes next to it.
@@ -536,10 +544,14 @@ matches the image, **not** that the image matches the platter.
 - **Per-file attribution is a capability, never implied.** It requires real extent mapping.
   - **NTFS (v1):** convert each bad extent from the mapfile to a volume-relative cluster range
     (subtract the partition offset, divide by the cluster size) and ask `ntfscluster -c <range>`
-    which inode owns it. It names data files, and names `$MFT` / `$INDEX_ALLOCATION` metadata
-    verbatim. One subprocess per extent (about 36 ms each on the small spike image; **large-volume
-    timing UNVERIFIED**), so extents are capped by a configurable limit and, beyond it, reporting
-    falls back to volume level and says so.
+    which inode owns it, or, better, do it in **one pass**: `ntfscluster -c 0-(nr_clusters-1) -v` dumps
+    every inode's VCN/LCN runs at once (11 ms / 10.7 KB on 64 MiB, 145 ms / 1.78 MB on a 10,001-inode
+    volume) and the bad extents are intersected locally, which is exact. It names data files, and
+    names `$MFT` / `$INDEX_ALLOCATION` metadata verbatim. Do not merge extents into one min-max span
+    (it names files in the good gaps). Guard the pass with a 120 s timeout and a 200,000-run cap.
+    Fallback, one `ntfscluster -c <range>` per extent (cost about 6 ms plus 2 us per inode, 447
+    extents = 5.9 s on the test image), capped at `min(200, 30 s / measured ms-per-call)`; beyond the
+    cap, report volume level and say so. Timings above 10,001 inodes are extrapolated (UNVERIFIED).
   - **Not available** when the damage hits `$MFT` (the volume will not open at all), or when the
     boot sector is damaged and not restored: report volume level and state why.
   - **Other filesystems:** `F_LOG2PHYS_EXT` on a mounted image, only where P0 shows the native driver
@@ -703,11 +715,19 @@ product, and awkward on Apple Silicon.
 
 ## 14. Revision history
 
+**v3.5 (2026-11-07), after P0 row 11 (synthetic):**
+
+- Boot-sector restore is verified: `dd` the partition's last sector over its first on a working copy,
+  with the offset formula and validation checks in §8; `ntfsfix` rejected (dirty flag, emptied log).
+- NTFS per-file attribution is a single `ntfscluster -c 0-(N-1) -v` pass intersected locally, not one
+  subprocess per extent (which is only the capped fallback).
+
 **v3.4 (2026-11-07), after P0 phase C:**
 
 - Recorded the real kernel-log medium-error format and ioreg behaviour on the failing drive (§4):
   `Errors` moves, `Retries` does not; one unreadable read blocks about 45-50 s.
-- P0 row 11 (boot-sector restore) remains open: it needs the earlier MiNaH image.
+- P0 row 11 (boot-sector restore) is answered on synthetic images (see v3.5); the real backup sector
+  is untested because the earlier MiNaH image was deleted.
 
 **v3.3 (2026-11-07), after P0 phase B and row 5:**
 

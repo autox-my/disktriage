@@ -269,3 +269,277 @@ is the relocatable form. Do not link `libntfs-3g` into the core library.
 - Not tested at all: volumes with compression, sparse files, alternate data
   streams, hibernated Windows volumes, sector sizes other than 512. Only
   macOS 27.2/arm64 and ntfs-3g 2026.9.28 were exercised.
+
+---
+
+## Row 11 (synthetic): boot-sector restore and scale
+
+Status: spike result, 2026-11-07. The real MiNaH image no longer exists, so P0
+row 11 is answered on **synthetic** images: `plain.img`/`part.img` (64 MiB,
+4 KiB clusters, 52 files), `disk.img` (80 MiB, MBR, one 0x07 partition of
+131072 sectors at LBA 2048), and two 2 GiB volumes built here. Everything was
+run on this host under `captures/ntfs-spike/row11/` (gitignored). No `sudo`, no
+mount, no `diskutil` except one `image attach --noMount --readOnly` of a copy.
+Only explicit working copies were written; the fixtures and the original images
+were never modified. Times are wall clock, measured around the child process.
+
+### A1. Baseline: the damaged copy fails every command
+
+`dmg.img` is a copy of `damaged-bootsec.img` (volume sector 0 zeroed).
+
+| command on `dmg.img` | exit | ms | message |
+|---|---|---|---|
+| `ntfsinfo -m` | **1** | 9.3 | `NTFS signature is missing.` / `Failed to mount: Invalid argument` |
+| `ntfsls -l` | **2** | 17.3 | same, and nothing on stdout |
+| `ntfscat /docs/readme.txt` | **1** | 9.6 | same |
+| `ntfscluster -c 8725-8788` | **1** | 9.2 | same |
+
+### A2. The backup boot sector is the last sector of the *volume*
+
+On `plain.img` the 512 bytes at byte offset 67108352 (sector 131071, the last
+sector of the 64 MiB file) are **byte-identical to sector 0** (SHA-256
+`4770ab54…8ffd65` for both). Same on `part.img` at the same offset. OEM ID is
+`NTFS    `, bytes/sector `0x0200` = 512, sectors/cluster 8, boot signature
+`55 AA`, hidden sectors 0 (`plain.img`) / 2048 (`part.img`) — the two fixtures
+differ from each other only in that field, and each one's backup matches its
+own primary.
+
+Two facts that decide the offset formula:
+
+- **`mkntfs` reserves the last sector.** Its BPB `total_sectors` field reads
+  131071, while the file/container holds 131072 sectors. `mkntfs.c`
+  (`create_backup_boot_sector`) writes at
+  `(num_sectors + 1) * sector_size - 512` after subtracting the reserved
+  sector, i.e. at the **end of the container**, one sector past the size the
+  BPB declares. Deriving the backup position from BPB `total_sectors` would
+  read the wrong sector here.
+- **On a whole-disk image it is the last sector of the partition, not of the
+  disk.** In `disk.img` the backup is at `P + V - 512` =
+  1048576 + 67108864 − 512 = **68156928** (sector 133119) and equals the
+  primary at `P`. The disk's absolute last sector (83885568) is zeros. Writing
+  that sector over the primary gives back `NTFS signature is missing`, exit 1 —
+  which is exactly why the OEM/sector checks below are not optional.
+
+`ntfsfix.c` itself tries "the last sector of the partition (expected location)"
+first, then the last sector the bad boot sector claims, then truncation
+(`try_alternate_boot`).
+
+**Formula, for a volume in a partition:**
+
+```
+backup_offset = partition_offset + partition_length_bytes - 512
+```
+
+with `partition_offset = start_lba * sector_size` and `partition_length_bytes =
+num_sectors * sector_size` from the MBR/GPT entry (not from the BPB). For a bare
+partition image, `partition_offset = 0` and `partition_length_bytes =
+file_size`.
+
+### A3. Restore on a working copy works, plain and offset
+
+Plain image: copy `dmg.img` → `dmg-restore.img`, then
+
+```sh
+dd if=dmg-restore.img of=bootbackup.bin bs=512 skip=131071 count=1
+dd if=bootbackup.bin of=dmg-restore.img bs=512 count=1 conv=notrunc
+```
+
+| check on the restored copy | result |
+|---|---|
+| `ntfsinfo -m` | **0**, 10.6 ms, `Volume Flags: 0x0000`, cluster 4096 |
+| `ntfsls -lR` | **0**, 11.0 ms, diff against the undamaged listing = **0 lines** |
+| `ntfscat /media/big.bin` | **0**, SHA-256 `cf11c5ec…b9886` = `work/plain/big.bin` |
+| `ntfscat /docs/readme.txt` | **0**, SHA-256 `7d423d80…49971` = the source file |
+| `ntfscluster -c 8725-8788` | **0**, `Inode 77 /media/clip.dat/$DATA` |
+
+Offset image: copy `disk.img` → `disk-work.img`, zero sector 2048, extract the
+partition with `dd bs=1m skip=1 count=64` → baseline fails (1 / 2 / 1). Restore
+from sector 133119 into sector 2048, re-extract → `ntfsinfo` **0** (10.1 ms),
+`ntfsls -lR` **0** with a 0-line diff against `part.img`, `ntfscluster -c`
+**0** naming `/media/clip.dat`, and `ntfscat /media/big.bin` hashes to
+`cf11c5ec…b9886` = `work/part/big.bin`. The attached-node route also works on
+the restored whole-disk copy: `diskutil image attach --noMount --readOnly`
+produced `/dev/disk8s1`, `ntfsinfo`/`ntfscluster` exited 0 on it, `mount`
+showed nothing, `diskutil eject` succeeded.
+
+### A4. Both boot sectors gone: no restore is possible
+
+Copy of `dmg.img` with the last sector zeroed as well:
+
+| command | exit | output |
+|---|---|---|
+| `ntfsinfo -m` | **1** | `NTFS signature is missing.` |
+| `ntfsls -l` | **2** | same |
+| `ntfscat` | **1** | same |
+| `ntfscluster -c` | **1** | same |
+| `ntfsfix -n` | **1** | `Mounting volume... FAILED` / `Attempting to correct errors... FAILED` / `Trying the alternate boot sector` |
+| `ntfsfix` (real) | **1** | adds `Unrecoverable error`, `Volume is corrupt. You should run chkdsk.`; image SHA-256 **unchanged**, nothing written |
+
+So the tool can state "cannot restore: both the primary and the recovery boot
+sector are unreadable" from a single failed attempt — and it must not retry the
+write.
+
+### A5. What `ntfsfix` actually does
+
+`ntfsfix --help`: `-b` clear bad sectors, `-d` clear dirty, `-n` no action.
+On a **copy** of the damaged image:
+
+```
+$ ntfsfix dmg-fixed2.img
+Mounting volume... FAILED
+Attempting to correct errors... FAILED
+Trying the alternate boot sector
+The alternate bootsector is usable
+Rewriting the bootsector
+The boot sector has been rewritten
+
+Processing $MFT and $MFTMirr...
+Reading $MFT... OK
+Reading $MFTMirr... OK
+Comparing $MFTMirr to $MFT... OK
+Processing of $MFT and $MFTMirr completed successfully.
+Setting required flags on partition... OK
+Going to empty the journal ($LogFile)... OK
+Checking the alternate boot sector... OK
+NTFS volume version is 3.1.
+... was processed successfully.
+```
+
+exit **0**, 33.0 ms. It **does** restore from the backup: the 512 bytes it
+writes at offset 0 are byte-identical to the original backup sector, and the
+backup sector itself is left untouched. But it writes more than that: 169 bytes
+differ from the damaged copy in total — the boot sector (0–211, 510–511), four
+bytes inside the `$Volume` MFT record (19504–20478, the dirty flag) and four
+bytes inside `$LogFile` (33553456–33554430, the emptied journal). The volume
+comes back **dirty** (`Volume Flags: 0x0001 DIRTY`), so every read tool then
+refuses:
+
+- `ntfsinfo` exit 1 / `ntfsls` exit 2 / `ntfscluster` exit 1, all with
+  `Volume is scheduled for check. Please boot into Windows TWICE, or use the
+  'force' option.`
+- with `-f` they exit 0 and `ntfscat -f /media/big.bin` still hashes to
+  `cf11c5ec…b9886`.
+
+`ntfsfix -n` on the same copy exits 1 and writes nothing (SHA-256 unchanged):
+`The startup data can be fixed, but no change was requested`.
+
+**Conclusion: `dd` is the better restore.** It is 2 subprocess-free writes, it
+does not set the dirty flag, and it does not touch `$MFT`/`$LogFile`. `ntfsfix`
+is a repair tool for the hand-off, not for inspection — as §8 already says.
+
+### A6. Minimal safe restore procedure
+
+1. Refuse unless the caller explicitly asked, and only on a **copy**; record
+   the source image's SHA-256/size before and after and assert unchanged.
+2. Compute `backup_offset` from the partition table (A2), `stat` the copy, and
+   require `backup_offset + 512 <= file_size`.
+3. Read exactly 512 bytes; a short read is a failure, not partially usable.
+4. Validate before writing: `bytes[3:11] == "NTFS    "`, bytes/sector at 0x0B
+   in {512, 1024, 2048, 4096} and equal to the sector size known from the
+   volume, sectors/cluster at 0x0D a power of two in 1..128, signature
+   `55 AA` at 0x1FE. Optionally require `total_sectors × bytes_per_sector` to
+   be within one sector of the partition length (allow the `mkntfs` reserved
+   sector). If any check fails: report "cannot restore" and stop.
+5. Write the 512 bytes at `partition_offset` with `conv=notrunc`; never extend
+   or truncate the file.
+6. Verify afterwards: `ntfsinfo -m` exits 0 and reports the expected cluster
+   size and volume size; only then run the rest of `inspect`. If it still
+   fails, the damage is beyond the boot sector (e.g. `$MFT`) and the result is
+   volume-level with the reason.
+
+### B1. A 2 GiB volume with realistic file counts
+
+| image | size | clusters | files | notes |
+|---|---|---|---|---|
+| `plain.img` | 64 MiB | 16383 | 52 | the existing fixture |
+| `big.img` | 2 GiB sparse | 524287 | 2000 small + 100 × 1–20 MiB | 1.0 GiB used; `mkntfs -F -Q -q` = 28.6 ms, 11 MiB allocated |
+| `bigempty.img` | 2 GiB sparse | 524287 | 10001 small | 55 MB used; adding the 10 000 files took 118.8 s |
+
+Population with `ntfscp`, no mount: 2000 small files in 22.8 s (11.4 ms/file),
+100 large files in 4.4 s (43.8 ms/file), **27.2 s total**, 0 failures. No
+counts were reduced.
+
+### B2. `ntfscluster -c` cost scales with the MFT, not the volume
+
+Single cluster range, repeated (mean / median over the loop):
+
+| image | inodes | 1 run | 10 runs | 100 runs | median |
+|---|---|---|---|---|---|
+| `plain.img` 64 MiB | 52 | 9.7 ms | 7.0 ms | 6.9 ms | 6.8 ms |
+| `big.img` 2 GiB, 1 GiB data | 2 100 | 13.7 ms | 10.9 ms | 10.9 ms | 10.7 ms |
+| `bigempty.img` 2 GiB, empty | ~30 | 7.3 ms | 6.8 ms | 6.9 ms | 6.7 ms |
+| `bigempty.img` + 10 k files | 10 001 | — | 27.9 ms | — | 25.5 ms |
+
+`t ≈ 6.3 ms + 2.0 µs × inodes`. The 2 GiB volume with 30 inodes costs the same
+as the 64 MiB volume: **volume size is irrelevant, MFT size is the cost**. Real
+batches with distinct ranges: 200 extents = 3.31 s (16.6 ms/call), 447 extents
+= 5.92 s (13.3 ms/call) on the 2 100-inode image.
+
+`-I <inode>` and `-F <file>` are different: **flat ~7 ms** at 52, 2 100 and
+10 001 inodes (7.2 / 7.4 / 7.1 ms), because they look up one inode instead of
+scanning the MFT.
+
+### B3. Alternatives to one subprocess per extent
+
+(a) **One `-c min-max` over the whole span** — `-c 73962-303000` on `big.img`:
+15.2 ms, 3 418 B, 105 `Inode …` lines. It prints one line per *run* that
+intersects the range and is fast, but it **cannot be used for attribution**: it
+also named `/large-050.bin` (LCN 195696), which was not a bad extent — every
+file in the good gaps between bad extents is reported. It also has no numeric
+output, so the caller cannot subtract the gaps without more calls.
+
+(b) **`-f` / other modes** — `-f` changes nothing on an image (same output,
+11.3 ms); it only bypasses the dirty-volume refusal. `-i` prints volume info
+only. `-s` is `-c` in sectors (`-s 1800000` = 18.0 ms). `-I`/`-F` are one
+inode/file. A comma list is rejected (`Invalid number '74022,'`, exit 1).
+
+(c) **One pass with `ntfsinfo`/`ntfscat`** — `ntfsinfo --help` has only
+`-i`/`-F`/`-m`; `-m` prints no runs (0 `VCN` lines) and `-i` is one inode at
+8.2 ms. `ntfscat -a 0x80 -i 2066` dumps the *file bytes* (1 060 921 bytes for
+the 1 MiB file), not its runs. Neither offers a bulk mode.
+
+**But there is a true single pass: `ntfscluster -c 0-<nr_clusters-1> -v`.**
+`-v` makes `cluster_find` print `VCN LCN Length` for every run of every inode
+it scans, before the range filter (`cluster.c`); the range `0..last` also makes
+it print the matching `Inode N /path/$ATTR` line after each run. One
+invocation therefore returns the complete extent map:
+
+| image | time | output | runs |
+|---|---|---|---|
+| `plain.img` (52 inodes) | 11.4 ms | 10 746 B | 46 |
+| `big.img` (2 100) | 37.4 ms | 377 255 B | 1 778 (1 760 inodes) |
+| `bigempty.img` (10 001) | 144.8 ms | 1 780 824 B | 8 262 |
+
+`t ≈ 10 ms + 13.5 µs × inodes`, ~215 B per run. Parsing it and intersecting
+locally reproduced the per-extent answers exactly on spot checks: 73962 →
+`/large-000.bin`, 195696 → `/large-050.bin`, 303627 → `/large-099.bin`,
+400000 → `* no inode found`; cluster 0 → `Inode 7 /$Boot/$DATA`.
+
+### B4. Recommendation and cap
+
+- **Primary: one `ntfscluster -c 0-(nr_clusters-1) -v` per image, parsed
+  streaming, intersected in-process with the mapfile's cluster ranges.** It is
+  exact (no gap false positives), independent of the extent count, and pays
+  for itself above ~4 extents at 2 100 inodes and ~6 at 10 001 (37.4/10.9 and
+  144.8/25.5). 447 extents would be 5.92 s one-by-one and 37 ms in one pass
+  (~160×).
+- **Guards for that pass:** a hard timeout (120 s), a cap on parsed runs
+  (e.g. 200 000 runs ≈ 43 MB by the measured 215 B/run), and a fallback that
+  reports volume level if either trips. This is not an extent cap; it is a
+  work cap.
+- **Fallback when the pass is unavailable (dirty volume it cannot force, or
+  output cap hit): per-extent `-c`, cap 200 extents, and additionally cap by a
+  30 s budget — `cap = min(200, 30 000 / per_call_ms)`, with `per_call` from
+  one probe call on that image.** Measured: 3.31 s for 200 extents at 2 100
+  inodes, ~5.1 s at 10 001. At 1 M inodes the model gives ~2 s/call, so the
+  time budget would reduce the cap to ~15 (**UNVERIFIED**, extrapolated).
+- **Never use the merged span for attribution**; it over-attributes every file
+  in the good gaps. `-I`/`-F` are viable for the second stage of a
+  "span → candidate inodes → per-inode runs" pipeline (flat ~7 ms each), but
+  the `-v` pass makes that stage unnecessary.
+- Restoring the boot sector does not help a volume whose `$MFT` is damaged;
+  those stay volume-level (A6 step 6).
+
+**UNVERIFIED:** backup placement/fields on a Windows-formatted volume (only
+`mkntfs` images here), 4 Kn volumes, the `-v` output format across other
+ntfs-3g versions, and all extrapolation past 10 001 inodes.
