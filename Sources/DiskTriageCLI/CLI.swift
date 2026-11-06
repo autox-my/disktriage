@@ -45,7 +45,9 @@ public func run(
         return triage(rest, readFile: readFile, writeFile: writeFile, executor: executor, now: now)
     case "list":
         return list(rest, executor: executor)
-    case "image", "inspect", "copy", "check", "guard":
+    case "check":
+        return runCheck(arguments: rest)
+    case "image", "inspect", "copy", "guard":
         return planned(command, rest)
     default:
         return usageError("unknown command '\(command)'")
@@ -399,7 +401,7 @@ private func rootHelp() -> CLIResult {
             + "  image    image a device to a file           (planned P2)\n"
             + "  inspect  inspect an image read-only         (planned P2)\n"
             + "  copy     copy an image with a manifest      (planned P3)\n"
-            + "  check    permissions and tooling self-test  (planned P2)\n"
+            + "  check    permissions and tooling self-test\n"
             + "  guard    hold mounts for attached disks     (planned P2)\n"
             + "\n"
             + "Run 'disktriage <command> --help' for options.\n"
