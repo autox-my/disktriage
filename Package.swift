@@ -9,6 +9,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .library(name: "DiskTriageCore", targets: ["DiskTriageCore"]),
+        .library(name: "DiskTriageGuard", targets: ["DiskTriageGuard"]),
         .executable(name: "disktriage", targets: ["disktriage"]),
     ],
     targets: [
@@ -52,6 +53,21 @@ let package = Package(
             name: "DiskTriageCollectorsTests",
             dependencies: ["DiskTriageCollectors", "DiskTriageCore"],
             path: "Tests/DiskTriageCollectorsTests"
+        ),
+        // P3a: the mount guard. macOS-only, and the decision logic is pure so
+        // the suite needs neither DiskArbitration nor a disk.
+        .target(
+            name: "DiskTriageGuard",
+            path: "Sources/DiskTriageGuard",
+            linkerSettings: [
+                .linkedFramework("DiskArbitration"),
+                .linkedFramework("CoreFoundation"),
+            ]
+        ),
+        .testTarget(
+            name: "DiskTriageGuardTests",
+            dependencies: ["DiskTriageGuard"],
+            path: "Tests/DiskTriageGuardTests"
         ),
     ]
 )

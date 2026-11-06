@@ -1,0 +1,95 @@
+{
+  "source": "Recorded DADiskDescription samples for the mount-guard decision table.",
+  "samples": [
+    {
+      "name": "internal APFS",
+      "provenance": "Live DADiskCopyDescription on this Mac, 2026-11-07: disk0-3 are APPLE SSD AP0256Q, DADeviceInternal=true, DADeviceProtocol=Apple Fabric. No external disk attached.",
+      "expected": "approve",
+      "description": {
+        "DADeviceInternal": true,
+        "DADeviceProtocol": "Apple Fabric",
+        "DADeviceModel": "APPLE SSD AP0256Q",
+        "DADeviceVendor": "",
+        "DAMediaKind": "IOMedia",
+        "DAMediaName": "APPLE SSD AP0256Q Media",
+        "DAMediaRemovable": false,
+        "DAMediaWhole": true
+      }
+    },
+    {
+      "name": "internal SATA disk",
+      "provenance": "diskdoctor.md section 8: the match is internal == false AND a physical protocol. No bench sample; an Intel Mac's built-in SATA disk reports DeviceInternal=true with the same protocol value an external eSATA drive would.",
+      "expected": "approve",
+      "description": {
+        "DADeviceInternal": true,
+        "DADeviceProtocol": "SATA",
+        "DAMediaWhole": true
+      }
+    },
+    {
+      "name": "internal USB media",
+      "provenance": "diskdoctor.md section 8: DeviceInternal must be false even when the protocol is USB; a built-in USB card reader is internal and must not be vetoed. No bench sample.",
+      "expected": "approve",
+      "description": {
+        "DADeviceInternal": true,
+        "DADeviceProtocol": "USB",
+        "DAMediaWhole": true
+      }
+    },
+    {
+      "name": "virtual disk image",
+      "provenance": "Live DADiskCopyDescription on this Mac, 2026-11-07: disk4 and disk6 are 'Disk Image' with DADeviceProtocol=Virtual Interface and no DADeviceInternal key. No external disk attached.",
+      "expected": "approve",
+      "description": {
+        "DADeviceModel": "Disk Image",
+        "DADeviceProtocol": "Virtual Interface",
+        "DADeviceVendor": "Apple",
+        "DAMediaKind": "IOMedia",
+        "DAMediaName": "Apple disk image Media",
+        "DAMediaRemovable": true,
+        "DAMediaWhole": true
+      }
+    },
+    {
+      "name": "USB NTFS volume",
+      "provenance": "P0 row 5, docs/p0-runbook.md: phase-b/q5-dissent.log logged bsd=disk8s2 protocol=USB fs=iboysoft_NTFS when the Seagate control disk was replugged.",
+      "expected": "dissent",
+      "description": {
+        "DADeviceInternal": false,
+        "DADeviceProtocol": "USB",
+        "DAVolumeKind": "iboysoft_NTFS",
+        "DAVolumeName": "Seagate"
+      }
+    },
+    {
+      "name": "USB whole disk",
+      "provenance": "P0 row 5 / phase C, docs/p0-runbook.md: the MiNaH WD3200BJKT over USB appears as a whole disk (DAMediaWhole=true) with no volume kind.",
+      "expected": "dissent",
+      "description": {
+        "DADeviceInternal": false,
+        "DADeviceProtocol": "USB",
+        "DAMediaWhole": true,
+        "DAMediaRemovable": true
+      }
+    },
+    {
+      "name": "Thunderbolt external volume",
+      "provenance": "diskdoctor.md section 8: external protocols are guarded when the description keys say external. No bench sample; the protocol value is the DiskArbitration string.",
+      "expected": "dissent",
+      "description": {
+        "DADeviceInternal": false,
+        "DADeviceProtocol": "Thunderbolt",
+        "DAVolumeKind": "APFS"
+      }
+    },
+    {
+      "name": "unknown internal flag",
+      "provenance": "Plan section 8 and tools/p0/dadissent.swift: an unreadable or absent DeviceInternal field is unknown, and unknown approves; the guard must not veto what it cannot identify.",
+      "expected": "approve",
+      "description": {
+        "DADeviceProtocol": "USB",
+        "DAVolumeKind": "ExFAT"
+      }
+    }
+  ]
+}
