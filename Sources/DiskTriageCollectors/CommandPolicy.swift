@@ -13,6 +13,12 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
     case ioregMedia
     case logShow(last: String, predicate: String)
     case smartctl(query: SmartQuery, node: String, deviceType: String? = nil)
+    /// `disktriage check`: the filesystem personality inventory.
+    case diskutilListFilesystems
+    /// `disktriage check`: a tiny readability probe, not evidence collection.
+    case logShowCompact(last: String)
+    /// `disktriage check`: a resolved tool's `--version`.
+    case toolVersion(path: String)
 
     public enum SmartQuery: String, Sendable, Equatable, Hashable {
         case info = "-i"
@@ -43,6 +49,12 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
             }
             argv += [query.rawValue, node]
             return argv
+        case .diskutilListFilesystems:
+            return ["/usr/sbin/diskutil", "listFilesystems"]
+        case .logShowCompact(let last):
+            return ["/usr/bin/log", "show", "--last", last, "--style", "compact"]
+        case .toolVersion(let path):
+            return [path, "--version"]
         }
     }
 }
@@ -67,19 +79,35 @@ public enum PolicyDecision: Sendable, Equatable {
 /// reach `exec` without passing it.
 public struct CommandPolicy: Sendable {
     public static let triage = CommandPolicy()
+    /// The self-test's narrower additions: `--version`, `listFilesystems` and
+    /// a tiny compact `log show`. These shapes are never available to triage.
+    public static let check = CommandPolicy(kind: .check)
 
     /// Test-only escape used to drive the real-process timeout, output and
     /// environment tests. It is internal, so no product caller can reach it.
     static let unrestrictedForTesting = CommandPolicy(allowsEverything: true)
 
+    private enum Kind: Sendable {
+        case triage
+        case check
+    }
+
     private let allowsEverything: Bool
+    private let kind: Kind
 
     public init() {
         self.allowsEverything = false
+        self.kind = .triage
     }
 
     init(allowsEverything: Bool) {
         self.allowsEverything = allowsEverything
+        self.kind = .triage
+    }
+
+    private init(kind: Kind) {
+        self.allowsEverything = false
+        self.kind = kind
     }
 
     public func evaluate(_ argv: [String]) -> PolicyDecision {
@@ -106,14 +134,34 @@ public struct CommandPolicy: Sendable {
         case "/usr/bin/log":
             return evaluateLog(Array(argv.dropFirst()))
         case "/opt/homebrew/bin/smartctl", "/usr/local/bin/smartctl", "/usr/bin/smartctl":
-            return evaluateSmartctl(Array(argv.dropFirst()))
+            return kind == .check ? evaluateCheckTool(argv) : evaluateSmartctl(Array(argv.dropFirst()))
         default:
+            if kind == .check {
+                return evaluateCheckTool(argv)
+            }
             return .rejected(.notAllowListed)
         }
     }
 
+    /// Check-only: a resolved absolute tool path and exactly `--version`. The
+    /// basename is the allow-list, so a random binary cannot be executed.
+    private func evaluateCheckTool(_ argv: [String]) -> PolicyDecision {
+        let allowListed = ["smartctl", "ddrescue", "ntfsinfo", "ntfsls", "ntfscat", "ntfscluster"]
+        guard argv.count == 2,
+              argv[1] == "--version",
+              argv[0].hasPrefix("/"),
+              allowListed.contains((argv[0] as NSString).lastPathComponent)
+        else {
+            return .rejected(.notAllowListed)
+        }
+        return .allowed
+    }
+
     private func evaluateDiskutil(_ args: [String]) -> PolicyDecision {
         if args == ["list", "-plist"] {
+            return .allowed
+        }
+        if kind == .check, args == ["listFilesystems"] {
             return .allowed
         }
         if args.count == 3, args[0] == "info", args[1] == "-plist" {
@@ -125,6 +173,9 @@ public struct CommandPolicy: Sendable {
     private func evaluateLog(_ args: [String]) -> PolicyDecision {
         guard args.first == "show" else {
             return .rejected(.notAllowListed)
+        }
+        if kind == .check {
+            return evaluateCompactLog(args)
         }
         var last: String?
         var predicate: String?
@@ -157,6 +208,21 @@ public struct CommandPolicy: Sendable {
         // than the kernel one was measured at ~117 s for 6 h.
         guard sawStyle else { return .rejected(.logOption) }
         guard predicate == KernelLogCollector.predicate else { return .rejected(.logPredicate) }
+        return .allowed
+    }
+
+    /// Check-only: exactly `log show --last <window> --style compact`, with a
+    /// bounded window and no predicate. It is a readability probe, not a
+    /// collection query.
+    private func evaluateCompactLog(_ args: [String]) -> PolicyDecision {
+        guard args.count == 5,
+              args[1] == "--last",
+              args[3] == "--style",
+              args[4] == "compact",
+              isBoundedWindow(args[2])
+        else {
+            return .rejected(.logOption)
+        }
         return .allowed
     }
 
@@ -226,4 +292,10 @@ private func isDeviceNode(_ node: String) -> Bool {
         name.removeFirst()
     }
     return isWholeDiskName(name)
+}
+
+/// A `--last` window such as `1s`, `30m`, `12h` or `7d`; never `all`.
+private func isBoundedWindow(_ value: String) -> Bool {
+    guard let unit = value.last, "smhd".contains(unit), value.count > 1 else { return false }
+    return value.dropLast().allSatisfy { $0.isASCII && $0.isNumber }
 }

@@ -67,6 +67,40 @@ struct CommandPolicyTests {
         }
     }
 
+    // The self-test adds three read-only shapes. It must not widen triage.
+    @Test("the check policy allows versions, listFilesystems and the compact log, and nothing else")
+    func checkPolicyAllowsOnlyTheSelfTestShapes() {
+        let check = CommandPolicy.check
+        let allowed: [[String]] = [
+            ["/usr/sbin/diskutil", "listFilesystems"],
+            ["/usr/bin/log", "show", "--last", "1s", "--style", "compact"],
+            ["/opt/homebrew/bin/smartctl", "--version"],
+            ["/usr/local/bin/ddrescue", "--version"],
+            ["/Users/fd/ntfs-prefix/bin/ntfsinfo", "--version"],
+            ["/Users/fd/ntfs-prefix/bin/ntfsls", "--version"],
+            ["/Users/fd/ntfs-prefix/bin/ntfscat", "--version"],
+            ["/Users/fd/ntfs-prefix/bin/ntfscluster", "--version"],
+        ]
+        for argv in allowed {
+            #expect(check.evaluate(argv) == .allowed, "check should allow: \(argv)")
+        }
+
+        let rejected: [[String]] = [
+            ["/tmp/evil", "--version"],
+            ["/opt/homebrew/bin/smartctl", "-a", "/dev/disk0"],
+            ["/usr/bin/log", "show", "--last", "1s", "--style", "ndjson", "--predicate", KernelLogCollector.predicate],
+            ["/usr/bin/log", "show", "--last", "all", "--style", "compact"],
+        ]
+        for argv in rejected {
+            #expect(check.evaluate(argv) != .allowed, "check must reject: \(argv)")
+        }
+
+        // The triage allow-list is unchanged: these are check-only shapes.
+        #expect(policy.evaluate(["/usr/sbin/diskutil", "listFilesystems"]) != .allowed)
+        #expect(policy.evaluate(["/usr/bin/log", "show", "--last", "1s", "--style", "compact"]) != .allowed)
+        #expect(policy.evaluate(["/opt/homebrew/bin/smartctl", "--version"]) != .allowed)
+    }
+
     // REQ-0014: triage never starts a SMART self-test.
     @Test("every SMART self-test and write flag is rejected before exec")
     func REQ0014_rejectsEverySelfTestAndWriteFlag() {
