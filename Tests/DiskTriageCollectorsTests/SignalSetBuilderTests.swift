@@ -79,4 +79,92 @@ struct SignalSetBuilderTests {
         #expect(builder.unsupportedReasons["device"] == nil, "no device reason once collected")
         #expect(set.smart?.status == .unsupported, "the other sections stay unsupported")
     }
+
+    // REQ-0029: I/O statistics are displayed without being counted until P0
+    // validates the real counters; the flag stays off by default.
+    @Test("the real MiNaH ioreg delta fills io but leaves the P0 flag off")
+    func REQ0029_theIORegDeltaIsDisplayedAndNotValidated() throws {
+        let delta = try minahDelta()
+        var builder = SignalSetBuilder(collectedAt: collectedAt)
+        builder.setIO(delta)
+        let set = try builder.build()
+
+        let io = try #require(set.io, "io section")
+        #expect(io.status == .ok, "ioreg answered")
+        #expect(io.retries == 0, "Retries (Read) stayed 0")
+        #expect(io.errors == 1, "Errors (Read) 0 -> 1")
+        #expect(io.timeouts == nil, "ioreg has no timeouts counter; never invent one")
+        #expect(io.p0Validated == nil, "P0 has not validated the counters")
+        #expect(builder.unsupportedReasons["io"] == nil, "io is no longer unsupported")
+    }
+
+    @Test("a healthy ioreg delta is a real zero, not an absent counter")
+    func theHealthyIORegDeltaIsAZeroMeasurement() throws {
+        let before = try IORegStatisticsParser.parse(collectorFixtureText("ioreg-phase-b-before.txt"))
+        let after = try IORegStatisticsParser.parse(collectorFixtureText("ioreg-phase-b-after.txt"))
+        let delta = try #require(
+            IORegStatistics.delta(before: before, after: after)
+                .first { $0.mediaName == "Seagate Expansion Media" }
+        )
+
+        var builder = SignalSetBuilder(collectedAt: collectedAt)
+        builder.setIO(delta)
+        let set = try builder.build()
+
+        #expect(set.io?.status == .ok, "status")
+        #expect(set.io?.retries == 0, "a measured zero")
+        #expect(set.io?.errors == 0, "a measured zero")
+        #expect(set.io?.timeouts == nil, "not measured")
+    }
+
+    @Test("the real kernel log becomes log events with a decimal LBA and a window")
+    func theKernelLogBecomesLogEvents() throws {
+        let parsed = KernelLogParser.parse(try collectorFixtureText("kernel-log-medium-errors.ndjson"))
+        var builder = SignalSetBuilder(collectedAt: collectedAt)
+        builder.setLog(parsed.events, windowHours: 1)
+        let set = try builder.build()
+
+        let log = try #require(set.log, "log section")
+        #expect(log.status == .ok, "log show answered")
+        #expect(log.windowHours == 1, "the --last 10m query window")
+        let events = try #require(log.events, "events")
+        #expect(events.count == 2, "one event per read size")
+        let dd = try #require(events.first { $0.count == 1 }, "the 0x100 dd read")
+        #expect(dd.kind == "medium_error", "kind")
+        #expect(dd.lba == 2048, "decimal LBA, not 0x800")
+        #expect(dd.firstTime == ISO8601DateFormatter().date(from: "2026-11-06T16:34:39Z"),
+                "first_time is the burst's first retry")
+        let probe = try #require(events.first { $0.count == 2 }, "the 0x20 probe reads")
+        #expect(probe.lba == 2048, "decimal LBA")
+        #expect(builder.unsupportedReasons["log"] == nil, "log is no longer unsupported")
+    }
+
+    @Test("a healthy log is an ok section with zero events, not an absent one")
+    func theHealthyLogIsAnEmptyOKSection() throws {
+        let parsed = KernelLogParser.parse(try collectorFixtureText("kernel-log-healthy-compact.txt"))
+        var builder = SignalSetBuilder(collectedAt: collectedAt)
+        builder.setLog(parsed.events, windowHours: 1)
+        let set = try builder.build()
+
+        #expect(set.log?.status == .ok, "log was measured")
+        #expect(set.log?.events?.isEmpty == true, "zero medium errors")
+        #expect(set.log?.windowHours == 1, "window")
+    }
+}
+
+private func collectorFixtureText(_ name: String) throws -> String {
+    let url = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()   // DiskTriageCollectorsTests
+        .deletingLastPathComponent()   // Tests
+        .appendingPathComponent("Fixtures/\(name)")
+    return try String(contentsOf: url, encoding: .utf8)
+}
+
+private func minahDelta() throws -> IORegDriverDelta {
+    let before = try IORegStatisticsParser.parse(collectorFixtureText("ioreg-phase-c-before.txt"))
+    let after = try IORegStatisticsParser.parse(collectorFixtureText("ioreg-phase-c-after.txt"))
+    return try #require(
+        IORegStatistics.delta(before: before, after: after)
+            .first { $0.mediaName == "Generic External Media" }
+    )
 }

@@ -1,0 +1,23 @@
++-o IOBlockStorageDriver  <class IOBlockStorageDriver, id 0x100004703, registered, matched, active, busy 0 (85 ms), retain 8>
+  | {
+  |   "IOClass" = "IOBlockStorageDriver"
+  |   "CFBundleIdentifier" = "com.apple.iokit.IOStorageFamily"
+  |   "IOProviderClass" = "IOBlockStorageDevice"
+  |   "IOPropertyMatch" = {"device-type"="Generic"}
+  |   "IOPowerManagement" = {"CapabilityFlags"=0,"CurrentPowerState"=0}
+  |   "IOProbeScore" = 0
+  |   "IOMatchedAtBoot" = Yes
+  |   "IOGeneralInterest" = "IOCommand is not serializable"
+  |   "IOMatchCategory" = "IODefaultMatchCategory"
+  |   "Statistics" = {"Operations (Write)"=43,"Latency Time (Write)"=0,"Bytes (Read)"=153164288,"Errors (Write)"=0,"Total Time (Read)"=20079272071,"Latency Time (Read)"=0,"Retries (Read)"=0,"Errors (Read)"=0,"Total Time (Write)"=59978153,"Bytes (Write)"=132096,"Operations (Read)"=9434,"Retries (Write)"=0}
+  |   "IOPersonalityPublisher" = "com.apple.iokit.IOStorageFamily"
+  |   "CFBundleIdentifierKernel" = "com.apple.iokit.IOStorageFamily"
+  | }
+  | 
+  +-o Seagate Expansion Media  <class IOMedia, id 0x100004705, registered, matched, active, busy 0 (84 ms), retain 13>
+    +-o IOMediaBSDClient  <class IOMediaBSDClient, id 0x100004706, registered, matched, active, busy 0 (0 ms), retain 6>
+    +-o IOGUIDPartitionScheme  <class IOGUIDPartitionScheme, id 0x100004708, !registered, !matched, active, busy 0 (2 ms), retain 6>
+      +-o Microsoft reserved partition@1  <class IOMedia, id 0x10000470c, registered, matched, active, busy 0 (1 ms), retain 12>
+      | +-o IOMediaBSDClient  <class IOMediaBSDClient, id 0x10000470f, registered, matched, active, busy 0 (0 ms), retain 6>
+      +-o Basic data partition@2  <class IOMedia, id 0x10000470d, registered, matched, active, busy 0 (2 ms), retain 14>
+        +-o IOMediaBSDClient  <class IOMediaBSDClient, id 0x10000470e, registered, matched, active, busy 0 (0 ms), retain 6>

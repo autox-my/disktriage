@@ -69,6 +69,25 @@ struct ClassifierTests {
         #expect(validatedMedia.confidence == .medium, "two weak sources corroborate")
     }
 
+    // REQ-0029: the real Phase C signal is Errors (Read), not Retries, and the
+    // P0 flag stays off until the counters are validated.
+    @Test
+    func `REQ-0029 an Errors (Read) delta alone does not raise confidence while P0 is off`() throws {
+        let set = try decode("""
+        {
+          "schema_version": 1, "collected_at": "2026-11-06T00:14:02Z",
+          "device": { "status": "ok", "bsd": "disk9", "media": "hdd", "bus": "sata" },
+          "smart": { "status": "ok", "pending": 0, "reallocated": 5,
+                     "uncorrectable": 0, "history": null },
+          "io": { "status": "ok", "retries": 0, "errors": 1 }
+        }
+        """)
+        let verdict = classify(set)
+        let media = try #require(cause(.media, in: verdict), "MEDIA cause")
+        #expect(media.sources == [.smart], "the unvalidated I/O counter is not a source")
+        #expect(media.confidence == .low, "one weak source")
+    }
+
     @Test
     func `REQ-0018 a null history never fires the rising-reallocated rule`() throws {
         let set = try fixture("stable-reallocated.json")

@@ -14,6 +14,8 @@ public enum SignalSetBuilderError: Error, Equatable {
 public struct SignalSetBuilder: Sendable {
     public let collectedAt: Date
     public private(set) var device: DeviceCollection?
+    public private(set) var io: IOSignals?
+    public private(set) var log: LogSignals?
     public private(set) var unsupportedReasons: [String: String]
 
     private static let sectionNames = ["device", "smart", "io", "log", "drivers", "fs"]
@@ -57,6 +59,39 @@ public struct SignalSetBuilder: Sendable {
         unsupportedReasons[section] = reason
     }
 
+    /// Installs the I/O section from one driver's counter delta.
+    ///
+    /// `timeouts` stays nil: ioreg exposes no timeouts counter (P0 phase B).
+    /// `p0_validated` stays absent unless a caller explicitly passes it, so the
+    /// counters are displayed but not counted (REQ-0029).
+    public mutating func setIO(_ delta: IORegDriverDelta, p0Validated: Bool? = nil) {
+        io = IOSignals(
+            status: .ok,
+            retries: delta.counters.retriesRead.map(Int.init),
+            errors: delta.counters.errorsRead.map(Int.init),
+            timeouts: nil,
+            p0Validated: p0Validated
+        )
+        unsupportedReasons.removeValue(forKey: "io")
+    }
+
+    /// Installs the log section from parsed kernel events and the `--last`
+    /// window the query used. A measured empty event list is `ok`, not absent.
+    public mutating func setLog(_ events: [KernelLogEvent], windowHours: Int) {
+        let mapped = events.compactMap { event -> LogEvent? in
+            guard let lba = event.lba else { return nil }
+            return LogEvent(
+                time: event.lastTime,
+                firstTime: event.firstTime,
+                kind: event.kind,
+                lba: lba,
+                count: event.occurrences
+            )
+        }
+        log = LogSignals(status: .ok, windowHours: windowHours, events: mapped)
+        unsupportedReasons.removeValue(forKey: "log")
+    }
+
     public func build() throws -> SignalSet {
         var object: [String: Any] = [
             "schema_version": DiskTriageCoreInfo.supportedSchemaVersion,
@@ -64,26 +99,22 @@ public struct SignalSetBuilder: Sendable {
         ]
 
         object["device"] = deviceSection()
-        for section in ["smart", "io", "log", "drivers", "fs"] {
+        object["io"] = ioSection()
+        object["log"] = logSection()
+        for section in ["smart", "drivers", "fs"] {
             object[section] = ["status": SignalStatus.unsupported.rawValue] as [String: Any]
         }
 
         var notes: [[String: Any]] = []
         for section in SignalSetBuilder.sectionNames {
             let collector = SignalSetBuilder.collectorNames[section] ?? section
-            if section == "device", let device, device.status == .ok {
-                continue
-            }
-            if section == "device", let device {
-                notes.append([
-                    "collector": collector,
-                    "outcome": device.status.rawValue,
-                ])
+            let outcome = sectionOutcome(section)
+            if section == "device", outcome == .ok {
                 continue
             }
             notes.append([
                 "collector": collector,
-                "outcome": SignalStatus.unsupported.rawValue,
+                "outcome": outcome.rawValue,
             ])
         }
         object["collector_notes"] = notes
@@ -95,6 +126,47 @@ public struct SignalSetBuilder: Sendable {
             throw SignalSetBuilderError.cannotEncode
         }
         return signals
+    }
+
+    private func sectionOutcome(_ section: String) -> SignalStatus {
+        switch section {
+        case "device": return device?.status ?? .unsupported
+        case "io": return io?.status ?? .unsupported
+        case "log": return log?.status ?? .unsupported
+        default: return .unsupported
+        }
+    }
+
+    private func ioSection() -> [String: Any] {
+        guard let io else {
+            return ["status": SignalStatus.unsupported.rawValue]
+        }
+        var section: [String: Any] = ["status": io.status.rawValue]
+        if let retries = io.retries { section["retries"] = retries }
+        if let errors = io.errors { section["errors"] = errors }
+        if let timeouts = io.timeouts { section["timeouts"] = timeouts }
+        if let validated = io.p0Validated { section["p0_validated"] = validated }
+        return section
+    }
+
+    private func logSection() -> [String: Any] {
+        guard let log else {
+            return ["status": SignalStatus.unsupported.rawValue]
+        }
+        var section: [String: Any] = ["status": log.status.rawValue]
+        if let window = log.windowHours { section["window_hours"] = window }
+        if let events = log.events {
+            section["events"] = events.map { event -> [String: Any] in
+                var item: [String: Any] = [:]
+                if let time = event.time { item["time"] = iso8601(time) }
+                if let first = event.firstTime { item["first_time"] = iso8601(first) }
+                if let kind = event.kind { item["kind"] = kind }
+                if let lba = event.lba { item["lba"] = lba }
+                if let count = event.count { item["count"] = count }
+                return item
+            }
+        }
+        return section
     }
 
     private func deviceSection() -> [String: Any] {
