@@ -113,14 +113,20 @@ Three states. Run the same 512 B read of the **internal** disk's raw node, never
 a suspect device.
 
 ```sh
-PROBE='sysopen(my $f,$ARGV[0],POSIX::O_RDONLY()) or die sprintf("open errno=%d (%s)\n",$!+0,$!); my $n=sysread($f,my $b,512); die sprintf("read errno=%d (%s)\n",$!+0,$!) unless defined $n; print "read ok: $n bytes\n"'
+PROBE='sysopen(my $f,$ARGV[0],POSIX::O_RDONLY()) or die sprintf("open errno=%d (%s)\n",$!+0,$!); my $n=sysread($f,my $b,4096); die sprintf("read errno=%d (%s)\n",$!+0,$!) unless defined $n; print "read ok: $n bytes\n"'
 
 TO 15 perl -MPOSIX -e "$PROBE" /dev/rdisk0                        # (a) non-root
+sudo -v                                                           # authenticate first: sudo cannot prompt from inside TO's process group
 TO 15 sudo perl -MPOSIX -e "$PROBE" /dev/rdisk0                   # (b) root, terminal has NO grant
 # grant FDA to the terminal app, quit it fully, relaunch it, then:
 TO 15 sudo perl -MPOSIX -e "$PROBE" /dev/rdisk0                   # (c) root, FDA granted
-TO 15 sudo dd if=/dev/rdisk0 of=/dev/null bs=512 count=1          # (d) cross-check
+TO 15 sudo dd if=/dev/rdisk0 of=/dev/null bs=4096 count=1          # (d) cross-check
 ```
+**Read size is 4096, not 512.** Apple internal storage has a 4096-byte device block
+and raw character nodes want block-aligned reads, so a 512 B read can fail with
+`EINVAL` (errno 22) *after* access was granted. If you see `read errno=22`, access
+worked; record it, and size probes from `DeviceBlockSize` in `diskutil info`.
+
 If the terminal already has FDA, remove it, relaunch, and record (b) first — (b)
 must be the *ungranted* baseline or row 7 is meaningless.
 
@@ -128,8 +134,7 @@ Also test one **non-internal** node if any exists (`/dev/rdisk0s1`) to see wheth
 per-node permissions differ.
 
 Expect: (a) `open errno=13 (Permission denied)` — Unix permissions, not TCC;
-(b) `open errno=1 (Operation not permitted)` — TCC denial; (c) `read ok: 512
-bytes`; (d) `1+0 records in`. If your account is in the `operator` group, (a) may
+(b) `open errno=1 (Operation not permitted)` — TCC denial; (c) `read ok: 4096 bytes`; (d) `1+0 records in`. If your account is in the `operator` group, (a) may
 succeed; then record the Unix case from whatever node does deny you, and say
 which — row 7 needs the two errnos side by side, not a memorised label.
 
@@ -162,7 +167,7 @@ PLIST
 cat > captures/fdaprobe.app/Contents/MacOS/probe <<'SH'
 #!/bin/sh
 # adjust the output path to this checkout; the app does not inherit the shell's cwd
-exec /usr/bin/perl -MPOSIX -e 'sysopen(my $f,$ARGV[0],POSIX::O_RDONLY()) or die sprintf("open errno=%d (%s)\n",$!+0,$!); my $n=sysread($f,my $b,512); die sprintf("read errno=%d (%s)\n",$!+0,$!) unless defined $n; print "read ok: $n bytes\n"' /dev/rdisk0 > "$HOME/Projects/<checkout>/captures/fda-probe-app.txt" 2>&1
+exec /usr/bin/perl -MPOSIX -e 'sysopen(my $f,$ARGV[0],POSIX::O_RDONLY()) or die sprintf("open errno=%d (%s)\n",$!+0,$!); my $n=sysread($f,my $b,4096); die sprintf("read errno=%d (%s)\n",$!+0,$!) unless defined $n; print "read ok: $n bytes\n"' /dev/rdisk0 > "$HOME/Projects/<checkout>/captures/fda-probe-app.txt" 2>&1
 SH
 chmod +x captures/fdaprobe.app/Contents/MacOS/probe
 codesign --force --sign - captures/fdaprobe.app    # ad-hoc: keyed by path+hash
@@ -176,7 +181,7 @@ Privacy & Security → Full Disk Access → `+`), repeat A3(b) (the `sudo` probe
 freshly launched Terminal; the non-root probe fails on Unix permissions either
 way, so it cannot show attribution.
 
-Expect: app run prints `read ok: 512 bytes` while the Terminal run is denied —
+Expect: app run prints `read ok: 4096 bytes` while the Terminal run is denied —
 that proves TCC follows the responsible process. Record which grant produced which
 result, and that an ad-hoc signature loses the grant on every rebuild.
 
