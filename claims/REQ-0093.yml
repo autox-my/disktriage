@@ -1,0 +1,12 @@
+# REQ-0093 — diskdoctor.md §8 hashing
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0093
+statement: "The copy command shall hash the bytes read from the image and the bytes written with SHA-256."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L483
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

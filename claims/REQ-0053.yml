@@ -1,0 +1,12 @@
+# REQ-0053 — diskdoctor.md §6 list labels
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0053
+statement: "The list command shall label unsupported media as triage not applicable."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L339
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

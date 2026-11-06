@@ -1,0 +1,12 @@
+# REQ-0092 — diskdoctor.md §8 damage scope
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0092
+statement: "The copy command shall record damage scope as volume and attribution as none in its manifest."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L480
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

@@ -1,0 +1,12 @@
+# REQ-0012 — diskdoctor.md §2.7 no hang
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0012
+statement: "The tool shall treat a collector timeout as an unresponsive-device signal rather than a crash."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L79
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

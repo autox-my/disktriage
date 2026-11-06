@@ -1,0 +1,12 @@
+# REQ-0029 — diskdoctor.md §5 sources not attributes
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0029
+statement: "The tool shall display I/O statistics without counting them as an independent evidence source until the P0 counter check validates real counters."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L257
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

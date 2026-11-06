@@ -1,0 +1,12 @@
+# REQ-0060 — diskdoctor.md §11 record redaction
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0060
+statement: "The triage command shall redact serial numbers when it records a SignalSet fixture."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L581
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

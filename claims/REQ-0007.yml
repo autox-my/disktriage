@@ -1,0 +1,12 @@
+# REQ-0007 — diskdoctor.md §2.5 ranked differential
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0007
+statement: "The tool shall name the top hypothesis with its evidence, its falsifier, and the cheapest next test."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L74
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

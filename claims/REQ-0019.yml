@@ -1,0 +1,14 @@
+# REQ-0019 — diskdoctor.md §3 history
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0019
+statement: "A trend rule shall not fire without a real prior snapshot."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L159
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

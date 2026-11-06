@@ -1,0 +1,15 @@
+# REQ-0063 — diskdoctor.md §7 probe off the suspect disk
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0063
+statement: "The permission probe shall read a 512-byte block from an internal disk raw node and touch the suspect disk only when that is not possible."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L390
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "512"
+  unit: "byte"

@@ -1,0 +1,13 @@
+# The subject registry: what the prose calls a thing, and the id its address covers.
+# Alias sets must be disjoint — a surface that resolved to two subjects would be two
+# different requirements sharing a name. An unregistered surface stays literal in the
+# parse (never silently collapsed), so add an alias here before you rely on one.
+schema: req.subject_registry/0
+version: 1
+subjects:
+  DISKDOCTOR:
+    label: DiskDoctor
+    aliases:
+      - diskdoctor
+      - the tool
+      - disktriage

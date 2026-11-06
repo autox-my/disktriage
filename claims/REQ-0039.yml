@@ -1,0 +1,15 @@
+# REQ-0039 — diskdoctor.md §5 low confidence MEDIA
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0039
+statement: "The tool shall exit with code 0 for a low-confidence MEDIA root cause with a warning."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L267
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "0"
+  unit: "none"

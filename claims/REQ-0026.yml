@@ -1,0 +1,15 @@
+# REQ-0026 — diskdoctor.md §5 confidence medium
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0026
+statement: "The tool shall assign medium confidence from a single strong source or 2 corroborating weak sources."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L264
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "2"
+  unit: "none"

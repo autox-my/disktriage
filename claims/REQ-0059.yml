@@ -1,0 +1,12 @@
+# REQ-0059 — diskdoctor.md §11 UTC rendering
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0059
+statement: "The tool shall render timestamps in UTC unless --local is given."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L584
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

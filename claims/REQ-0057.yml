@@ -1,0 +1,12 @@
+# REQ-0057 — diskdoctor.md §6 one rendering
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0057
+statement: "The human rendering shall be derived from the same structure as the --json output."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L344
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

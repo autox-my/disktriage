@@ -1,0 +1,12 @@
+# REQ-0074 — diskdoctor.md §8 mount guard
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0074
+statement: "The tool shall instruct a physical disconnect when the unmount hangs."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L427
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

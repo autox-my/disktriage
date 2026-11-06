@@ -1,0 +1,12 @@
+# REQ-0071 — diskdoctor.md §8 mount guard
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0071
+statement: "The mount guard shall dissent from every DiskArbitration mount approval for a target device."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L425
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

@@ -1,0 +1,12 @@
+# REQ-0038 — diskdoctor.md §5 exit precedence
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0038
+statement: "The tool shall rank exit code 11 above exit code 10, then 10 above 12, then 12 above 13, then 13 above 20, and 20 above 0."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L308
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

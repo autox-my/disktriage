@@ -1,0 +1,15 @@
+# REQ-0031 — diskdoctor.md §5 exit code 10
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0031
+statement: "The tool shall exit with code 10 when a MEDIA root cause reaches at least medium confidence."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L300
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "10"
+  unit: "none"

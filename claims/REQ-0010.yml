@@ -1,0 +1,12 @@
+# REQ-0010 — diskdoctor.md §2.6 never destroy evidence
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0010
+statement: "The tool shall write only to an image file or a copy destination."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L76
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

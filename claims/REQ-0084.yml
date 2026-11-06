@@ -1,0 +1,16 @@
+# REQ-0084 — diskdoctor.md §8 pass-2 stop rule
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0084
+statement: "The tool shall apply the pass-2 stop rule at a marginal yield of less than 0.01 percent of device size over the trailing ten minutes and a projected remaining time above twice the elapsed time."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L456
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  operator: "LT"
+  value: "0.0001"
+  unit: "none"

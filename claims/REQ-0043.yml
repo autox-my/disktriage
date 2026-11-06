@@ -1,0 +1,12 @@
+# REQ-0043 — diskdoctor.md §6 image is FDA only
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0043
+statement: "The image command shall be the only command that requires Full Disk Access."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L330
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

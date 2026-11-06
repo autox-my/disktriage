@@ -1,0 +1,12 @@
+# REQ-0072 — diskdoctor.md §8 mount guard
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0072
+statement: "The guard command shall be started before the target device is connected."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L426
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

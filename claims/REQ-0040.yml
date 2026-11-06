@@ -1,0 +1,12 @@
+# REQ-0040 — diskdoctor.md §5 findings vs code
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0040
+statement: "The tool shall report every finding in the JSON causes and aggravators whatever the exit code it returns."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L308
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

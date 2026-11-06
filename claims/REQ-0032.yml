@@ -1,0 +1,15 @@
+# REQ-0032 — diskdoctor.md §5 exit code 11
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0032
+statement: "The tool shall exit with code 11 when the device is failing and the prescription is to power off for professional recovery."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L301
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "11"
+  unit: "none"

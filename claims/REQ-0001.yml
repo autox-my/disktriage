@@ -1,0 +1,14 @@
+# REQ-0001 — diskdoctor.md §2.1 never mount the source
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0001
+statement: "The tool shall not mount the source device."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L59
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

@@ -1,0 +1,12 @@
+# REQ-0048 — diskdoctor.md §6 dry run default
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0048
+statement: "The image command shall default to dry-run in the first release."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L333
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

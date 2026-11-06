@@ -1,0 +1,14 @@
+# REQ-0005 — diskdoctor.md §2.4 no third-party driver dependency
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0005
+statement: "The tool shall not require a third-party filesystem driver to mount a volume."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L69
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

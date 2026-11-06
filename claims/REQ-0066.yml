@@ -1,0 +1,12 @@
+# REQ-0066 — diskdoctor.md §7 degraded mode
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0066
+statement: "The tool shall mark imaging as blocked with the reason when Full Disk Access is denied."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L394
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

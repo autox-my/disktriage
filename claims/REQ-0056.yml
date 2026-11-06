@@ -1,0 +1,12 @@
+# REQ-0056 — diskdoctor.md §6 json
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0056
+statement: "Every command shall accept --json."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L344
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

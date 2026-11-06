@@ -1,0 +1,12 @@
+# REQ-0061 — diskdoctor.md §7 probe every run
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0061
+statement: "The tool shall probe Full Disk Access with a real read on every run."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L389
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

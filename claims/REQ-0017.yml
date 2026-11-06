@@ -1,0 +1,12 @@
+# REQ-0017 — diskdoctor.md §3 device identity
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0017
+statement: "The tool shall key each device by serial or IORegistry path rather than by its BSD name."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L161
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

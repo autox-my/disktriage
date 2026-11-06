@@ -1,0 +1,12 @@
+# REQ-0069 — diskdoctor.md §7 self test
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0069
+statement: "The check command shall report root status, raw device access, removable volume access, unified log readability, mount guard availability, and installed third-party filesystem drivers."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L406
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

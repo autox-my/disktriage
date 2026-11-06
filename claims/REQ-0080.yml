@@ -1,0 +1,12 @@
+# REQ-0080 — diskdoctor.md §8 sleep
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0080
+statement: "The image command shall prevent system sleep for the duration of the image."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L444
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

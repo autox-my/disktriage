@@ -1,0 +1,12 @@
+# REQ-0023 — diskdoctor.md §5 status is not zero
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0023
+statement: "The tool shall treat denied, timeout, and unsupported statuses as distinct from numeric values."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L227
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

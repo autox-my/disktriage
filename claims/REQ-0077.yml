@@ -1,0 +1,12 @@
+# REQ-0077 — diskdoctor.md §8 resume
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0077
+statement: "The image command shall resume by default after validating that the mapfile and image match the device size and serial."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L438
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

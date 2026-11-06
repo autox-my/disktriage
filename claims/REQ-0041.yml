@@ -1,0 +1,12 @@
+# REQ-0041 — diskdoctor.md §5 21 and 30 are last resort
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0041
+statement: "The tool shall report a permission or tooling failure as a signal status when it can still form a verdict."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L309
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

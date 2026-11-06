@@ -1,0 +1,12 @@
+# REQ-0096 — diskdoctor.md §8 repair hand-off
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0096
+statement: "The FILESYSTEM prescription shall target a copy of the image rather than the original image or the device."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L498
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

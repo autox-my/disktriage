@@ -1,0 +1,12 @@
+# REQ-0087 — diskdoctor.md §8 ETA
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0087
+statement: "The tool shall show an image ETA as a range derived from device size and measured bus speed."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L462
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

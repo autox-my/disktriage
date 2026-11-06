@@ -1,0 +1,16 @@
+# REQ-0025 — diskdoctor.md §5 confidence high
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0025
+statement: "The tool shall assign high confidence from at least 2 independent concurring sources with no competing explanation."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L263
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  operator: "GE"
+  value: "2"
+  unit: "none"

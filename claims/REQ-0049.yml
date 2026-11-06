@@ -1,0 +1,12 @@
+# REQ-0049 — diskdoctor.md §6 unsupported media
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0049
+statement: "The tool shall allow imaging of unsupported media with a caveat that no health classification applies."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L334
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

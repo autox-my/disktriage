@@ -1,0 +1,12 @@
+# REQ-0009 — diskdoctor.md §2.6 never destroy evidence
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0009
+statement: "The tool shall perform read-only operations only until the user explicitly requests a write."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L76
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

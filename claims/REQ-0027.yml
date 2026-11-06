@@ -1,0 +1,12 @@
+# REQ-0027 — diskdoctor.md §5 confidence low
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0027
+statement: "The tool shall assign low confidence from a weak or circumstantial source."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L265
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

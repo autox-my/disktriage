@@ -1,0 +1,14 @@
+# REQ-0100 — diskdoctor.md §1 non-goals
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0100
+statement: "The tool shall not imply that a disk is safe without evidence."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L52
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

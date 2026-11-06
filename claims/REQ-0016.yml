@@ -1,0 +1,12 @@
+# REQ-0016 — diskdoctor.md §3 classifier
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0016
+statement: "The classifier shall be a pure function over a SignalSet that is testable with recorded fixtures and no hardware."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L106
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

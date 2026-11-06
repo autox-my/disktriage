@@ -1,0 +1,12 @@
+# REQ-0024 — diskdoctor.md §3 collector notes
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0024
+statement: "The tool shall record each collector outcome and elapsed time in collector_notes."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L147
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

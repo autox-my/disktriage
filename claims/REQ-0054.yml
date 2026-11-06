@@ -1,0 +1,14 @@
+# REQ-0054 — diskdoctor.md §6 list labels
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0054
+statement: "The list command shall not show a health line for devices the classifier does not cover."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L339
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

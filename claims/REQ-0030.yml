@@ -1,0 +1,15 @@
+# REQ-0030 — diskdoctor.md §5 exit code 0
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0030
+statement: "The tool shall exit with code 0 when no actionable fault is found."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L299
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "0"
+  unit: "none"

@@ -1,0 +1,15 @@
+# REQ-0033 — diskdoctor.md §5 exit code 12
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0033
+statement: "The tool shall exit with code 12 on a bridge, link, or power suspicion that requires a swap and retest."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L302
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "12"
+  unit: "none"

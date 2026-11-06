@@ -1,0 +1,12 @@
+# REQ-0050 — diskdoctor.md §6 source identity
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0050
+statement: "The image command shall print the model, serial, and size of the source device before the first read."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L336
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

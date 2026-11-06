@@ -1,0 +1,12 @@
+# REQ-0021 — diskdoctor.md §3 nullable counters
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0021
+statement: "The tool shall represent an unknown counter as null rather than zero."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L113
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

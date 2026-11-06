@@ -1,0 +1,12 @@
+# REQ-0055 — diskdoctor.md §6 inspect images only
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0055
+statement: "The inspect command shall accept image files only and refuse raw device nodes."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L341
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

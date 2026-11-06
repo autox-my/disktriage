@@ -1,0 +1,12 @@
+# REQ-0078 — diskdoctor.md §8 resume
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0078
+statement: "The image command shall refuse an existing destination file with no matching mapfile."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L440
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

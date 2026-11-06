@@ -1,0 +1,12 @@
+# REQ-0086 — diskdoctor.md §8 bus drop-out
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0086
+statement: "The image command shall survive a bus drop-out by reopening on error and skipping the offending region."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L449
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

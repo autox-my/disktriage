@@ -1,0 +1,12 @@
+# REQ-0094 — diskdoctor.md §8 hashing
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0094
+statement: "The copy command shall state that hash equality proves the copy matches the image and not that the image matches the disk."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L484
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

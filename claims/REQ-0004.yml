@@ -1,0 +1,12 @@
+# REQ-0004 — diskdoctor.md §2.3 insufficient evidence is a verdict
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0004
+statement: "Insufficient evidence shall be a verdict carrying its own exit code, message, and prescription."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L67
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

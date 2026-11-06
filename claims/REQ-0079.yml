@@ -1,0 +1,16 @@
+# REQ-0079 — diskdoctor.md §8 destination checks
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0079
+statement: "The image command shall refuse a destination that is on the source disk, lacks free space for the full device, has a file-size limit less than 4 gib, or is not writable."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L441
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  operator: "LT"
+  value: "4"
+  unit: "gib"

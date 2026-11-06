@@ -1,0 +1,14 @@
+# REQ-0045 — diskdoctor.md §6 inconclusive triage
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0045
+statement: "An inconclusive triage result shall not block imaging."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L332
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

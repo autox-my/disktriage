@@ -1,0 +1,12 @@
+# REQ-0058 — diskdoctor.md §6 streams
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0058
+statement: "The tool shall write progress to stderr and the verdict to stdout."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L345
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

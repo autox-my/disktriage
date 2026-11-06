@@ -1,0 +1,12 @@
+# REQ-0088 — diskdoctor.md §8 inspection
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0088
+statement: "The inspection command shall attach the image read-only and without automount, then mount it with a native read-only driver."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L466
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

@@ -1,0 +1,12 @@
+# REQ-0065 — diskdoctor.md §7 degraded mode
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0065
+statement: "The tool shall complete triage and render its verdict without Full Disk Access."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L394
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

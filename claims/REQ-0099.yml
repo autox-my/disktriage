@@ -1,0 +1,14 @@
+# REQ-0099 — diskdoctor.md §1 non-goals
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0099
+statement: "The tool shall not predict the extent of data loss."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L51
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

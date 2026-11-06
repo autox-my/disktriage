@@ -1,0 +1,15 @@
+# REQ-0034 — diskdoctor.md §5 exit code 13
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0034
+statement: "The tool shall exit with code 13 when only a filesystem fault remains."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L303
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "13"
+  unit: "none"

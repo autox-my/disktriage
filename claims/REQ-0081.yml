@@ -1,0 +1,12 @@
+# REQ-0081 — diskdoctor.md §8 guardrails
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0081
+statement: "The image command shall pass ddrescue a maximum read rate, a timeout, a maximum error count, and a watch for device disappearance."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L446
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

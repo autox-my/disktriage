@@ -1,0 +1,12 @@
+# REQ-0070 — diskdoctor.md §7 self test
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0070
+statement: "The check command shall report the presence and version of smartctl and ddrescue."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L411
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

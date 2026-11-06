@@ -1,0 +1,12 @@
+# REQ-0097 — diskdoctor.md §8 repair hand-off
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0097
+statement: "The tool shall print an NTFS repair hand-off instead of performing the repair."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L499
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

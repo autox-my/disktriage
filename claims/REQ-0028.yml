@@ -1,0 +1,12 @@
+# REQ-0028 — diskdoctor.md §5 sources not attributes
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0028
+statement: "The tool shall count SMART pending, reallocated, and uncorrectable attributes as a single evidence source."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L256
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

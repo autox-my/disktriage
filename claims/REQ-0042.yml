@@ -1,0 +1,14 @@
+# REQ-0042 — diskdoctor.md §6 triage writes nothing
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0042
+statement: "The triage command shall not mount the source volume or write to it, apart from an optional local history snapshot."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L328
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

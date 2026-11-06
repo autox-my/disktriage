@@ -1,0 +1,12 @@
+# REQ-0076 — diskdoctor.md §8 mapfile
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0076
+statement: "The image command shall always write a mapfile."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L437
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []

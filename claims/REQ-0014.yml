@@ -1,0 +1,14 @@
+# REQ-0014 — diskdoctor.md §2.7 no hang
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0014
+statement: "The tool shall not start a SMART self-test during triage."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L80
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"

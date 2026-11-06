@@ -1,0 +1,12 @@
+# REQ-0006 — diskdoctor.md §2.4 no third-party driver dependency
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0006
+statement: "The tool shall detect installed third-party filesystem drivers without installing any driver."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L69
+  date: 2026-11-06
+  rejected_alternatives: []
+  assumptions: []
