@@ -10,6 +10,9 @@ let package = Package(
     products: [
         .library(name: "DiskTriageCore", targets: ["DiskTriageCore"]),
         .library(name: "DiskTriageGuard", targets: ["DiskTriageGuard"]),
+        // The P0 row-5 probe is now a thin entry point over DiskTriageGuard,
+        // so tools/p0/build-dadissent.sh builds the same code `guard` uses.
+        .executable(name: "dadissent", targets: ["dadissent"]),
         .executable(name: "disktriage", targets: ["disktriage"]),
     ],
     targets: [
@@ -68,6 +71,11 @@ let package = Package(
             name: "DiskTriageGuardTests",
             dependencies: ["DiskTriageGuard"],
             path: "Tests/DiskTriageGuardTests"
+        ),
+        .executableTarget(
+            name: "dadissent",
+            dependencies: ["DiskTriageGuard"],
+            path: "Sources/dadissent"
         ),
     ]
 )
