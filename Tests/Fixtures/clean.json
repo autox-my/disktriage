@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-11-06T02:00:00Z",
+  "device": {
+    "status": "ok",
+    "bsd": "disk6", "size_bytes": 1000204886016,
+    "model": "WDC WD10EZEX-00WN4A0", "serial": "REDACTED0003",
+    "media": "hdd", "bus": "sata", "removable": false
+  },
+  "smart": {
+    "status": "ok", "overall": "PASSED",
+    "pending": 0, "reallocated": 0, "uncorrectable": 0,
+    "power_on_hours": 1200, "raw_read_errors": 0,
+    "history": null
+  },
+  "io": { "status": "ok", "retries": 0, "timeouts": 0 },
+  "log": { "status": "ok", "window_hours": 72, "events": [] },
+  "drivers": { "status": "ok", "items": [] },
+  "permissions": { "root": true, "raw_read": "granted", "removable_volumes": "granted" },
+  "fs": { "status": "ok", "type": "apfs", "mounted": false, "readable": true },
+  "symptoms": { "source": "user", "clicking": false }
+}

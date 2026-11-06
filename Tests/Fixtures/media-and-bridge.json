@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-11-06T05:10:00Z",
+  "device": {
+    "status": "ok",
+    "bsd": "disk12", "size_bytes": 500107862016,
+    "model": "ST500LM012 HN-M500MBB", "serial": "REDACTED0010",
+    "media": "hdd", "bus": "usb", "bridge": "generic-sata", "sat_passthrough": "none",
+    "removable": true
+  },
+  "smart": { "status": "unsupported", "history": null },
+  "io": { "status": "ok", "retries": null, "timeouts": null },
+  "log": {
+    "status": "ok", "window_hours": 72,
+    "events": [{ "time": "2026-11-06T05:05:00Z", "first_time": "2026-11-06T04:55:00Z",
+                 "kind": "medium_error", "lba": 100, "count": 3 }]
+  },
+  "permissions": { "root": true, "raw_read": "granted", "removable_volumes": "granted" },
+  "fs": { "status": "timeout" },
+  "symptoms": { "source": "user", "clicking": false }
+}

@@ -1,0 +1,76 @@
+{
+  "minah.json": {
+    "required_causes": [{ "class": "MEDIA", "confidence": "high" }],
+    "required_aggravators": ["DRIVER"],
+    "exit_code": 10
+  },
+  "bridge-hides-smart.json": {
+    "required_causes": [
+      { "class": "BRIDGE", "confidence": "low" },
+      { "class": "UNKNOWN", "confidence": "low" }
+    ],
+    "required_aggravators": [],
+    "exit_code": 12
+  },
+  "bridge-hides-smart-log.json": {
+    "required_causes": [{ "class": "MEDIA", "confidence": "medium" }],
+    "required_aggravators": [],
+    "exit_code": 10
+  },
+  "clean.json": {
+    "required_causes": [],
+    "expect_no_cause": true,
+    "required_aggravators": [],
+    "exit_code": 0
+  },
+  "stable-reallocated.json": {
+    "required_causes": [{ "class": "MEDIA", "confidence": "low" }],
+    "required_aggravators": [],
+    "exit_code": 0,
+    "expect_warning": true
+  },
+  "reallocated-rising.json": {
+    "required_causes": [{ "class": "MEDIA", "confidence": "medium" }],
+    "required_aggravators": [],
+    "exit_code": 10,
+    "synthetic": true
+  },
+  "filesystem-only.json": {
+    "required_causes": [{ "class": "FILESYSTEM", "confidence": "medium" }],
+    "required_aggravators": [],
+    "exit_code": 13
+  },
+  "head-clicking.json": {
+    "required_causes": [{ "class": "HEAD", "confidence": "high" }],
+    "required_aggravators": [],
+    "exit_code": 11
+  },
+  "all-timeout.json": {
+    "required_causes": [{ "class": "UNKNOWN", "confidence": "low" }],
+    "required_aggravators": [],
+    "exit_code": 20,
+    "expect_imaging_offered": true
+  },
+  "smart-denied-not-root.json": {
+    "required_causes": [],
+    "expect_no_cause": true,
+    "required_aggravators": [],
+    "exit_code": 21
+  },
+  "unsupported-media.json": {
+    "required_causes": [],
+    "expect_no_cause": true,
+    "required_aggravators": [],
+    "exit_code": 20,
+    "expect_unsupported": true,
+    "expect_imaging_offered": true
+  },
+  "media-and-bridge.json": {
+    "required_causes": [
+      { "class": "MEDIA", "confidence": "medium" },
+      { "class": "BRIDGE", "confidence": "low" }
+    ],
+    "required_aggravators": [],
+    "exit_code": 10
+  }
+}

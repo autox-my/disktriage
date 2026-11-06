@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-11-06T05:00:00Z",
+  "device": {
+    "status": "ok",
+    "bsd": "disk11", "size_bytes": 1000204886016,
+    "model": "APPLE SSD AP1024Q", "serial": "REDACTED0009",
+    "media": "ssd", "bus": "nvme", "removable": false
+  },
+  "smart": { "status": "unsupported", "history": null },
+  "io": { "status": "unsupported" },
+  "log": { "status": "ok", "window_hours": 72, "events": [] },
+  "permissions": { "root": true, "raw_read": "granted", "removable_volumes": "granted" },
+  "fs": { "status": "ok", "type": "apfs", "mounted": false, "readable": null },
+  "symptoms": { "source": "user", "clicking": false }
+}
