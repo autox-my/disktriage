@@ -9,6 +9,10 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .library(name: "DiskTriageCore", targets: ["DiskTriageCore"]),
+        .library(name: "DiskTriageGuard", targets: ["DiskTriageGuard"]),
+        // The P0 row-5 probe is now a thin entry point over DiskTriageGuard,
+        // so tools/p0/build-dadissent.sh builds the same code `guard` uses.
+        .executable(name: "dadissent", targets: ["dadissent"]),
         .executable(name: "disktriage", targets: ["disktriage"]),
     ],
     targets: [
@@ -18,7 +22,7 @@ let package = Package(
         ),
         .target(
             name: "DiskTriageCLI",
-            dependencies: ["DiskTriageCore", "DiskTriageCollectors"],
+            dependencies: ["DiskTriageCore", "DiskTriageCollectors", "DiskTriageGuard"],
             path: "Sources/DiskTriageCLI"
         ),
         .executableTarget(
@@ -38,7 +42,7 @@ let package = Package(
         ),
         .testTarget(
             name: "DiskTriageCLITests",
-            dependencies: ["DiskTriageCLI", "DiskTriageCollectors", "DiskTriageCore"],
+            dependencies: ["DiskTriageCLI", "DiskTriageCollectors", "DiskTriageCore", "DiskTriageGuard"],
             path: "Tests/DiskTriageCLITests"
         ),
         // P1c: the collector framework. OS calls, subprocesses and filesystem
@@ -52,6 +56,26 @@ let package = Package(
             name: "DiskTriageCollectorsTests",
             dependencies: ["DiskTriageCollectors", "DiskTriageCore"],
             path: "Tests/DiskTriageCollectorsTests"
+        ),
+        // P3a: the mount guard. macOS-only, and the decision logic is pure so
+        // the suite needs neither DiskArbitration nor a disk.
+        .target(
+            name: "DiskTriageGuard",
+            path: "Sources/DiskTriageGuard",
+            linkerSettings: [
+                .linkedFramework("DiskArbitration"),
+                .linkedFramework("CoreFoundation"),
+            ]
+        ),
+        .testTarget(
+            name: "DiskTriageGuardTests",
+            dependencies: ["DiskTriageGuard"],
+            path: "Tests/DiskTriageGuardTests"
+        ),
+        .executableTarget(
+            name: "dadissent",
+            dependencies: ["DiskTriageGuard"],
+            path: "Sources/dadissent"
         ),
     ]
 )

@@ -58,8 +58,8 @@ were inconvenient:
 
 - `disktriage triage --from <signalset.json>` is the only working command; live
   collection arrives with the collectors in P2. Without `--from` it says so on
-  stderr and exits **30** (tool error). `image`, `inspect`, `copy`, `check`,
-  `guard` and `list` also exit 30 with "not implemented yet (planned P2/P3)".
+  stderr and exits **30** (tool error). `image`, `inspect`, `copy`, `check` and
+  `list` also exit 30 with "not implemented yet (planned P2/P3)".
 - **Usage errors exit 2** (unknown command, unknown flag, `--from` without a
   value). The plan is silent on a usage code, so this page records the choice:
   it is req's convention and collides with no verdict or collection code
@@ -71,6 +71,39 @@ were inconvenient:
   `--to /Volumes/Scratch/minah.img` that `triage --from` cannot supply.
 - `--json` prints the same verdict as the tty on stdout; progress stays on
   stderr. `--local` renders log timestamps in the local zone (default UTC).
+
+### CLI decisions (P3a, `guard`)
+
+`disktriage guard [--suspend] [--seconds N] [--json] [--observe]` is the mount
+guard from diskdoctor.md §8. It is streamed, not buffered: a decision line is
+written and flushed when it is made, because a guard runs for minutes.
+
+- **It never claims protection that is not active.** The first line is
+  `mode=dissent|suspend protection: ACTIVE` or
+  `protection: NOT ACTIVE (reason)`. Without root the dissent is not honoured,
+  so it says `NOT ACTIVE (not root)` and never `ACTIVE`.
+- **Exit 0**: the run completed — a dissent run as root, an observation, or a
+  suspend whose teardown resumed or correctly held. SIGINT/SIGTERM runs teardown
+  and exits 0, so an interrupt is not a crash.
+- **Exit 30**: protection was requested and is not active (not root with no
+  `--seconds` bound, or any `--suspend` without root), a suspend did not reach
+  `ps -o stat=` state `T`, or the daemon could not be resumed.
+- **Exit 2**: usage (unknown option, bad `--seconds`, `--observe` without
+  `--seconds` or with `--suspend`).
+- `--observe` is the explicit observation-only run that exits 0 without root; it
+  requires `--seconds`. Without root, the default `--seconds N` run still
+  observes and logs, then exits 30 because protection was requested. The
+  `--observe` flag is additive to the plan's synopsis, which has no other way to
+  ask for an observation that exits 0.
+- **Suspend teardown is the safety-critical rule**: SIGCONT is sent only when no
+  new `/dev/rdisk*` node appeared since start (compare sets, not counts). If a
+  node is still present the daemon stays suspended and the last line is
+  `unplug the disk, then run: sudo kill -CONT <pid>`.
+- `--json` writes one JSON object per decision and a final summary on stdout;
+  the human banner, the honesty line and the warning stay on stderr.
+- The suite never sends a signal: `ProcessSignaling` is injected and faked. The
+  DiskArbitration shim is exercised for real only by the unprivileged
+  `--seconds 5` smoke with no disk attached.
 
 ### The test report is the evidence
 
