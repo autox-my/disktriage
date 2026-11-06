@@ -60,6 +60,10 @@ NVMe, which the collector will see).
    the image. A read-write driver writes (journal replay, dirty flag); a read-only mount still
    trusts a failing device to answer every block. Because `diskarbitrationd` automounts at
    plug-in, enforcement needs an active mount guard (see §8), not just good intentions.
+   **Measured limit (P0 row 5):** a dissent stops the *mount*, but a third-party driver's probe
+   (`ms_ntfs.util -p` / `-k`) still reads the volume before the approval is asked. The principle is
+   therefore "never mount", not "never touch": macOS and its drivers may read the boot sector and
+   early metadata as soon as the disk is visible to it.
 2. **Diagnosis must not require FDA.** Only imaging does. Triage triggers no TCC prompts.
    *Honest caveat:* triage does depend on third-party tools (`smartctl`) and may need root
    (sudo). "Stock Mac" applies to the permission model and the filesystem drivers, not to the
@@ -205,7 +209,7 @@ Collector mapping:
 |---|---|---|---|
 | identity, bus, bridge | `ioreg`, `diskutil info -plist` | `lsblk -J`, `/sys/block` | `Get-PhysicalDisk` |
 | SMART | `smartctl -d sat -a` (**P0: does opening the device trip TCC? per-bridge support?**) | `smartctl -a` | `smartctl`, `Get-StorageReliabilityCounter` |
-| I/O error counters | `ioreg -r -c IOBlockStorageDriver -k Statistics` (**P0: real counters?**) | `/sys/block/*/device/ioerr_cnt` | reliability counter |
+| I/O error counters | `ioreg -r -c IOBlockStorageDriver -k Statistics` (**P0 B2: real Bytes / Operations / Retries / Errors counters; no timeouts counter; movement on bad media UNVERIFIED**) | `/sys/block/*/device/ioerr_cnt` | reliability counter |
 | kernel error history | unified log predicate (**P0: retention?**) | `dmesg` / `journalctl -k` | Event Log |
 | installed FS drivers | `/Library/Filesystems`, `systemextensionsctl list` | `/proc/filesystems`, `lsmod` | filter drivers |
 | raw access | FDA-gated, plus root | free as root | admin |
@@ -219,6 +223,14 @@ MiNaH SMART data came from Linux (`smartctl -d sat` on the PVE host), so the mac
 unproven. If SMART is mostly unavailable, `BRIDGE` / "SMART hidden" is the *common* path and §5
 must make it useful on its own (kernel log, I/O stats, symptoms, imaging advice), not an error
 branch.
+
+**Measured (P0 phase B, Seagate Expansion bridge 0bc2:231a, macOS 27.2):** `smartctl` cannot reach
+SMART through this bridge even as root with Full Disk Access ("Not a device of type 'scsi'" /
+"Operation not supported by device"), and `diskutil` reports `SMARTStatus: Not Supported`. The cause
+is the OS/bridge path, not permissions. Only one bridge was tested, so "this bridge" versus
+"macOS-wide" is open. Consequences: the no-SMART path carries triage; `io.timeouts` is **not**
+available from ioreg (which exposes Retries and Errors) and must come from the kernel log or the
+collector's own timeouts.
 
 **Bounded v1 scope: macOS only.** Keep the `SignalSet` and classifier free of OS assumptions so
 Linux is a collector, not a rewrite.
@@ -301,7 +313,6 @@ Aggravators (modify the advice, never the root cause):
 |---|---|
 | 0 | no actionable fault found (warnings may apply) |
 | 10 | media risk — image before anything else |
-| 11 | On a real MiNaH-style image (boot sector unreadable), does restoring the backup boot sector on a working copy let the ntfs-3g tools open the volume, and how long does `ntfscluster` take across a realistic number of bad extents on a large volume? | Boot-sector restore stays in §8; set the extent cap from the measured time | Report volume-level only for boot-sector damage and say why; consider an own parser for the boot-sector/MFT-mirror cases |
 | 11 | failing — power off, professional recovery |
 | 12 | bridge/link/power suspicion — swap and retest |
 | 13 | filesystem only — repair the image |
@@ -431,7 +442,12 @@ Deep link:
 - If the volume is already mounted: `diskutil unmountDisk` with a hard timeout. If that hangs
   (third-party driver stuck in a retrying read), say so and instruct a physical disconnect, then
   reconnect with `guard` running.
-- P0 must verify the dissent also stops third-party driver mounts.
+- **Measured (P0 row 5):** the dissent does stop the third-party NTFS driver's *mount*, but not its
+  *probe*, which runs first and reads the volume. For a disk whose first sectors are already
+  failing, the probe itself can stall. A stronger guard is to suspend `diskarbitrationd`
+  (`SIGSTOP`) for the whole session, which prevents both probe and mount; while it is stopped,
+  `diskutil` hangs, so collection uses `ioreg` only. **UNVERIFIED** until P0 phase C. Where neither
+  is acceptable, use the Linux rescue path (the only host on which macOS never sees the disk).
 - `hdiutil attach` for inspection always uses `-nomount`, then an explicit native mount, so a
   third-party driver cannot claim the image volume.
 
@@ -463,6 +479,10 @@ Deep link:
   stop, print what remains unread and the exact command to resume.
 - **Platform quirks to verify (P0/P3):** ddrescue direct-I/O behaviour and sector-size detection on
   macOS, `/dev/rdiskN` vs `/dev/diskN`.
+- **Measured on macOS 27.2 (P0 phase B):** `ddrescue -d` (direct I/O) fails with "Direct disc
+  access not available" and must not be used. Use `/dev/rdiskN`; `-b` equals the device block size;
+  `-O` and `-K` are accepted; four 16 MiB images (plain, `-b 4096`, `-n -O -K`, buffered node) were
+  byte-identical to a `dd` reference. Reopen-on-bus-drop behaviour is UNVERIFIED.
 - **ETA** is derived from device size and measured bus speed, shown as a range, not a promise.
 
 ### Inspection
@@ -575,6 +595,7 @@ earlier question "was the MiNaH SMART data collected on macOS?" is closed: it ca
 | 8 | Does a raw read of the internal disk work as an FDA probe? | Probe off the suspect disk | Probe the target with one bounded, time-limited read |
 | 9 | ddrescue on macOS: direct I/O, sector size, `/dev/rdiskN`, `-O`, `-K` behave as documented? | Wrapper defaults as in §8 | Adjust wrapper defaults and document the workarounds |
 | 10 | Do `diskutil` / `smartctl` hang on a failing disk, and do timeout + kill work (uninterruptible I/O)? | Collectors as designed | Treat the stuck collector as evidence (`timeout` = unresponsive), abandon it without waiting, never block the CLI |
+| 11 | On a real MiNaH-style image (boot sector unreadable), does restoring the backup boot sector on a working copy let the ntfs-3g tools open the volume, and how long does `ntfscluster` take across a realistic number of bad extents on a large volume? | Boot-sector restore stays in §8; set the extent cap from the measured time | Report volume-level only for boot-sector damage and say why; consider an own parser for the boot-sector/MFT-mirror cases |
 
 Schema impact: items 3 and 4 touch fields (`log.window_hours`, manifest `attribution`). Resolve them
 before the P1 schema freeze. If item 1 fails because of TCC, or item 6 fails, the FDA design
@@ -619,7 +640,7 @@ produce it. Timestamps render in UTC unless `--local` is passed, so the test is 
 
 | Risk | Mitigation |
 |---|---|
-| SMART over USB doesn't work on modern macOS | P0 gate; make the no-SMART path useful on its own |
+| SMART over USB doesn't work on modern macOS | **Measured: not reachable via smartctl through the Seagate bridge on macOS 27.2 (P0 row 1).** The no-SMART path (kernel log, ioreg Retries/Errors, symptoms) carries triage; a second bridge would show whether this is bridge-specific |
 | USB-SATA bridges hide SMART entirely | Explicit `BRIDGE` branch; publish a known-good bridge list; never fake a verdict |
 | TCC behaviour changes between macOS releases | Probe every run; keep the permission layer one module |
 | Granting Terminal FDA is a broad privilege | State it explicitly; offer the app/helper options |
@@ -634,6 +655,7 @@ produce it. Timestamps render in UTC unless `--local` is passed, so the test is 
 | Imaging the wrong device after a `diskN` renumber | Serial-confirmation prompt before the first read |
 | Unsupported media treated as "nothing to do" | `UNSUPPORTED` blocks classification only; imaging stays available |
 | Mount at plug-in before the tool runs | `guard`, documented workflow |
+| Driver probe reads at plug-in can stall on a failing disk; a dissent does not stop them | Suspend `diskarbitrationd` for the session (UNVERIFIED, P0 phase C) or use the Linux rescue path; say that a probe read may already have happened |
 | Resuming onto the wrong image / wrong disk | Validate mapfile + image against device size and serial |
 | SMR drives image badly | Detect and warn; note long rebuild behaviour |
 | Firmware-encrypted drives (WD/Seagate) | Out of scope, detect and hand off |
@@ -668,6 +690,14 @@ product, and awkward on Apple Silicon.
 ---
 
 ## 14. Revision history
+
+**v3.3 (2026-11-07), after P0 phase B and row 5:**
+
+- Principle 1 narrowed to "never mount": a DiskArbitration dissent blocks the mount but not the
+  third-party driver's probe reads; a `diskarbitrationd` suspend is the stronger guard (UNVERIFIED).
+- Measured: SMART unreachable via smartctl through the Seagate bridge; ioreg exposes real
+  Retries/Errors counters but no timeouts; `ddrescue -d` unavailable on macOS.
+- Fixed a misplaced table row: P0 row 11 had been inserted into the exit-code table.
 
 **v3.2 (2026-11-06), after P0 phase A and the NTFS spike:**
 
