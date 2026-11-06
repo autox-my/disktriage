@@ -82,6 +82,30 @@ public struct SmartSignals: Codable, Equatable, Sendable {
     /// real prior snapshot (diskdoctor.md §3, §5).
     public let history: SmartHistory?
 
+    public init(
+        status: SignalStatus,
+        overall: String? = nil,
+        pending: Int? = nil,
+        reallocated: Int? = nil,
+        uncorrectable: Int? = nil,
+        powerOnHours: Int? = nil,
+        rawReadErrors: Int? = nil,
+        errorLog: [SmartError]? = nil,
+        selfTest: SmartSelfTest? = nil,
+        history: SmartHistory? = nil
+    ) {
+        self.status = status
+        self.overall = overall
+        self.pending = pending
+        self.reallocated = reallocated
+        self.uncorrectable = uncorrectable
+        self.powerOnHours = powerOnHours
+        self.rawReadErrors = rawReadErrors
+        self.errorLog = errorLog
+        self.selfTest = selfTest
+        self.history = history
+    }
+
     enum CodingKeys: String, CodingKey {
         case status, overall, pending, reallocated, uncorrectable, history
         case powerOnHours = "power_on_hours"
@@ -100,6 +124,11 @@ public struct SmartError: Codable, Equatable, Sendable {
 public struct SmartSelfTest: Codable, Equatable, Sendable {
     public let last: String?
     public let ageHours: Int?
+
+    public init(last: String? = nil, ageHours: Int? = nil) {
+        self.last = last
+        self.ageHours = ageHours
+    }
 
     enum CodingKeys: String, CodingKey {
         case last
@@ -177,18 +206,33 @@ public struct LogEvent: Codable, Equatable, Sendable {
     public let kind: String?
     public let lba: Int?
     public let count: Int?
+    /// SCSI sense key from the kernel's `Sense Data` line (3 = MEDIUM ERROR).
+    public let senseKey: Int?
+    /// Highest retry number in the burst; the kernel retries about every 2.2 s.
+    public let retry: Int?
 
-    public init(time: Date?, firstTime: Date? = nil, kind: String? = nil, lba: Int? = nil, count: Int? = nil) {
+    public init(
+        time: Date?,
+        firstTime: Date? = nil,
+        kind: String? = nil,
+        lba: Int? = nil,
+        count: Int? = nil,
+        senseKey: Int? = nil,
+        retry: Int? = nil
+    ) {
         self.time = time
         self.firstTime = firstTime
         self.kind = kind
         self.lba = lba
         self.count = count
+        self.senseKey = senseKey
+        self.retry = retry
     }
 
     enum CodingKeys: String, CodingKey {
-        case time, kind, lba, count
+        case time, kind, lba, count, retry
         case firstTime = "first_time"
+        case senseKey = "sense_key"
     }
 }
 
@@ -271,5 +315,44 @@ public extension JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
+    }
+}
+
+public extension SignalSet {
+    /// A copy safe to commit as a fixture: the device serial is replaced by
+    /// the caller's hash and every measurement is preserved (REQ-0060).
+    ///
+    /// The schema carries no UUID or volume-name field; a `nil` serial is left
+    /// alone rather than inventing a value.
+    func redacted(serialHash: (String) -> String) -> SignalSet {
+        guard let device, let serial = device.serial, !serial.isEmpty else {
+            return self
+        }
+        let redactedDevice = DeviceSignals(
+            status: device.status,
+            bsd: device.bsd,
+            sizeBytes: device.sizeBytes,
+            model: device.model,
+            serial: serialHash(serial),
+            media: device.media,
+            bus: device.bus,
+            bridge: device.bridge,
+            satPassthrough: device.satPassthrough,
+            removable: device.removable
+        )
+        return SignalSet(
+            schemaVersion: schemaVersion,
+            collectedAt: collectedAt,
+            device: redactedDevice,
+            smart: smart,
+            io: io,
+            log: log,
+            drivers: drivers,
+            permissions: permissions,
+            fs: fs,
+            symptoms: symptoms,
+            collectorNotes: collectorNotes,
+            synthetic: synthetic
+        )
     }
 }

@@ -80,13 +80,13 @@ struct CLITests {
     }
 
     @Test
-    func `triage without --from says live collection is P2 and exits 30`() {
+    func `triage without a disk or --from is a usage error`() {
         let result = run(arguments: ["triage"])
 
-        #expect(result.exitCode == 30, "nothing could be collected")
+        #expect(result.exitCode == 2, "nothing names a disk to collect")
         #expect(result.stdout.isEmpty, "no verdict")
-        #expect(result.stderr.contains("collectors"), "names the missing collectors")
-        #expect(result.stderr.contains("--from"), "names the working input")
+        #expect(result.stderr.contains("disk"), "names the missing disk")
+        #expect(result.stderr.contains("--from"), "names the recorded input")
     }
 
     @Test
@@ -125,7 +125,7 @@ struct CLITests {
 
     @Test
     func `planned commands are not implemented and exit 30`() {
-        for command in ["image", "inspect", "copy", "check", "guard", "list"] {
+        for command in ["image", "inspect", "copy", "check", "guard"] {
             let result = run(arguments: [command])
             #expect(result.exitCode == 30, "\(command): tool error, not a verdict")
             #expect(result.stdout.isEmpty, "\(command): nothing on stdout")
@@ -143,7 +143,7 @@ private struct ExpectedVerdict: Decodable {
     }
 }
 
-private func fixturePath(_ name: String) -> String {
+func fixturePath(_ name: String) -> String {
     URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()   // DiskTriageCLITests
         .deletingLastPathComponent()   // Tests

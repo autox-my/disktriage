@@ -4,14 +4,17 @@ import Foundation
 ///
 /// `TriageCommand` is the only way the product builds a command; the paths are
 /// absolute so a sanitised `PATH` can never select the binary.
-public enum TriageCommand: Sendable, Equatable {
+public enum TriageCommand: Sendable, Equatable, Hashable {
     case diskutilList
     case diskutilInfo(disk: String)
     case ioregStatistics
+    /// `ioreg -r -c IOMedia -d 1 -w 0`: the association query that supplies the
+    /// `BSD Name` the Statistics capture lacks.
+    case ioregMedia
     case logShow(last: String, predicate: String)
     case smartctl(query: SmartQuery, node: String, deviceType: String? = nil)
 
-    public enum SmartQuery: String, Sendable, Equatable {
+    public enum SmartQuery: String, Sendable, Equatable, Hashable {
         case info = "-i"
         case health = "-H"
         case attributes = "-A"
@@ -25,9 +28,14 @@ public enum TriageCommand: Sendable, Equatable {
         case .diskutilInfo(let disk):
             return ["/usr/sbin/diskutil", "info", "-plist", disk]
         case .ioregStatistics:
-            return ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-k", "Statistics"]
+            // `-k Statistics` prunes the child IOMedia entry on macOS 27.2, and
+            // without that entry the driver cannot be associated with a disk.
+            // The unfiltered query still carries the `Statistics` property.
+            return ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-w", "0"]
+        case .ioregMedia:
+            return ["/usr/sbin/ioreg", "-r", "-c", "IOMedia", "-d", "1", "-w", "0"]
         case .logShow(let last, let predicate):
-            return ["/usr/bin/log", "show", "--last", last, "--predicate", predicate]
+            return ["/usr/bin/log", "show", "--last", last, "--style", "ndjson", "--predicate", predicate]
         case .smartctl(let query, let node, let deviceType):
             var argv = ["/opt/homebrew/bin/smartctl", "--json=o"]
             if let deviceType {
@@ -84,8 +92,16 @@ public struct CommandPolicy: Sendable {
         case "/usr/sbin/diskutil":
             return evaluateDiskutil(Array(argv.dropFirst()))
         case "/usr/sbin/ioreg":
-            return Array(argv.dropFirst()) == ["-r", "-c", "IOBlockStorageDriver", "-k", "Statistics"]
-                ? .allowed : .rejected(.notAllowListed)
+            let args = Array(argv.dropFirst())
+            switch args {
+            case ["-r", "-c", "IOBlockStorageDriver", "-k", "Statistics"],
+                 ["-r", "-c", "IOBlockStorageDriver", "-k", "Statistics", "-d", "1", "-w", "0"],
+                 ["-r", "-c", "IOBlockStorageDriver", "-w", "0"],
+                 ["-r", "-c", "IOMedia", "-d", "1", "-w", "0"]:
+                return .allowed
+            default:
+                return .rejected(.notAllowListed)
+            }
         case "/usr/bin/log":
             return evaluateLog(Array(argv.dropFirst()))
         case "/opt/homebrew/bin/smartctl", "/usr/local/bin/smartctl", "/usr/bin/smartctl":
@@ -111,6 +127,7 @@ public struct CommandPolicy: Sendable {
         }
         var last: String?
         var predicate: String?
+        var sawStyle = false
         var index = 1
         while index < args.count {
             switch args[index] {
@@ -121,6 +138,12 @@ public struct CommandPolicy: Sendable {
             case "--predicate":
                 guard predicate == nil, index + 1 < args.count else { return .rejected(.logOption) }
                 predicate = args[index + 1]
+                index += 2
+            case "--style":
+                guard !sawStyle, index + 1 < args.count, args[index + 1] == "ndjson" else {
+                    return .rejected(.logOption)
+                }
+                sawStyle = true
                 index += 2
             default:
                 return .rejected(.logOption)

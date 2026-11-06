@@ -1,0 +1,41 @@
+{
+  "json_format_version": [
+    1,
+    0
+  ],
+  "smartctl": {
+    "version": [
+      7,
+      5
+    ],
+    "pre_release": false,
+    "svn_revision": "5714",
+    "platform_info": "Darwin 27.2.0 arm64",
+    "build_info": "(local build)",
+    "argv": [
+      "smartctl",
+      "--json=o",
+      "-d",
+      "auto",
+      "-i",
+      "/dev/rdisk8"
+    ],
+    "output": [
+      "smartctl 7.5 2025-04-30 r5714 [Darwin 27.2.0 arm64] (local build)",
+      "Copyright (C) 2002-25, Bruce Allen, Christian Franke, www.smartmontools.org",
+      "",
+      "Smartctl open device: /dev/rdisk8 failed: Operation not supported by device"
+    ],
+    "messages": [
+      {
+        "string": "Smartctl open device: /dev/rdisk8 failed: Operation not supported by device",
+        "severity": "error"
+      }
+    ],
+    "exit_status": 2
+  },
+  "local_time": {
+    "time_t": 1793981433,
+    "asctime": "Sat Nov  7 00:10:33 2026 +08"
+  }
+}

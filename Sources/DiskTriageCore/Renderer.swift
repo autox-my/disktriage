@@ -308,9 +308,11 @@ public enum Renderer {
 
     private static func errorSignalRows(_ signals: SignalSet, timeZone: TimeZone) -> [String] {
         var rows: [String] = []
-        if let io = signals.io, io.status == .ok, io.retries != nil || io.timeouts != nil {
+        if let io = signals.io, io.status == .ok,
+           io.retries != nil || io.errors != nil || io.timeouts != nil {
             var parts: [String] = []
             if let retries = io.retries { parts.append("retries \(comma(retries))") }
+            if let errors = io.errors { parts.append("errors \(comma(errors))") }
             if let timeouts = io.timeouts { parts.append("timeouts \(comma(timeouts))") }
             rows.append(row("IORegistry", parts.joined(separator: " · ")))
         }
@@ -328,6 +330,21 @@ public enum Renderer {
                 value += "  (\(count) \(occurrences)\(window))"
             }
             rows.append(row("unified log", value))
+
+            // The kernel's own sense record, when the parser carried it. The
+            // MiNaH fixture predates these fields and must render unchanged.
+            if event.senseKey != nil || event.retry != nil {
+                var evidence: [String] = []
+                if let key = event.senseKey {
+                    let name = key == 3 ? " (MEDIUM ERROR)" : ""
+                    evidence.append("sense key \(key)\(name)")
+                }
+                if let lba = event.lba { evidence.append("LBA \(lba)") }
+                if let retry = event.retry {
+                    evidence.append("\(retry) retries")
+                }
+                rows.append(row("kernel log", evidence.joined(separator: " · ")))
+            }
         }
         return rows
     }

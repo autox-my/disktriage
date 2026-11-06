@@ -1,0 +1,65 @@
+{
+  "_note": "SYNTHETIC: no USB-HDD on this bench can return an ATA attribute table, so this shape is hand-built from smartctl's documented --json=o schema. The values are the MiNaH plan values (diskdoctor.md §3).",
+  "json_format_version": [1, 0],
+  "smartctl": {
+    "version": [7, 5],
+    "svn_revision": "5714",
+    "platform_info": "Darwin 27.2.0 arm64",
+    "argv": ["smartctl", "--json=o", "-a", "/dev/disk4"],
+    "exit_status": 0
+  },
+  "device": { "name": "/dev/disk4", "type": "sat", "protocol": "ATA" },
+  "model_name": "WDC WD3200BJKT-75F4T0",
+  "serial_number": "REDACTED",
+  "smart_status": { "passed": true },
+  "ata_smart_attributes": {
+    "revision": 16,
+    "table": [
+      {
+        "id": 1,
+        "name": "Raw_Read_Error_Rate",
+        "value": 100,
+        "worst": 100,
+        "thresh": 6,
+        "raw": { "value": 21545, "string": "21545" }
+      },
+      {
+        "id": 5,
+        "name": "Reallocated_Sector_Ct",
+        "value": 100,
+        "worst": 100,
+        "thresh": 36,
+        "raw": { "value": 14, "string": "14" }
+      },
+      {
+        "id": 9,
+        "name": "Power_On_Hours",
+        "value": 95,
+        "worst": 95,
+        "thresh": 0,
+        "raw": { "value": 4531, "string": "4531" }
+      },
+      {
+        "id": 197,
+        "name": "Current_Pending_Sector",
+        "value": 100,
+        "worst": 100,
+        "thresh": 0,
+        "raw": { "value": 131, "string": "131" }
+      },
+      {
+        "id": 198,
+        "name": "Offline_Uncorrectable",
+        "value": 100,
+        "worst": 100,
+        "thresh": 0,
+        "raw": { "value": 0, "string": "0" }
+      }
+    ]
+  },
+  "ata_smart_data": {
+    "self_test": {
+      "status": { "string": "completed without error" }
+    }
+  }
+}

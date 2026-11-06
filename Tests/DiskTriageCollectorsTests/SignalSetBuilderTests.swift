@@ -150,6 +150,74 @@ struct SignalSetBuilderTests {
         #expect(set.log?.events?.isEmpty == true, "zero medium errors")
         #expect(set.log?.windowHours == 1, "window")
     }
+
+    @Test("a SMART collection fills the smart section only after a real attribute table")
+    func aSmartCollectionFillsTheSection() throws {
+        let smart = SmartCollector(executor: RecordingExecutor([
+            .smartctl(query: .all, node: "/dev/disk4"): .ok(try collectorFixtureText("smart-ata-synthetic.json")),
+        ])).collect(bsd: "disk4")
+        var builder = SignalSetBuilder(collectedAt: collectedAt)
+        builder.setSmart(smart)
+        let set = try builder.build()
+
+        let section = try #require(set.smart, "smart section")
+        #expect(section.status == .ok, "status")
+        #expect(section.pending == 131, "pending")
+        #expect(section.reallocated == 14, "reallocated")
+        #expect(section.history == nil, "no invented history")
+        #expect(builder.unsupportedReasons["smart"] == nil, "no longer unsupported")
+    }
+
+    @Test("an unsupported SMART collection keeps nil counters, never zeros")
+    func anUnsupportedSmartCollectionHasNoCounters() throws {
+        let smart = SmartCollector(executor: RecordingExecutor([
+            .smartctl(query: .all, node: "/dev/disk8"): CollectorResult(
+                outcome: .error,
+                exitCode: 1,
+                stdout: try collectorFixtureText("smart-unsupported-not-scsi.json")
+            ),
+        ])).collect(bsd: "disk8")
+        var builder = SignalSetBuilder(collectedAt: collectedAt)
+        builder.setSmart(smart)
+        let set = try builder.build()
+
+        #expect(set.smart?.status == .unsupported, "status")
+        #expect(set.smart?.pending == nil, "pending is nil")
+        #expect(set.smart?.reallocated == nil, "reallocated is nil")
+        #expect(builder.unsupportedReasons["smart"]?.contains("Not a device") == true, "reason recorded")
+    }
+
+    @Test("an I/O collection carries the ioreg Errors (Read) counter")
+    func anIOCollectionCarriesErrors() throws {
+        let io = IOStatsCollector(executor: RecordingExecutor([
+            .ioregStatistics: .ok(try collectorFixtureText("ioreg-internal-driver.txt")),
+            .ioregMedia: .ok(try collectorFixtureText("ioreg-iomedia-internal.txt")),
+        ])).collect(bsd: "disk0")
+        var builder = SignalSetBuilder(collectedAt: collectedAt)
+        builder.setIO(io)
+        let set = try builder.build()
+
+        #expect(set.io?.status == .ok, "status")
+        #expect(set.io?.errors == 0, "a measured zero")
+        #expect(set.io?.retries == 0, "a measured zero")
+        #expect(set.io?.timeouts == nil, "ioreg has no timeouts counter")
+    }
+
+    @Test("a log collection carries the sense key and retry count")
+    func aLogCollectionCarriesTheEvidence() throws {
+        let log = KernelLogCollector(executor: RecordingExecutor([
+            .logShow(last: "6h", predicate: ""): .ok(try collectorFixtureText("kernel-log-medium-errors.ndjson")),
+        ])).collect(bsd: "disk8")
+        var builder = SignalSetBuilder(collectedAt: collectedAt)
+        builder.setLog(log)
+        let set = try builder.build()
+
+        #expect(set.log?.status == .ok, "status")
+        #expect(set.log?.windowHours == 6, "window")
+        let event = try #require(set.log?.events?.first { $0.count == 1 }, "the dd event")
+        #expect(event.senseKey == 3, "sense key")
+        #expect(event.retry == 20, "max retry")
+    }
 }
 
 private func collectorFixtureText(_ name: String) throws -> String {

@@ -1,0 +1,49 @@
+{
+  "json_format_version": [
+    1,
+    0
+  ],
+  "smartctl": {
+    "version": [
+      7,
+      5
+    ],
+    "pre_release": false,
+    "svn_revision": "5714",
+    "platform_info": "Darwin 27.2.0 arm64",
+    "build_info": "(local build)",
+    "argv": [
+      "smartctl",
+      "--json=o",
+      "-d",
+      "sat",
+      "-a",
+      "/dev//dev/rdisk8"
+    ],
+    "output": [
+      "smartctl 7.5 2025-04-30 r5714 [Darwin 27.2.0 arm64] (local build)",
+      "Copyright (C) 2002-25, Bruce Allen, Christian Franke, www.smartmontools.org",
+      "",
+      "/dev//dev/rdisk8: Type 'sat+...': Not a device of type 'scsi'",
+      "=======> VALID ARGUMENTS ARE: ata, scsi[+TYPE], nvme[,NSID], sat[,auto][,N][+TYPE], usbasm1352r,N, usbcypress[,X], usbjmicron[,p][,x][,N], usbprolific, usbsunplus[/sat], sntasmedia[/sat], sntjmicron[,NSID][/sat], sntrealtek[/sat], jmb39x[-q[2]],N[,sLBA][,force][+TYPE], jms56x,N[,sLBA][,force][+TYPE], auto, test <=======",
+      "",
+      "Use smartctl -h to get a usage summary",
+      ""
+    ],
+    "messages": [
+      {
+        "string": "/dev//dev/rdisk8: Type 'sat+...': Not a device of type 'scsi'",
+        "severity": "error"
+      },
+      {
+        "string": "=======> VALID ARGUMENTS ARE: ata, scsi[+TYPE], nvme[,NSID], sat[,auto][,N][+TYPE], usbasm1352r,N, usbcypress[,X], usbjmicron[,p][,x][,N], usbprolific, usbsunplus[/sat], sntasmedia[/sat], sntjmicron[,NSID][/sat], sntrealtek[/sat], jmb39x[-q[2]],N[,sLBA][,force][+TYPE], jms56x,N[,sLBA][,force][+TYPE], auto, test <=======",
+        "severity": "error"
+      }
+    ],
+    "exit_status": 1
+  },
+  "local_time": {
+    "time_t": 1793982876,
+    "asctime": "Sat Nov  7 00:34:36 2026 +08"
+  }
+}

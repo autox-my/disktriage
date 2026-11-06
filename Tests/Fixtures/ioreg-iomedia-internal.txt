@@ -1,0 +1,21 @@
++-o APPLE SSD AP0256Q Media  <class IOMedia, id 0x1000006f0, registered, matched, active, busy 0 (128 ms), retain 14>
+    {
+      "Content" = "GUID_partition_scheme"
+      "Removable" = No
+      "Whole" = Yes
+      "Leaf" = No
+      "BSD Name" = "disk0"
+      "Ejectable" = No
+      "Preferred Block Size" = 4096
+      "IOMediaIcon" = {"IOBundleResourceFile"="Internal.icns","CFBundleIdentifier"="com.apple.iokit.IOStorageFamily"}
+      "BSD Minor" = 0
+      "IOGeneralInterest" = "IOCommand is not serializable"
+      "Writable" = Yes
+      "BSD Major" = 1
+      "Size" = 251000193024
+      "IOBusyInterest" = "IOCommand is not serializable"
+      "Open" = Yes
+      "Content Hint" = ""
+      "BSD Unit" = 0
+    }
+    

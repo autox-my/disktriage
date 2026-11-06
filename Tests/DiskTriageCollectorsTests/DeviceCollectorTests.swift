@@ -24,6 +24,7 @@ struct DeviceCollectorTests {
         #expect(identity.removable == false, "removable")
         #expect(identity.blockSize == 4096, "block size")
         #expect(identity.internalDisk == true, "internal")
+        #expect(identity.virtualOrPhysical == "Unknown", "the internal disk's plist says Unknown, not Physical")
 
         var builder = SignalSetBuilder(collectedAt: try collectedAt())
         builder.setDevice(collection)
@@ -37,6 +38,21 @@ struct DeviceCollectorTests {
         #expect(verdict.code == .insufficientEvidence, "unsupported media is not a health verdict")
         let note = try #require(verdict.unsupportedNote, "unsupported note")
         #expect(note.contains("ssd"), "the classifier names the media: \(note)")
+    }
+
+    @Test("a virtual APFS container reports VirtualOrPhysical = Virtual")
+    func aVirtualDiskIsMarkedVirtual() throws {
+        let data = try #require(
+            try? Data(contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Fixtures/diskutil-info-virtual-apfs.plist")),
+            "the virtual fixture"
+        )
+        let identity = try DeviceCollector.parseInfoPList(data)
+        #expect(identity.bsd == "disk1", "bsd")
+        #expect(identity.virtualOrPhysical == "Virtual", "virtual")
+        #expect(identity.internalDisk == true, "still internal")
     }
 
     @Test("enumeration keeps whole disks and drops slices")

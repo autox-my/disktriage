@@ -16,6 +16,10 @@ public struct DeviceIdentity: Sendable, Equatable {
     public let removable: Bool?
     public let blockSize: Int64?
     public let internalDisk: Bool?
+    /// `Virtual`, `Physical` or `Unknown` from `diskutil info -plist`. The
+    /// internal Apple NVMe reports `Unknown`; synthesized APFS containers and
+    /// disk images report `Virtual`, which `list` filters out.
+    public let virtualOrPhysical: String?
 
     public init(
         bsd: String,
@@ -26,7 +30,8 @@ public struct DeviceIdentity: Sendable, Equatable {
         bus: String? = nil,
         removable: Bool? = nil,
         blockSize: Int64? = nil,
-        internalDisk: Bool? = nil
+        internalDisk: Bool? = nil,
+        virtualOrPhysical: String? = nil
     ) {
         self.bsd = bsd
         self.sizeBytes = sizeBytes
@@ -37,6 +42,7 @@ public struct DeviceIdentity: Sendable, Equatable {
         self.removable = removable
         self.blockSize = blockSize
         self.internalDisk = internalDisk
+        self.virtualOrPhysical = virtualOrPhysical
     }
 }
 
@@ -49,6 +55,19 @@ public struct DeviceCollection: Sendable, Equatable {
     public init(status: SignalStatus, identity: DeviceIdentity? = nil, reason: String? = nil) {
         self.status = status
         self.identity = identity
+        self.reason = reason
+    }
+}
+
+/// The whole-disk enumeration and the status of the command that produced it.
+public struct DiskEnumeration: Sendable, Equatable {
+    public let status: SignalStatus
+    public let disks: [String]
+    public let reason: String?
+
+    public init(status: SignalStatus, disks: [String] = [], reason: String? = nil) {
+        self.status = status
+        self.disks = disks
         self.reason = reason
     }
 }
@@ -70,15 +89,27 @@ public struct DeviceCollector: Sendable {
 
     /// `[0] enumerate` for the decision tree: whole disks only, never slices.
     public func enumerateWholeDisks() -> [String] {
+        enumerate().disks
+    }
+
+    /// Enumeration that keeps its status: an empty list from a failed command
+    /// is not "no disks attached" (diskdoctor.md §2.3).
+    public func enumerate() -> DiskEnumeration {
         let result = executor.run(.diskutilList)
-        guard result.outcome == .ok, let data = result.stdout.data(using: .utf8),
+        guard result.outcome == .ok else {
+            return DiskEnumeration(
+                status: result.outcome.signalStatus,
+                reason: "diskutil list \(result.outcome.rawValue) after \(result.durationMs) ms"
+            )
+        }
+        guard let data = result.stdout.data(using: .utf8),
               let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
               let dictionary = plist as? [String: Any],
               let disks = dictionary["AllDisks"] as? [String]
         else {
-            return []
+            return DiskEnumeration(status: .error, reason: "diskutil list output did not parse")
         }
-        return disks.filter(isWholeDiskName)
+        return DiskEnumeration(status: .ok, disks: disks.filter(isWholeDiskName))
     }
 
     public func collect(bsd: String) -> DeviceCollection {
@@ -152,7 +183,8 @@ public struct DeviceCollector: Sendable {
                 ?? plist["RemovableMedia"] as? Bool
                 ?? plist["Ejectable"] as? Bool,
             blockSize: integer(plist["DeviceBlockSize"]),
-            internalDisk: plist["Internal"] as? Bool
+            internalDisk: plist["Internal"] as? Bool,
+            virtualOrPhysical: plist["VirtualOrPhysical"] as? String
         )
     }
 }

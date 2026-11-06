@@ -14,6 +14,7 @@ public enum SignalSetBuilderError: Error, Equatable {
 public struct SignalSetBuilder: Sendable {
     public let collectedAt: Date
     public private(set) var device: DeviceCollection?
+    public private(set) var smart: SmartSignals?
     public private(set) var io: IOSignals?
     public private(set) var log: LogSignals?
     public private(set) var unsupportedReasons: [String: String]
@@ -75,21 +76,70 @@ public struct SignalSetBuilder: Sendable {
         unsupportedReasons.removeValue(forKey: "io")
     }
 
+    /// Installs the I/O section from a live whole-disk snapshot. A non-ok
+    /// status keeps its reason and carries no counters.
+    public mutating func setIO(_ collection: IOCollection) {
+        io = IOSignals(
+            status: collection.status,
+            retries: collection.counters?.retriesRead.map(Int.init),
+            errors: collection.counters?.errorsRead.map(Int.init),
+            timeouts: nil,
+            p0Validated: nil
+        )
+        if collection.status == .ok {
+            unsupportedReasons.removeValue(forKey: "io")
+        } else {
+            unsupportedReasons["io"] = collection.reason ?? "ioreg did not return a usable snapshot"
+        }
+    }
+
+    /// Installs the SMART section. Only `ok` makes the counters measurements;
+    /// `unsupported`, `timeout` and `denied` keep nil counters (REQ-0023).
+    public mutating func setSmart(_ collection: SmartCollection) {
+        smart = collection.signals
+        if collection.status == .ok {
+            unsupportedReasons.removeValue(forKey: "smart")
+        } else {
+            unsupportedReasons["smart"] = collection.reason ?? "smartctl did not return a usable recording"
+        }
+    }
+
     /// Installs the log section from parsed kernel events and the `--last`
     /// window the query used. A measured empty event list is `ok`, not absent.
     public mutating func setLog(_ events: [KernelLogEvent], windowHours: Int) {
-        let mapped = events.compactMap { event -> LogEvent? in
+        log = LogSignals(status: .ok, windowHours: windowHours, events: mapped(events))
+        unsupportedReasons.removeValue(forKey: "log")
+    }
+
+    /// Installs a live log collection. A timeout or denial keeps its status
+    /// and has no window and no events.
+    public mutating func setLog(_ collection: KernelLogCollection) {
+        if collection.status == .ok {
+            log = LogSignals(
+                status: .ok,
+                windowHours: collection.windowHours,
+                events: mapped(collection.events)
+            )
+            unsupportedReasons.removeValue(forKey: "log")
+        } else {
+            log = LogSignals(status: collection.status)
+            unsupportedReasons["log"] = collection.reason ?? "log show did not return a usable recording"
+        }
+    }
+
+    private func mapped(_ events: [KernelLogEvent]) -> [LogEvent] {
+        events.compactMap { event -> LogEvent? in
             guard let lba = event.lba else { return nil }
             return LogEvent(
                 time: event.lastTime,
                 firstTime: event.firstTime,
                 kind: event.kind,
                 lba: lba,
-                count: event.occurrences
+                count: event.occurrences,
+                senseKey: event.senseKey,
+                retry: event.maxRetry
             )
         }
-        log = LogSignals(status: .ok, windowHours: windowHours, events: mapped)
-        unsupportedReasons.removeValue(forKey: "log")
     }
 
     public func build() throws -> SignalSet {
@@ -99,9 +149,10 @@ public struct SignalSetBuilder: Sendable {
         ]
 
         object["device"] = deviceSection()
+        object["smart"] = smartSection()
         object["io"] = ioSection()
         object["log"] = logSection()
-        for section in ["smart", "drivers", "fs"] {
+        for section in ["drivers", "fs"] {
             object[section] = ["status": SignalStatus.unsupported.rawValue] as [String: Any]
         }
 
@@ -131,10 +182,52 @@ public struct SignalSetBuilder: Sendable {
     private func sectionOutcome(_ section: String) -> SignalStatus {
         switch section {
         case "device": return device?.status ?? .unsupported
+        case "smart": return smart?.status ?? .unsupported
         case "io": return io?.status ?? .unsupported
         case "log": return log?.status ?? .unsupported
         default: return .unsupported
         }
+    }
+
+    private func smartSection() -> [String: Any] {
+        guard let smart else {
+            return ["status": SignalStatus.unsupported.rawValue]
+        }
+        guard smart.status == .ok else {
+            return ["status": smart.status.rawValue]
+        }
+
+        var section: [String: Any] = ["status": SignalStatus.ok.rawValue]
+        if let overall = smart.overall { section["overall"] = overall }
+        if let pending = smart.pending { section["pending"] = pending }
+        if let reallocated = smart.reallocated { section["reallocated"] = reallocated }
+        if let uncorrectable = smart.uncorrectable { section["uncorrectable"] = uncorrectable }
+        if let hours = smart.powerOnHours { section["power_on_hours"] = hours }
+        if let raw = smart.rawReadErrors { section["raw_read_errors"] = raw }
+        if let errorLog = smart.errorLog {
+            section["error_log"] = errorLog.map { error -> [String: Any] in
+                var item: [String: Any] = [:]
+                if let lba = error.lba { item["lba"] = lba }
+                if let type = error.type { item["type"] = type }
+                if let count = error.count { item["count"] = count }
+                return item
+            }
+        }
+        if let selfTest = smart.selfTest {
+            var item: [String: Any] = [:]
+            if let last = selfTest.last { item["last"] = last }
+            if let age = selfTest.ageHours { item["age_hours"] = age }
+            section["self_test"] = item
+        }
+        // First sight of a drive: an explicit null, never an invented snapshot.
+        section["history"] = smart.history.map { history -> [String: Any] in
+            var item: [String: Any] = [:]
+            if let recorded = history.recordedAt { item["recorded_at"] = iso8601(recorded) }
+            if let pending = history.pending { item["pending"] = pending }
+            if let reallocated = history.reallocated { item["reallocated"] = reallocated }
+            return item
+        } ?? NSNull()
+        return section
     }
 
     private func ioSection() -> [String: Any] {
@@ -163,6 +256,8 @@ public struct SignalSetBuilder: Sendable {
                 if let kind = event.kind { item["kind"] = kind }
                 if let lba = event.lba { item["lba"] = lba }
                 if let count = event.count { item["count"] = count }
+                if let senseKey = event.senseKey { item["sense_key"] = senseKey }
+                if let retry = event.retry { item["retry"] = retry }
                 return item
             }
         }
