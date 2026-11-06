@@ -1,0 +1,18 @@
+# REQ-0105 — diskdoctor.md §8 resume and the mapfile
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0105
+statement: "The image command shall refuse with exit 30 to resume an image whose recorded limit differs from the requested limit or from its full or partial state."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L478
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "30"
+  unit: "none"
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0105_resumingWithADifferentLimitIsRefused()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0105_sidecarRecordsAndComparesTheLimit()"

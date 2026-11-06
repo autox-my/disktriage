@@ -1,0 +1,14 @@
+# REQ-0104 — diskdoctor.md §8 imaging `--limit`
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0104
+statement: "The image command shall confirm the source identity by the whole device size, never by the limit."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L477
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0104_confirmationNamesTheWholeDevice()"

@@ -1,0 +1,15 @@
+# REQ-0103 — diskdoctor.md §8 destination checks
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0103
+statement: "The image command shall check free space against the limit rather than the whole device when the image is partial."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L476
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0103_freeSpaceUsesTheLimitWhenPartial()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0103_freeSpaceUsesTheLimitWhenPartial()"

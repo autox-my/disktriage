@@ -1,0 +1,14 @@
+# REQ-0107 — diskdoctor.md §8 pass-2 stop rule
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0107
+statement: "The image command shall apply the pass-2 stop rule to the limited image size when the image is partial."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L456
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0107_stopRuleUsesTheLimitedImageSize()"

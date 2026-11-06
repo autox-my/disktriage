@@ -1,0 +1,15 @@
+# REQ-0102 — diskdoctor.md §8 imaging `--limit`
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0102
+statement: "The image command shall pass the byte limit to ddrescue as -s in both passes when the image is partial."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L477
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0102_partialPlanCarriesDashS()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0102_bothPassesCarryTheByteLimit()"

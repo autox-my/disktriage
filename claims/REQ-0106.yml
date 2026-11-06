@@ -1,0 +1,16 @@
+# REQ-0106 — diskdoctor.md §8 imaging `--limit`
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0106
+statement: "The image command shall not report a partial image as a complete image of the device."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L478
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0106_partialCompleteIsNeverCalledComplete()"

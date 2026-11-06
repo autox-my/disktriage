@@ -102,6 +102,135 @@ struct ImagingRulesTests {
         #expect(!passes[1].line.contains(" -d "))
     }
 
+    // REQ-0101: the limit is whole GiB (2^30 bytes), and at or above the device
+    // size it is the full device, not a partial image.
+    @Test("REQ0101 a limit is whole GiB and at or above the device is the full device")
+    func REQ0101_limitIsGiBAndFullAtOrAboveTheDevice() {
+        #expect(limitBytesForGiB(8) == 8_589_934_592, "GiB is 2^30 bytes")
+        #expect(limitBytesForGiB(1) == 1_073_741_824)
+        #expect(limitBytesForGiB(0) == nil, "a zero limit is not a limit")
+        #expect(limitBytesForGiB(Int64.max) == nil, "an unrepresentable limit is refused")
+
+        let device: Int64 = 10_000_000_000
+        #expect(effectiveImageBytes(deviceBytes: device, limitBytes: 8_589_934_592) == 8_589_934_592)
+        #expect(imageIsPartial(deviceBytes: device, limitBytes: 8_589_934_592) == true)
+
+        let smallDevice: Int64 = 1_073_741_824
+        #expect(effectiveImageBytes(deviceBytes: smallDevice, limitBytes: 8_589_934_592) == smallDevice,
+                "a limit above the device is the full device")
+        #expect(imageIsPartial(deviceBytes: smallDevice, limitBytes: 8_589_934_592) == false)
+        #expect(imageIsPartial(deviceBytes: smallDevice, limitBytes: smallDevice) == false,
+                "a limit equal to the device is the full device")
+        #expect(imageIsPartial(deviceBytes: nil, limitBytes: 8_589_934_592) == false,
+                "without a device size a partial image cannot be claimed")
+        #expect(effectiveImageBytes(deviceBytes: nil, limitBytes: 8_589_934_592) == nil)
+        #expect(effectiveImageBytes(deviceBytes: device, limitBytes: nil) == device)
+    }
+
+    // REQ-0102: both passes carry the byte limit as `-s` when partial, so
+    // ddrescue reads exactly the first N bytes.
+    @Test("REQ0102 both passes carry the byte limit as -s when partial")
+    func REQ0102_bothPassesCarryTheByteLimit() {
+        let partial = ddrescuePasses(
+            rawDevice: "/dev/rdisk8",
+            image: "/tmp/x.img",
+            mapfile: "/tmp/x.img.mapfile",
+            blockSize: 4096,
+            limitBytes: 8_589_934_592
+        )
+        #expect(partial[0].argv == [
+            "caffeinate", "-dimsu", "ddrescue", "-n", "-b", "4096", "-O",
+            "-K", "65536", "-T", "90", "-s", "8589934592",
+            "/dev/rdisk8", "/tmp/x.img", "/tmp/x.img.mapfile",
+        ])
+        #expect(partial[1].argv == [
+            "caffeinate", "-dimsu", "ddrescue", "-r3", "-b", "4096", "-O",
+            "-K", "65536", "-T", "90", "-s", "8589934592",
+            "/dev/rdisk8", "/tmp/x.img", "/tmp/x.img.mapfile",
+        ])
+
+        let full = ddrescuePasses(
+            rawDevice: "/dev/rdisk8",
+            image: "/tmp/x.img",
+            mapfile: "/tmp/x.img.mapfile",
+            blockSize: 4096
+        )
+        #expect(!full[0].argv.contains("-s"), "a full image has no -s")
+        #expect(!full[1].argv.contains("-s"))
+    }
+
+    // REQ-0103: when the image is partial, the free-space gate covers the
+    // limit; its detail still names both the limit and the whole device.
+    @Test("REQ0103 free space covers the limit when partial and names both sizes")
+    func REQ0103_freeSpaceUsesTheLimitWhenPartial() {
+        let source = ImageSource(
+            bsd: "disk8",
+            model: "Synthetic Bridge Disk",
+            serial: "SYNTH0000ABCD",
+            sizeBytes: 250_000_000_000,
+            blockSize: 512
+        )
+        let facts = DestinationFacts(
+            destinationExists: false,
+            mapfileExists: false,
+            freeBytes: 10_737_418_240,          // 10 GiB free
+            containerFilesystem: "apfs",
+            parentIsWritable: true,
+            backingWholeDisk: "disk0"
+        )
+
+        let partial = assessDestination(facts: facts, source: source, limitBytes: 8_589_934_592)
+        let partialFree = partial.first { $0.name == "free space" }
+        #expect(partialFree?.outcome == .pass, "8 GiB is within 10 GiB free")
+        #expect(partialFree?.detail.contains("8.0 GiB") == true, "the limit is the requirement")
+        #expect(partialFree?.detail.contains("232.8 GiB") == true, "the device is still named")
+
+        let full = assessDestination(facts: facts, source: source, limitBytes: nil)
+        let fullFree = full.first { $0.name == "free space" }
+        #expect(fullFree?.outcome == .refuse, "the full 232.8 GiB does not fit in 10 GiB")
+        #expect(fullFree?.detail.contains("10.0 GiB") == true)
+        #expect(fullFree?.detail.contains("232.8 GiB") == true)
+    }
+
+    // REQ-0105: the sidecar's recorded limit is part of the resume authority,
+    // so a partial image is never silently continued as a full one or with a
+    // different limit.
+    @Test("REQ0105 the sidecar records the limit and refuses a different one")
+    func REQ0105_sidecarRecordsAndComparesTheLimit() throws {
+        let partial = ImageSidecar(
+            schema: "disktriage.image/1",
+            device: ImageSidecarDevice(model: "Expansion", serialSHA256: "abc123", sizeBytes: 100),
+            limitBytes: 50
+        )
+        #expect(sidecarMatchesDevice(partial, model: "Expansion", serialHash: "abc123",
+                                     sizeBytes: 100, limitBytes: 50) == true)
+        #expect(sidecarMatchesDevice(partial, model: "Expansion", serialHash: "abc123",
+                                     sizeBytes: 100, limitBytes: nil) == false,
+                "a full resume of a partial image is refused")
+        #expect(sidecarMatchesDevice(partial, model: "Expansion", serialHash: "abc123",
+                                     sizeBytes: 100, limitBytes: 60) == false,
+                "a different limit is refused")
+
+        let full = ImageSidecar(
+            schema: "disktriage.image/1",
+            device: ImageSidecarDevice(model: "Expansion", serialSHA256: "abc123", sizeBytes: 100)
+        )
+        #expect(sidecarMatchesDevice(full, model: "Expansion", serialHash: "abc123",
+                                     sizeBytes: 100, limitBytes: nil) == true)
+        #expect(sidecarMatchesDevice(full, model: "Expansion", serialHash: "abc123",
+                                     sizeBytes: 100, limitBytes: 50) == false,
+                "a partial resume of a full image is refused")
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(partial)
+        let text = String(decoding: data, as: UTF8.self)
+        #expect(text.contains("\"limit_bytes\":50"), "the sidecar records the limit")
+
+        let decoded = try JSONDecoder().decode(ImageSidecar.self, from: data)
+        #expect(decoded.limitBytes == 50)
+    }
+
     // REQ-0083: the block size comes from the device, not a constant.
     @Test("REQ0083 the block size is the collected device block size")
     func REQ0083_blockSizeComesFromTheDevice() {
