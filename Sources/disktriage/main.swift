@@ -1,18 +1,14 @@
 import Foundation
-import DiskTriageCore
+import DiskTriageCLI
 
-// Skeleton only: commands land in P1 (diskdoctor.md §6). Usage exits 0; a
-// command that is not implemented yet exits 30 ("tool error"), so a script can
-// never mistake this binary for a working triage run.
-let arguments = CommandLine.arguments.dropFirst()
+// Thin shell: all decisions live in DiskTriageCLI so they are testable through
+// `run(arguments:readFile:now:)` without a process.
+let result = run(arguments: Array(CommandLine.arguments.dropFirst()))
 
-if arguments.isEmpty || arguments == ["--help"] || arguments == ["help"] {
-    print("disktriage — disk triage & rescue (skeleton; commands land in P1)")
-    print("plan: diskdoctor.md §6")
-    exit(0)
+if !result.stdout.isEmpty {
+    FileHandle.standardOutput.write(Data(result.stdout.utf8))
 }
-
-FileHandle.standardError.write(
-    Data("disktriage: no commands implemented yet (P1) — see diskdoctor.md §6\n".utf8)
-)
-exit(30)
+if !result.stderr.isEmpty {
+    FileHandle.standardError.write(Data(result.stderr.utf8))
+}
+exit(result.exitCode)
