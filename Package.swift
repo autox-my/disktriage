@@ -21,11 +21,12 @@ let package = Package(
             dependencies: ["DiskTriageCore"],
             path: "Sources/disktriage"
         ),
-        // An executable, not a `.testTarget`: this toolchain (/usr/bin/swift
-        // from the Command Line Tools) ships without XCTest and without Swift
-        // Testing, so `swift test` cannot execute a suite here. The runner is
-        // dependency-free and invoked by scripts/check.sh. See docs/sdlc.md.
-        .executableTarget(
+        // A regular test target: full Xcode (27.2, Swift 6.4.2) ships Swift
+        // Testing, and the default `swiftbuild` engine builds and runs it.
+        // The old dependency-free runner and the `native` pin are gone because
+        // both workarounds were measured unnecessary, not because they were
+        // inconvenient. See docs/sdlc.md.
+        .testTarget(
             name: "DiskTriageCoreTests",
             dependencies: ["DiskTriageCore"],
             path: "Tests/DiskTriageCoreTests"

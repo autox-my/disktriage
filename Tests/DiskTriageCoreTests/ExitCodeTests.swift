@@ -1,73 +1,80 @@
 import DiskTriageCore
+import Testing
 
 /// Exit codes and their precedence are a contract from diskdoctor.md §5.
 /// The expectations below are transcribed from the plan's table, not derived
 /// from the implementation.
-@MainActor
-func exitCodeTests() {
-    test("exit codes match the plan (diskdoctor.md §5)") {
-        try expectEqual(ExitCode.noActionableFault.rawValue, 0, "no actionable fault")
-        try expectEqual(ExitCode.mediaRisk.rawValue, 10, "media risk")
-        try expectEqual(ExitCode.failing.rawValue, 11, "failing")
-        try expectEqual(ExitCode.bridgeLinkPower.rawValue, 12, "bridge/link/power")
-        try expectEqual(ExitCode.filesystemOnly.rawValue, 13, "filesystem only")
-        try expectEqual(ExitCode.insufficientEvidence.rawValue, 20, "insufficient evidence")
-        try expectEqual(ExitCode.permissionDenied.rawValue, 21, "permission denied")
-        try expectEqual(ExitCode.toolError.rawValue, 30, "tool error")
+struct ExitCodeTests {
+    @Test("exit codes match the plan (diskdoctor.md §5)")
+    func exitCodesMatchThePlan() {
+        #expect(ExitCode.noActionableFault.rawValue == 0, "no actionable fault")
+        #expect(ExitCode.mediaRisk.rawValue == 10, "media risk")
+        #expect(ExitCode.failing.rawValue == 11, "failing")
+        #expect(ExitCode.bridgeLinkPower.rawValue == 12, "bridge/link/power")
+        #expect(ExitCode.filesystemOnly.rawValue == 13, "filesystem only")
+        #expect(ExitCode.insufficientEvidence.rawValue == 20, "insufficient evidence")
+        #expect(ExitCode.permissionDenied.rawValue == 21, "permission denied")
+        #expect(ExitCode.toolError.rawValue == 30, "tool error")
     }
 
-    test("precedence picks the most severe: 11 > 10 > 12 > 13 > 20 > 0") {
+    @Test("precedence picks the most severe: 11 > 10 > 12 > 13 > 20 > 0")
+    func precedencePicksTheMostSevere() {
         let all: [ExitCode] = [
             .noActionableFault, .mediaRisk, .failing,
             .bridgeLinkPower, .filesystemOnly, .insufficientEvidence,
         ]
-        try expectEqual(ExitCode.mostSevere(all), .failing, "all findings")
+        #expect(ExitCode.mostSevere(all) == .failing, "all findings")
 
-        try expectEqual(
-            ExitCode.mostSevere([.noActionableFault, .mediaRisk, .bridgeLinkPower, .filesystemOnly, .insufficientEvidence]),
-            .mediaRisk, "without failing"
+        #expect(
+            ExitCode.mostSevere([.noActionableFault, .mediaRisk, .bridgeLinkPower, .filesystemOnly, .insufficientEvidence]) == .mediaRisk,
+            "without failing"
         )
-        try expectEqual(
-            ExitCode.mostSevere([.bridgeLinkPower, .filesystemOnly, .insufficientEvidence, .noActionableFault]),
-            .bridgeLinkPower, "without failing or media"
+        #expect(
+            ExitCode.mostSevere([.bridgeLinkPower, .filesystemOnly, .insufficientEvidence, .noActionableFault]) == .bridgeLinkPower,
+            "without failing or media"
         )
-        try expectEqual(
-            ExitCode.mostSevere([.filesystemOnly, .insufficientEvidence, .noActionableFault]),
-            .filesystemOnly, "without 11, 10, 12"
+        #expect(
+            ExitCode.mostSevere([.filesystemOnly, .insufficientEvidence, .noActionableFault]) == .filesystemOnly,
+            "without 11, 10, 12"
         )
-        try expectEqual(
-            ExitCode.mostSevere([.insufficientEvidence, .noActionableFault]),
-            .insufficientEvidence, "without 11, 10, 12, 13"
+        #expect(
+            ExitCode.mostSevere([.insufficientEvidence, .noActionableFault]) == .insufficientEvidence,
+            "without 11, 10, 12, 13"
         )
-        try expectEqual(ExitCode.mostSevere([.noActionableFault]), .noActionableFault, "clean")
+        #expect(ExitCode.mostSevere([.noActionableFault]) == .noActionableFault, "clean")
     }
 
-    test("precedence does not depend on input order") {
+    @Test("precedence does not depend on input order")
+    func precedenceDoesNotDependOnInputOrder() {
         let codes: [ExitCode] = [.filesystemOnly, .failing, .noActionableFault, .bridgeLinkPower]
-        try expectEqual(ExitCode.mostSevere(codes), .failing, "forward order")
-        try expectEqual(ExitCode.mostSevere(codes.reversed()), .failing, "reverse order")
+        #expect(ExitCode.mostSevere(codes) == .failing, "forward order")
+        #expect(ExitCode.mostSevere(codes.reversed()) == .failing, "reverse order")
     }
 
-    test("a verdict outranks a collection failure") {
-        try expectEqual(ExitCode.mostSevere([.permissionDenied, .mediaRisk]), .mediaRisk, "denied + media")
-        try expectEqual(ExitCode.mostSevere([.toolError, .failing]), .failing, "tool error + failing")
+    @Test("a verdict outranks a collection failure")
+    func aVerdictOutranksACollectionFailure() {
+        #expect(ExitCode.mostSevere([.permissionDenied, .mediaRisk]) == .mediaRisk, "denied + media")
+        #expect(ExitCode.mostSevere([.toolError, .failing]) == .failing, "tool error + failing")
     }
 
-    test("a collection failure is used only when no verdict exists") {
-        try expectEqual(ExitCode.mostSevere([.permissionDenied]), .permissionDenied, "denied alone")
-        try expectEqual(ExitCode.mostSevere([.permissionDenied, .toolError]), .toolError, "denied + tool error")
+    @Test("a collection failure is used only when no verdict exists")
+    func aCollectionFailureIsUsedOnlyWhenNoVerdictExists() {
+        #expect(ExitCode.mostSevere([.permissionDenied]) == .permissionDenied, "denied alone")
+        #expect(ExitCode.mostSevere([.permissionDenied, .toolError]) == .toolError, "denied + tool error")
     }
 
-    test("no findings is insufficient evidence, never success") {
-        try expectEqual(ExitCode.mostSevere([]), .insufficientEvidence, "empty finding list")
+    @Test("no findings is insufficient evidence, never success")
+    func noFindingsIsInsufficientEvidence() {
+        #expect(ExitCode.mostSevere([]) == .insufficientEvidence, "empty finding list")
     }
 
-    test("Verdict adopts the most severe code") {
+    @Test("Verdict adopts the most severe code")
+    func verdictAdoptsTheMostSevereCode() {
         let verdict = Verdict(
             adopting: [.noActionableFault, .mediaRisk, .bridgeLinkPower],
             headline: "degrading, not dead; extent of loss unknown until imaged"
         )
-        try expectEqual(verdict.code, .mediaRisk, "verdict.code")
-        try expectEqual(verdict.code.rawValue, 10, "verdict.code.rawValue")
+        #expect(verdict.code == .mediaRisk, "verdict.code")
+        #expect(verdict.code.rawValue == 10, "verdict.code.rawValue")
     }
 }

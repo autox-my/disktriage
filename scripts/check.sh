@@ -6,17 +6,14 @@
 #   3  UNVERIFIABLE    (could not run / could not decide — stop and report)
 #
 # Exit statuses are captured explicitly and never read through a pipeline.
-# A runner that exits 0 without executing a test is UNVERIFIABLE, not PASS.
+# A runner that exits 0 without executing a test is UNVERIFIABLE, not PASS,
+# and so is a missing, empty or unparsable JUnit report: the report is the
+# evidence that the tests ran at all.
 #
-# Build system: this machine's toolchain cannot initialise the default
-# `swiftbuild` engine ("Unknown error parsing property list", CLT-only
-# install), so the gate pins `native`. Override with DISKTRIAGE_BUILD_SYSTEM
-# only if you are testing that change deliberately.
-#
-# Test runner: `/usr/bin/swift` from the Command Line Tools ships without
-# XCTest and without Swift Testing, so `swift test` cannot execute a suite
-# here. The suite is a dependency-free executable (Tests/DiskTriageCoreTests)
-# and `swift test` replaces it the day the toolchain provides a framework.
+# The gate builds, runs the Swift Testing suite through `swift test` with a
+# JUnit report, and counts the report. SwiftPM writes swift-testing results to
+# `<stem>-swift-testing.xml` beside the requested `<stem>.xml`, so both are
+# collected; XCTest, if it is ever added, lands in the requested file.
 # See docs/sdlc.md.
 set -uo pipefail
 
@@ -36,7 +33,13 @@ if [ -z "$SWIFT_BIN" ] || [ ! -x "$SWIFT_BIN" ]; then
     exit 3
 fi
 
-BUILD_SYSTEM="${DISKTRIAGE_BUILD_SYSTEM:-native}"
+XMLLINT_BIN="${XMLLINT_BIN:-$(command -v xmllint 2>/dev/null || true)}"
+if [ -z "$XMLLINT_BIN" ] || [ ! -x "$XMLLINT_BIN" ]; then
+    echo "SKIP          xmllint not found (set XMLLINT_BIN); the report cannot be counted"
+    echo "UNVERIFIABLE"
+    exit 3
+fi
+
 LOG_DIR="$(mktemp -d)" || {
     echo "UNVERIFIABLE  cannot create a temporary directory"
     exit 3
@@ -45,9 +48,16 @@ trap 'rm -rf "$LOG_DIR"' EXIT
 BUILD_LOG="$LOG_DIR/build.log"
 TEST_LOG="$LOG_DIR/test.log"
 
+# Gitignored by `.build/`. No stale report may answer for this run: the test
+# step removes both files before invoking the runner.
+REPORT_DIR="$ROOT/.build/test-results"
+REPORT_STEM="$REPORT_DIR/junit"
+REQUESTED_REPORT="$REPORT_STEM.xml"
+SWIFT_TESTING_REPORT="$REPORT_STEM-swift-testing.xml"
+
 run_build() {
     echo "== build =="
-    "$SWIFT_BIN" build --build-system "$BUILD_SYSTEM" >"$BUILD_LOG" 2>&1
+    "$SWIFT_BIN" build >"$BUILD_LOG" 2>&1
     local rc=$?
     cat "$BUILD_LOG"
     if [ "$rc" -ne 0 ]; then
@@ -57,39 +67,68 @@ run_build() {
     echo "PASS          swift build"
 }
 
+# Counts one report. Prints "<total> <not-passed>".
+count_report() {
+    local report="$1" total bad
+    total="$("$XMLLINT_BIN" --noout --xpath 'count(//testcase)' "$report" 2>"$LOG_DIR/xpath.log")" || {
+        echo "UNVERIFIABLE  cannot parse $report: $(tr '\n' ' ' <"$LOG_DIR/xpath.log")"
+        return 3
+    }
+    bad="$("$XMLLINT_BIN" --noout --xpath 'count(//testcase[failure or error or skipped])' "$report" 2>>"$LOG_DIR/xpath.log")" || {
+        echo "UNVERIFIABLE  cannot parse $report: $(tr '\n' ' ' <"$LOG_DIR/xpath.log")"
+        return 3
+    }
+    printf '%s %s\n' "$total" "$bad"
+}
+
 run_tests() {
     echo "== test =="
-    "$SWIFT_BIN" run --build-system "$BUILD_SYSTEM" DiskTriageCoreTests >"$TEST_LOG" 2>&1
+    mkdir -p "$REPORT_DIR" || {
+        echo "UNVERIFIABLE  cannot create $REPORT_DIR"
+        return 3
+    }
+    rm -f "$REQUESTED_REPORT" "$SWIFT_TESTING_REPORT"
+
+    "$SWIFT_BIN" test --xunit-output "$REQUESTED_REPORT" >"$TEST_LOG" 2>&1
     local rc=$?
     cat "$TEST_LOG"
-    if [ "$rc" -ne 0 ]; then
-        echo "FAIL          test runner exited $rc"
+
+    local report total=0 bad=0 seen=0 counts written=""
+    for report in "$REQUESTED_REPORT" "$SWIFT_TESTING_REPORT"; do
+        if [ ! -s "$report" ]; then
+            continue
+        fi
+        counts="$(count_report "$report")"
+        case "$?" in
+            0) ;;
+            *) echo "$counts"; return 3 ;;
+        esac
+        seen=$((seen + 1))
+        total=$((total + ${counts% *}))
+        bad=$((bad + ${counts#* }))
+        written="$written$report"$'\n'
+    done
+
+    if [ "$seen" -eq 0 ]; then
+        echo "UNVERIFIABLE  no JUnit report was written ($REQUESTED_REPORT, $SWIFT_TESTING_REPORT)"
+        return 3
+    fi
+    if [ "$total" -le 0 ]; then
+        echo "UNVERIFIABLE  the report carries no test cases"
+        return 3
+    fi
+    if [ "$bad" -ne 0 ]; then
+        echo "FAIL          $bad of $total tests failed or were skipped"
         return 1
     fi
-
-    # The runner's own summary is the only evidence that tests ran.
-    local summary
-    summary="$(awk '/^Executed [0-9]+ tests, [0-9]+ failures$/{ last = $0 } END{ print last }' "$TEST_LOG")"
-    if [ -z "$summary" ]; then
-        echo "UNVERIFIABLE  runner exited 0 but printed no 'Executed N tests, M failures' summary"
-        return 3
-    fi
-
-    local total failures
-    total="${summary#Executed }"
-    total="${total%% tests,*}"
-    failures="${summary##*tests, }"
-    failures="${failures%% *}"
-
-    if [ "$total" -le 0 ]; then
-        echo "UNVERIFIABLE  runner executed $total tests"
-        return 3
-    fi
-    if [ "$failures" -ne 0 ]; then
-        echo "FAIL          $failures of $total tests failed"
+    if [ "$rc" -ne 0 ]; then
+        echo "FAIL          swift test exited $rc although the report shows $total passing tests"
         return 1
     fi
     echo "PASS          $total tests, 0 failures"
+    printf '%s' "$written" | while IFS= read -r report; do
+        [ -n "$report" ] && echo "report        $report"
+    done
 }
 
 run_build

@@ -15,16 +15,26 @@ pure function over a `SignalSet`; everything else is plumbing.
 | What | Command |
 |---|---|
 | The gate — run before handing back | `bash scripts/check.sh` |
-| Build | `swift build --build-system native` |
-| Tests | `swift run --build-system native DiskTriageCoreTests` |
-| CLI (skeleton; commands land in P1) | `swift run --build-system native disktriage` |
+| Build | `swift build` |
+| Tests | `swift test` |
+| Tests + the JUnit report the gate reads | `swift test --xunit-output .build/test-results/junit.xml` |
+| CLI (skeleton; commands land in P1) | `swift run disktriage` |
 
 **Never read an exit status through a pipeline.** `cmd | tail` reports `tail`'s
 status. Capture `$?` on the command itself.
 
-This toolchain ships without XCTest and without Swift Testing, so the suite is a
-dependency-free executable and the default `swiftbuild` engine is replaced by
-`native`. Do not delete either workaround to "simplify"; see `docs/sdlc.md`.
+This toolchain is full Xcode 27.2 / Swift 6.4.2: the default `swiftbuild` engine
+works (the old property-list failure does not reproduce), and Swift Testing is
+available, so the suite is a regular `.testTarget` and the old
+dependency-free runner and `native` pin are gone. Those workarounds were
+retired only after the replacement was measured green and mutation-checked; see
+`docs/sdlc.md`.
+
+`swift test --xunit-output <dir>/junit.xml` writes Swift Testing's results to
+`<dir>/junit-swift-testing.xml`, not to the requested path, and a filtered or
+empty run exits 0 with a report holding zero test cases. The gate counts the
+report with `xmllint` and answers **3** for missing/empty/zero-testcase — a
+runner that runs nothing is never a pass.
 
 ## The gate's three answers — the third is not a pass
 
@@ -88,6 +98,6 @@ code, and so is the check that reads it.
 | `docs/` | SDLC and requirement workflow | yes |
 | `Sources/DiskTriageCore/` | `SignalSet`, `Verdict`, exit codes — pure | yes, test first |
 | `Sources/disktriage/` | thin CLI target | yes, test first |
-| `Tests/DiskTriageCoreTests/` | the dependency-free suite | yes, test first |
+| `Tests/DiskTriageCoreTests/` | the Swift Testing suite (`.testTarget`) | yes, test first |
 | `Tests/Fixtures/` | golden `SignalSet` JSON (redacted only) | yes, with the test |
 | `scripts/` | the gate | yes, with a probe that proves it bites |

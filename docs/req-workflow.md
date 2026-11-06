@@ -56,38 +56,80 @@ This page is the project's authoring and traceability convention. The tool's own
 
 Two records, with different jobs:
 
-1. **A `// REQ-NNNN` tag** on the line above the test call. It is the grep anchor for humans and
+1. **A `// REQ-NNNN` tag** on the line above the declaration. It is the grep anchor for humans and
    review; a test that proves several claims carries several tags. It is *not* what `req` reads.
 2. **The claim's `tests:` list**, holding the exact JUnit id, copied from the report — never
    retyped.
 
-The suite is the dependency-free runner (`Tests/DiskTriageCoreTests`, TAP-like `ok N - name`),
-because this toolchain ships without XCTest and Swift Testing (see `docs/sdlc.md`). The JUnit id
-is therefore defined by an adapter that `scripts/` must gain:
+The suite is a regular `.testTarget` using Swift Testing (`import Testing`, `@Test`, `#expect`,
+`#require`); `scripts/check.sh` runs it through `swift test --xunit-output` and counts the JUnit
+report. What the report actually contains was measured, not assumed:
 
-- `classname` = `DiskTriageCoreTests.<file stem>`, e.g. `DiskTriageCoreTests.ExitCodeTests`,
-  `DiskTriageCoreTests.SignalSetTests`.
-- `name` = the test's own name string, verbatim.
-- id = `classname::name`, e.g.
-  `DiskTriageCoreTests.ExitCodeTests::REQ-0038 precedence picks the most severe code`.
+```
+<testcase classname="DiskTriageCoreTests.ExitCodeTests"
+          name="precedencePicksTheMostSevere()" time="0.000312083" />
+```
 
-So a new test names its primary claim first, and the tag carries the rest:
+- `classname` = `<module>.<suite type name>` → `DiskTriageCoreTests.ExitCodeTests`,
+  `DiskTriageCoreTests.SignalSetTests` (the suite type, not the file name, though here they agree).
+- `name` = the Swift **function** name plus `()` → `precedencePicksTheMostSevere()`.
+- id = `classname::name` →
+  `DiskTriageCoreTests.ExitCodeTests::precedencePicksTheMostSevere()`.
+
+**The `@Test("…")` display name does not reach the report.** So the human sentence and the id are
+two different strings, and a REQ tag must live in the *function* name to be part of the id:
 
 ```swift
 // REQ-0038
-test("REQ-0038 precedence picks the most severe code") {
-    try expectEqual(ExitCode.mostSevere([.mediaRisk, .bridgeLinkPower]), .mediaRisk, "…")
+@Test("precedence picks the most severe: 11 > 10 > 12 > 13 > 20 > 0")
+func REQ0038_precedencePicksTheMostSevere() {
+    #expect(ExitCode.mostSevere([.mediaRisk, .bridgeLinkPower]) == .mediaRisk, "…")
 }
 ```
 
 ```yaml
 tests:
-  - "DiskTriageCoreTests.ExitCodeTests::REQ-0038 precedence picks the most severe code"
+  - "DiskTriageCoreTests.ExitCodeTests::REQ0038_precedencePicksTheMostSevere()"
 ```
 
+A hyphen cannot appear in a Swift identifier, so the tag is `REQ0038_…` in code while the claim id
+stays `REQ-0038`. The existing ten tests predate this convention and are unlinked; they keep their
+names until a human links them, and renaming a test is a requirement edit either way.
+
+**Parameterised tests collapse.** `@Test(arguments: [1, 2]) func probeParam(_ value: Int)` yields
+**one** `<testcase classname="…ProbeParameterisedTests" name="probeParam(_:)">`, not
+`probeParam[1]`/`probeParam[2]` as pytest would: a failure in any argument fails the whole case, and
+no argument can be linked on its own. If per-case evidence matters, write separate tests.
+
+**The file name is not the one you ask for.** `swift test --xunit-output <dir>/junit.xml` writes
+XCTest results to `<dir>/junit.xml` but **Swift Testing results to the sibling
+`<dir>/junit-swift-testing.xml`**; with only Swift Testing in the package, `junit.xml` is never
+created. The parent directory must already exist — SwiftPM does not create it and the test target
+fails with "No such file or directory" — so `scripts/check.sh` creates it, deletes both files
+before each run, and counts the union. No XCTest target exists here, so no XCTest shape is recorded;
+it would land in the requested file.
+
+**Does `req` consume it? Yes — measured against a scratch corpus** (one claim, `aliases/`, a copy of
+the report), not inferred:
+
+| linked id in the report | `req gate --test-report …` |
+|---|---|
+| a passing test | **0** PASS, `tests_linked` PASS |
+| a test the report marks failed | **1** FAIL, `REQ-0001: linked test failed: <id>` |
+| an id that was renamed away | **3** UNVERIFIABLE, `REQ-0001: linked test not in the report: <id>` |
+
+So Swift Testing is a usable evidence source for `req`: `classname` is present and non-empty, `name`
+is XML-escaped by SwiftPM, and the trailing `()` is accepted verbatim — no name-escaping problem, no
+missing `classname`, nothing that needs a `req` change or a Forgejo issue. Two limits are SwiftPM's,
+not `req`'s, and are handled in `scripts/`: the report is at a sibling path, and a parameterised test
+has no per-argument ids. On the real corpus `req check --test-report
+.build/test-results/junit-swift-testing.xml` is still **3** — because all 100 claims are **unlinked**,
+not because the report is unreadable.
+
 - **Fixtures:** golden `SignalSet` JSON lives in `Tests/Fixtures/<case>.json` and is replayed by a
-  test whose name begins `REQ-NNNN fixture <case>`. Fixtures keep signal *statuses* (denied,
-  timeout), not only values; a fixture with history is labelled synthetic.
+  test whose display name begins `REQ-NNNN fixture <case>` (the id keeps the function name, as
+  above). Fixtures keep signal *statuses* (denied, timeout), not only values; a fixture with
+  history is labelled synthetic.
 - **One claim per test where possible.** A shared boundary test may prove several claims; list
   its id in each. A link is a claim about evidence — link only a test that demonstrably proves the
   obligation, and never link on the strength of a numeric constant alone when the claim is about
@@ -97,19 +139,18 @@ tests:
 - A claim with no `tests:` is *no linked test* — UNVERIFIABLE, named per claim. Do not declare
   `evidence: process` to silence it; process evidence is only for obligations a Decision,
   signature or workflow establishes (none of the current 100 claims are process-evidenced).
-- If the suite ever moves to XCTest or Swift Testing, the convention survives: `// REQ-NNNN` above
-  the declaration, `classname` = `<module>.<class>` (XCTest) or the suite's type name (Swift
-  Testing), `name` = the function name.
 
 ## `req` in the TDD loop
 
 ```
 claim (statement + pin)     →  req canon              # parse; 0 flagged pins is authoring green
 failing test + // REQ tag   →  bash scripts/check.sh   # red (the project's gate, exit 1)
-                            →  JUnit report
-req gate --test-report <junit.xml>                    # 1: a linked test failed; 3: link missing/stale
+                            →  .build/test-results/junit-swift-testing.xml
+req gate --test-report .build/test-results/junit-swift-testing.xml
+                                                       # 1: a linked test failed; 3: link missing/stale
 implement                   →  bash scripts/check.sh   # green
-req check --test-report <junit.xml>                    # 0: every variant and projection confirmed
+req check --test-report .build/test-results/junit-swift-testing.xml
+                                                       # 0: every variant and projection confirmed
 ```
 
 Exit codes are tri-state: **0** settled affirmatively, **1** a definite finding, **3**
@@ -117,10 +158,8 @@ UNVERIFIABLE (cannot be told; blocks and is never a pass), **2** usage. `req che
 `req gate` per `.req/variants` line and one `req render --check` per `.req/projections` line;
 with neither list it runs one default gate. `req canon` only diagnoses — it never gates a release.
 
-The missing link is the TAP→JUnit adapter above: `scripts/check.sh` reads the runner's
-`Executed N tests` summary, but nothing writes a JUnit document. Until the adapter exists, no
-claim may be linked (the id would be a guess) and `req gate`/`req check` answer exit 3 for every
-claim — truthfully. The adapter is `scripts/` work, with a probe that proves it bites.
+The report is the gate's own evidence too: it is written under `.build/test-results/` (gitignored),
+and a missing, empty or zero-testcase report is exit **3** even when the runner exited 0.
 
 ## Deliberately not claims (plan §9)
 
@@ -144,9 +183,11 @@ only if that is impossible).
 ## Current state
 
 - 100 claims, all structured, 51 pins held, 0 lints (`req canon --fail-on-flag` → 0).
-- Every claim is machine-evidenced and **unlinked** — deliberately: no JUnit report exists, so
-  `req check` is exit 3 (UNVERIFIABLE) and that is not a pass. Link a claim when its test's id
-  first appears in a report the adapter wrote.
+- The suite runs under Swift Testing and writes a JUnit report that `req` reads (measured above).
+  Every claim is nonetheless **unlinked** — deliberately: linking is a human judgement about
+  evidence, and this change only made the evidence available. `req check --test-report
+  .build/test-results/junit-swift-testing.xml` is therefore exit 3 (*no linked test*), which is
+  not a pass. Link a claim when its test's id is copied from a report.
 - No `.req/variants` and no `.req/projections` are committed yet; `req check` therefore runs the
   default variant and checks no projection. Add a variant line in the commit that first uses
   `applicability`, and pin `docs/spec.md` only when a projection is a deliverable. Those two
