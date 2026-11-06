@@ -68,9 +68,12 @@ NVMe, which the collector will see).
    An **absent signal is never a zero**: every signal carries a status (`ok | denied |
    unsupported | timeout | error`), and counters are nullable.
 4. **No third-party filesystem driver dependency.** Stock macOS only for mounting. Detect drivers,
-   never require or install one. Inspection uses native read-only `mount_ntfs` / `hdiutil`.
+   never require or install one. macOS 27.2 has **no native NTFS mount helper** (P0 A2), so NTFS
+   inspection uses the ntfs-3g **userspace tools** (`ntfsinfo`, `ntfsls`, `ntfscat`, `ntfscluster`)
+   as a GPL subprocess **on the image only**: no mount, no FUSE, no kernel extension, no root, no
+   FDA (spike: `docs/ntfs-spike.md`). Native read-only mounts remain for APFS/HFS+/exFAT/FAT.
    *Exception, stated up front:* there is no native NTFS repair on macOS, so NTFS repair is a
-   documented **hand-off** (§8), never something the tool performs.
+   documented **hand-off** (§8), never something the tool performs on the original.
 5. **Ranked differential, not a health score.** Output the top hypothesis, the evidence, what would
    falsify it, and the single cheapest next test.
 6. **Never destroy evidence.** Every operation is read-only until the user explicitly asks to write,
@@ -298,6 +301,7 @@ Aggravators (modify the advice, never the root cause):
 |---|---|
 | 0 | no actionable fault found (warnings may apply) |
 | 10 | media risk — image before anything else |
+| 11 | On a real MiNaH-style image (boot sector unreadable), does restoring the backup boot sector on a working copy let the ntfs-3g tools open the volume, and how long does `ntfscluster` take across a realistic number of bad extents on a large volume? | Boot-sector restore stays in §8; set the extent cap from the measured time | Report volume-level only for boot-sector damage and say why; consider an own parser for the boot-sector/MFT-mirror cases |
 | 11 | failing — power off, professional recovery |
 | 12 | bridge/link/power suspicion — swap and retest |
 | 13 | filesystem only — repair the image |
@@ -318,7 +322,7 @@ disktriage list                      # devices, one health line each
 disktriage guard                     # hold mounts for new/attached disks; run BEFORE plugging in
 disktriage triage <disk>             # decision tree; --json; --symptom/--tried flags
 disktriage image <disk> --to <file>  # ddrescue wrapper: mapfile, resume, verify; --dry-run prints the command
-disktriage inspect <image>           # mount the IMAGE read-only, native driver
+disktriage inspect <image>           # inspect the IMAGE read-only (native mount, or ntfs-3g tools for NTFS)
 disktriage copy <image> --to <dir>   # hashed copy + manifest; volume-level damage report
 disktriage check                     # permissions & tooling self-test
 ```
@@ -463,11 +467,24 @@ Deep link:
 
 ### Inspection
 
-- `hdiutil attach -readonly -nomount` then native `mount_ntfs` (read-only), or `hdiutil`/native
-  mount for APFS/HFS+. Never a writable third-party driver.
-- Whole-disk raw images with an MBR/GPT need partition-level attach, and raw images may still be
-  probed by DiskArbitration. This is an explicit P3 test (including with a third-party driver
-  installed), not an assumption.
+- **APFS / HFS+ / exFAT / FAT:** `diskutil image attach --noMount --readOnly` (or
+  `hdiutil attach -readonly -nomount`), then an explicit native read-only mount. Never a writable
+  third-party driver.
+- **NTFS:** no native mount exists on macOS 27.2. Inspect the image with the ntfs-3g userspace tools
+  (`ntfsinfo`, `ntfsls`, `ntfscat`): read-only, no mount, no root, no FDA, tens of milliseconds on a
+  64 MiB image (`docs/ntfs-spike.md`). Never a mount of the image through a third-party driver.
+- **Whole-disk images:** the ntfs-3g tools have no offset option. Extract the partition with
+  `dd skip=` (least bad: byte-identical, no kernel path) or attach with `diskutil image attach
+  --noMount --readOnly`. Cluster numbers are **volume-relative**: subtract the partition offset in
+  every mapfile-to-cluster conversion. Raw images may still be probed by DiskArbitration; testing
+  attach with a third-party driver installed is an explicit P3 test, not an assumption.
+- **Boot-sector damage (the MiNaH case):** the ntfs-3g tools do **not** fall back to the backup boot
+  sector; every command fails. Planned, **UNVERIFIED** (P0 row 11): on a **working copy** of the
+  image, never the original, and only when explicitly requested, restore the backup boot sector
+  (last sector of the volume) over the primary, then retry.
+- **Failure behaviour to design around:** metadata damage fails loud (nonzero exit), but *data*
+  damage is silent (exit 0, correct length, zero bytes) and `ntfsls` exits 0 on a partial listing.
+  So every `inspect` and `copy` output carries mapfile-derived damage notes next to it.
 - Unreadable regions of the image are zero-filled. That is *not* an I/O error, so inspection and
   copy must consult the mapfile to know which data is real.
 
@@ -477,28 +494,39 @@ Two facts shape this. Unreadable regions are zero-filled in the image, and that 
 And a copy of a zero-filled hole hashes perfectly, so hash equality proves only that the copy
 matches the image, **not** that the image matches the platter.
 
-- **v1 default: volume-level reporting.** `copy` reads the mapfile and reports, e.g., "447
-  unreadable extents, 11.4 MB. File-level attribution is not available in v1." The manifest records
-  `damage.scope = "volume"` and makes **no per-file integrity claim** (`attribution: "none"`).
+- **Baseline, always: volume-level reporting.** `copy` reads the mapfile and reports, e.g., "447
+  unreadable extents, 11.4 MB". The manifest records `damage.scope = "volume"`. Where per-file
+  attribution is unavailable (see below), it says so and makes **no per-file integrity claim**
+  (`attribution: "none"`).
 - **Hash while copying.** SHA-256 of what was read from the image and of what was written. This
   proves the write landed and the copy is faithful to the image. It says nothing about whether the
   image was faithful to the disk, and the output states that.
-- **Per-file attribution is a capability, never implied.** It requires real extent mapping:
-  (i) `F_LOG2PHYS_EXT` on the mounted image, only if P0 (item 4) shows the native driver supports
-  it; or (ii) an NTFS parser that walks the MFT `$DATA` runlists and intersects them with the
-  mapfile (about 2 days, NTFS only; prototyped in the reference case). When active, each file is
-  `integrity: intact | overlaps-bad-extent` with `attribution: "extent-map"`.
+- **Per-file attribution is a capability, never implied.** It requires real extent mapping.
+  - **NTFS (v1):** convert each bad extent from the mapfile to a volume-relative cluster range
+    (subtract the partition offset, divide by the cluster size) and ask `ntfscluster -c <range>`
+    which inode owns it. It names data files, and names `$MFT` / `$INDEX_ALLOCATION` metadata
+    verbatim. One subprocess per extent (about 36 ms each on the small spike image; **large-volume
+    timing UNVERIFIED**), so extents are capped by a configurable limit and, beyond it, reporting
+    falls back to volume level and says so.
+  - **Not available** when the damage hits `$MFT` (the volume will not open at all), or when the
+    boot sector is damaged and not restored: report volume level and state why.
+  - **Other filesystems:** `F_LOG2PHYS_EXT` on a mounted image, only where P0 shows the native driver
+    supports it (HFS+/APFS: still open); otherwise volume level.
+  - When active, each file is `integrity: intact | overlaps-bad-extent | metadata-damaged` with
+    `attribution: "ntfscluster"` (or `"extent-map"` for another mapper).
 - **No flag-everything fallback.** If mapping is unavailable, make no per-file claims. Marking every
   file `unknown` would be indistinguishable from not reporting.
-- Decision for v1: (i) if P0 allows it, else volume-level only, with (ii) as the planned v1.1
-  upgrade (see §9).
+- Decision for v1: volume-level report always, plus `ntfscluster` per-file attribution for NTFS when
+  the volume opens. An own NTFS parser is deferred (see §9) and only reconsidered if the tools prove
+  unusable on real damage.
 
 ### Repair hand-off
 
 - `FILESYSTEM` prescribes repair of a **copy of the image**, never the original image or device.
 - Native tools exist for HFS+/APFS/FAT/exFAT (`fsck_*`). For **NTFS there is no native repair**, so
   the tool prints a hand-off (`ntfsfix` / `chkdsk` against a copy, or a data-recovery tool) and
-  does not run it.
+  does not run it. The only NTFS write the tool may perform is the explicit boot-sector restore on
+  a working copy described under Inspection.
 
 ---
 
@@ -509,7 +537,8 @@ matches the image, **not** that the image matches the platter.
 | Implementation language | Swift for macOS collectors (IOKit, DiskArbitration, TCC, signing); the JSON `SignalSet` + shared fixtures keep a later Linux port independent of the language | before P1 |
 | Process identity for FDA | A (Terminal) by default; revisit after P0 attribution results | end of P0 |
 | Final name | choose before any signed build (bundle ID is permanent) | before P4 |
-| Per-file damage attribution | **Decided for v1: volume-level reporting.** NTFS runlist ∩ mapfile parser (~2 d) is the v1.1 upgrade; per-file flags earlier only if P0 item 4 passes. Fixed now because it shapes the manifest schema | before P1 |
+| Per-file damage attribution | **Decided for v1: volume-level report always, plus `ntfscluster` per-file attribution for NTFS** (spike: `docs/ntfs-spike.md`). An own NTFS parser (3–5 d basic, 1–2 weeks robust) is deferred; reconsider only if the tools fail on real damage. Fixes the manifest schema | before P1 |
+| NTFS inspection dependency | **ntfs-3g userspace tools** as a GPL subprocess on images (not bottled; core formula is Linux-only; tap variant needs macFUSE), built from the upstream tarball with `--disable-ntfs-3g`. macFUSE rejected as a dependency | before P3 |
 | Keep `copy`? | decide after P3; may reduce to `ditto` + manifest | P3 |
 
 ---
@@ -539,7 +568,7 @@ earlier question "was the MiNaH SMART data collected on macOS?" is closed: it ca
 | 1 | Does `smartctl -d sat` work over USB on current macOS / Apple Silicon, and does opening the device trip TCC or need root? | Triage stays permission-free; FDA is only an imaging concern | **TCC/root is the cause:** FDA moves onto P2's critical path. **Bridge is the cause:** publish a per-bridge known-good list; `BRIDGE` becomes the common path and the confidence rules lose a source |
 | 2 | Does `ioreg` expose real retries/timeouts for USB disks? | Genuine third independent source for §5 | Do not count I/O stats as independent; display only; recalibrate confidence rules |
 | 3 | Does the unified log retain medium errors with LBAs, and for how long? | The no-SMART path keeps its strongest signal; record the window in `log.window_hours` | Product value drops materially: reduce to symptoms + imaging advice, and reconsider shipping triage before `image` |
-| 4 | Does `F_LOG2PHYS_EXT` work on the native read-only NTFS mount? | Per-file attribution via ioctl is viable | Volume-level reporting in v1 (already decided); NTFS runlist parser planned for v1.1 |
+| 4 | Does `F_LOG2PHYS_EXT` work on a native read-only mount? **NTFS: answered no (A2: no native NTFS mount helper exists).** Still open for HFS+/APFS | Per-file attribution via ioctl is viable for that filesystem | NTFS attribution comes from `ntfscluster` (§8); other filesystems: volume-level reporting |
 | 5 | Does a DiskArbitration mount-approval dissent block third-party driver mounts? | `guard` is the enforcement mechanism | Principle 1 is advisory only: pick another mechanism (e.g. disable-driver instructions) or downgrade the principle honestly |
 | 6 | Does a `ddrescue` child inherit the TCC grant under option A (Terminal)? | Option A survives | Option B or C is required; P2 becomes the largest phase, not P3 |
 | 7 | Does TCC return a different errno (`EPERM`) from Unix permissions (`EACCES`)? | State machine as specified | Collapse to a single "denied" state and show both remedies |
@@ -610,6 +639,11 @@ produce it. Timestamps render in UTC unless `--local` is passed, so the test is 
 | Firmware-encrypted drives (WD/Seagate) | Out of scope, detect and hand off |
 | APFS/FileVault volumes | Read-only attach works; encryption needs a passphrase, prompt safely |
 | No native NTFS repair | Hand-off only; documented exception to principle 4 |
+| No native NTFS reader on macOS 27.2 | ntfs-3g userspace tools on the image (GPL subprocess, source build); no macFUSE, no kernel extension |
+| Boot sector damaged (the MiNaH case): the ntfs-3g tools do not fall back to the backup | Restore the backup boot sector on a working copy only, explicitly requested; UNVERIFIED (P0 row 11) |
+| Damage hits `$MFT`: the volume will not open, so no file-level attribution | Volume-level report that states why |
+| `ntfscluster` takes one range per invocation | Cap on extents, fall back to volume level beyond it; large-volume timing UNVERIFIED |
+| Data damage is silent (exit 0, zero bytes); `ntfsls` exits 0 on partial listings | Mapfile-derived damage notes beside every `inspect` / `copy` output |
 | SSD / NVMe / flash misclassified as HDD | Media-type check; `UNSUPPORTED` verdict |
 | GPL | `ddrescue` as subprocess; comply if bundled |
 
@@ -624,13 +658,26 @@ no formula of that name. Bundle identifier is still not fixed and must be decide
 signed build, since the bundle identifier is permanent for TCC.
 
 Distribution: Homebrew tap first, signed `.app` wrapper later. Triage depends on `smartctl`
-(smartmontools) and imaging on `ddrescue`; the formula declares both. A bootable Linux rescue image
+(smartmontools) and imaging on `ddrescue`; the formula declares both. NTFS inspection depends on
+the ntfs-3g userspace tools, built from the upstream tarball with `--disable-ntfs-3g` (no FUSE).
+Homebrew's core formula is Linux-only and the tap variant requires macFUSE, so the formula builds
+from source or ships a pinned static build (GPL: comply if bundled). A bootable Linux rescue image
 is the ultimate answer to TCC — it sidesteps the permission model entirely — but is a separate
 product, and awkward on Apple Silicon.
 
 ---
 
 ## 14. Revision history
+
+**v3.2 (2026-11-06), after P0 phase A and the NTFS spike:**
+
+- macOS 27.2 has no native NTFS mount helper: principle 4 and §8 now use the ntfs-3g userspace
+  tools on the image (no mount, no FUSE); macFUSE rejected.
+- Per-file damage attribution for NTFS via `ntfscluster` replaces "volume-level only" as the v1
+  design; an own parser deferred.
+- Boot-sector damage (the MiNaH case) gets a planned, unverified restore-on-a-copy path (P0 row 11).
+- §7/P0 results recorded in `docs/p0-runbook.md`: EPERM (1) = TCC denied, EACCES (13) = TCC passed;
+  the grant follows the app and is lost when the bits change; probes use 4096-byte reads.
 
 **v3.1 (2026-11-06), naming:**
 
@@ -698,7 +745,7 @@ ERROR SIGNALS ──────────────────────
 
 FILESYSTEM DRIVERS ────────────────────────────────────────────────
   /Library/Filesystems/iboysoft-ntfs.fs    ← third-party, claims NTFS volumes
-  native: mount_ntfs (read-only)
+  NTFS inspection: ntfs-3g tools on the image (no mount)
 
 DIFFERENTIAL ──────────────────────────────────────────────────────
   1. MEDIA DEGRADATION                          confidence: HIGH
@@ -727,7 +774,7 @@ NEXT  (~3–4 h, estimated from size and bus speed)
   (you will be asked to type the last four of the serial: 6789)
 
 THEN
-  disktriage inspect minah.img      # read-only, native, no third-party driver
+  disktriage inspect minah.img      # read-only, ntfs-3g tools on the image, no mount, no third-party driver
   disktriage copy   minah.img --to ~/Archive   # hashed copy + volume-level damage report
 ```
 

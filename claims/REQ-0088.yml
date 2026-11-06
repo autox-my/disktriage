@@ -2,11 +2,14 @@
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0088
-statement: "The inspection command shall attach the image read-only and without automount, then mount it with a native read-only driver."
+statement: "The inspection command shall attach the image read-only and without automount, then inspect it read-only with a native driver where macOS provides one and, for NTFS, with userspace tools on the image without mounting."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L466
+  source: diskdoctor.md#8-imaging--inspection
   date: 2026-11-06
-  rejected_alternatives: []
-  assumptions: []
+  rejected_alternatives:
+    - "native mount_ntfs: absent on macOS 27.2 (P0 A2)"
+    - "macFUSE with ntfs-3g mount: kernel extension or FSKit, heavy install, and a mount again"
+  assumptions:
+    - "ntfs-3g userspace tools work read-only on images (docs/ntfs-spike.md)"
