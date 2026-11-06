@@ -187,13 +187,14 @@ struct ImageCommandTests {
         #expect(result.stdout.contains("not measured"))
     }
 
-    // Non-dry-run is the only mode that has no implementation yet.
-    @Test("the non-dry-run path names the guard and FDA work and exits 30")
-    func nonDryRunExitsThirty() {
+    // Non-dry-run refuses before any probe without the explicit consent flag.
+    @Test("the non-dry-run path refuses without --accept-risk")
+    func nonDryRunRequiresConsent() {
         let result = serialRun(["--confirm-serial", "ABCD", "--no-dry-run"])
-        #expect(result.exitCode == 30)
+        #expect(result.exitCode == 2)
         #expect(result.stdout.isEmpty)
-        #expect(result.stderr.contains("execution arrives with the guard and FDA check (P2/P3)"))
+        #expect(result.stderr.contains("--accept-risk"))
+        #expect(result.stderr.contains("finish the drive off"))
     }
 
     // MARK: - Destination checks
