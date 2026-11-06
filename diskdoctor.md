@@ -234,6 +234,16 @@ bridge-specific. Over USB, `diskutil` also gives no `SolidState` key for HDD or 
 available from ioreg (which exposes Retries and Errors) and must come from the kernel log or the
 collector's own timeouts.
 
+**Measured on the MiNaH drive (P0 phase C):** with SMART unavailable, the signals that exist are the
+kernel log and ioreg. The unified log (readable without root) carries `[External] I/O error! ... Sense
+Data 0x03, 0x11, 0x00` (medium error, unrecovered read) followed by `I/O error ... lba 0x800 count N,
+retry 1..20` (LBA in hex, retries about 2.2 s apart), then `diskN: I/O error.`; repeats may be
+coalesced (`happened 42 times`). ioreg `Errors (Read)` moved 0 -> 1, while `Retries` stayed 0 despite
+20 kernel retries, so `Errors` is usable and `Retries` is not a reliable source. A single read of an
+unreadable region blocks for about 45-50 s before failing, so collectors that read media need a
+timeout of at least 90 s and must not be treated as hung before then; `ioreg` / `log show` do not
+read media and stay fast.
+
 **Bounded v1 scope: macOS only.** Keep the `SignalSet` and classifier free of OS assumptions so
 Linux is a collector, not a rewrite.
 
@@ -692,6 +702,12 @@ product, and awkward on Apple Silicon.
 ---
 
 ## 14. Revision history
+
+**v3.4 (2026-11-07), after P0 phase C:**
+
+- Recorded the real kernel-log medium-error format and ioreg behaviour on the failing drive (§4):
+  `Errors` moves, `Retries` does not; one unreadable read blocks about 45-50 s.
+- P0 row 11 (boot-sector restore) remains open: it needs the earlier MiNaH image.
 
 **v3.3 (2026-11-07), after P0 phase B and row 5:**
 
