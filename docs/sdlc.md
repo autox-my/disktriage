@@ -35,7 +35,7 @@ prints both logs in full, and chooses one outcome from the JUnit report it count
 | Build | `swift build` |
 | Tests | `swift test` |
 | Tests with the report the gate reads | `swift test --xunit-output .build/test-results/junit.xml` |
-| CLI (skeleton; P1 adds commands) | `swift run disktriage` |
+| CLI (triage a recorded SignalSet) | `swift run disktriage triage --from Tests/Fixtures/minah.json` |
 
 The toolchain is full Xcode 27.2 / Swift 6.4.2, so the two old workarounds are
 retired — but only because they were measured unnecessary, not because they
@@ -53,6 +53,24 @@ were inconvenient:
   precedence, then the 11/12 precedence, turned it red; restoring them turned
   it green. If `import Testing` ever stops resolving, the build fails and the
   gate answers **1** — never a silent run of nothing.
+
+### CLI decisions (P1b)
+
+- `disktriage triage --from <signalset.json>` is the only working command; live
+  collection arrives with the collectors in P2. Without `--from` it says so on
+  stderr and exits **30** (tool error). `image`, `inspect`, `copy`, `check`,
+  `guard` and `list` also exit 30 with "not implemented yet (planned P2/P3)".
+- **Usage errors exit 2** (unknown command, unknown flag, `--from` without a
+  value). The plan is silent on a usage code, so this page records the choice:
+  it is req's convention and collides with no verdict or collection code
+  (0, 10–13, 20, 21, 30).
+- `--help` and `<command> --help` exit 0 on stdout and read nothing.
+- A recorded set has no live device, so the suggested image destination is
+  derived from the file stem (`<stem>.img` under `/Volumes/Scratch`). That is
+  what reproduces the Appendix transcript, which carries
+  `--to /Volumes/Scratch/minah.img` that `triage --from` cannot supply.
+- `--json` prints the same verdict as the tty on stdout; progress stays on
+  stderr. `--local` renders log timestamps in the local zone (default UTC).
 
 ### The test report is the evidence
 
