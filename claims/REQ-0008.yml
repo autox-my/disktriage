@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0008 REQ-0030 REQ-0100 a clean drive is 'no actionable fault found', never 'healthy' and never a score`()"

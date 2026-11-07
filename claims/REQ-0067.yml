@@ -13,4 +13,4 @@ rationale:
 tests:
   - "DiskTriageCLITests.CheckCommandTests::REQ0061_REQ0067_REQ0068_deniedExitsOne()"
   - "DiskTriageCollectorsTests.CheckRunnerTests::REQ0067_REQ0068_deniedRowCarriesTheOnboarding()"
-  - "DiskTriageCoreTests.FDAStateTests::REQ0061_REQ0067_REQ0068_EPERMIsDeniedAndNamesTheTerminal()"
+  - "DiskTriageCoreTests.FDAStateTests::REQ0064_REQ0061_REQ0067_REQ0068_EPERMIsDeniedAndNamesTheTerminal()"

@@ -411,6 +411,15 @@ public enum Renderer {
                 "Power off; do not retry it.",
             ]
         case .filesystem:
+            if signals.fs?.type?.lowercased() == "ntfs" {
+                // The plan's repair hand-off: NTFS has no native repair, so the
+                // tool prints the hand-off and never performs it.
+                return [
+                    "The filesystem does not read, with no hardware signal to explain it.",
+                    "NTFS has no native repair on macOS: run ntfsfix or chkdsk against",
+                    "a copy of the image; this tool never repairs in place.",
+                ]
+            }
             return [
                 "The filesystem does not read, with no hardware signal to explain it.",
                 "Repair a copy of the image, never the original.",

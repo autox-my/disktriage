@@ -13,4 +13,4 @@ rationale:
 pins:
   modality: "SHALL"
 tests:
-  - "DiskTriageCLITests.InspectCommandTests::REQ0121_missingToolsExitThirty()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0088_REQ0121_missingToolsExitThirty()"

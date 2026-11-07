@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0043_REQ0066_deniedFDABlocks()"

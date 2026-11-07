@@ -10,3 +10,6 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.HistoryCLITests::REQ0017_REQ0155_noSerialMeansNoKey()"
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0017_REQ0156_keyIsTheFullSha256OfTheSerial()"

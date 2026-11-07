@@ -46,8 +46,8 @@ struct CheckCommandTests {
         #expect(!result.stdout.contains("VERDICT  PASS"), "never a pass")
     }
 
-    @Test("--json carries the same verdict and every row")
-    func jsonCarriesTheVerdict() throws {
+    @Test("REQ0056 --json carries the same verdict and every row")
+    func REQ0056_jsonCarriesTheVerdict() throws {
         let probes = CLICheckProbes(raw: [.notRun(reason: "no internal disk found")])
         let result = runCheck(arguments: ["--json"], probes: probes)
 

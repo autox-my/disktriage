@@ -10,3 +10,6 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCollectorsTests.CheckRunnerTests::REQ0006_REQ0069_REQ0070_reportsEveryRowAndToolVersion()"
+  - "DiskTriageCollectorsTests.CommandPolicyTests::REQ0001_REQ0005_REQ0006_REQ0073_noMountUnmountOrDriverLoadIsAllowed()"

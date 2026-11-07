@@ -13,5 +13,5 @@ rationale:
 pins:
   modality: "SHALL"
 tests:
+  - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0089_REQ0098_REQ0114_rejectsEverythingElse()"
   - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0114_allowsOnlyReadOnlyShapes()"
-  - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0114_rejectsEverythingElse()"

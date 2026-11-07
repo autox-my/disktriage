@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.HistoryCLITests::REQ0042_REQ0159_recordedSignalSetNeverTouchesTheStore()"

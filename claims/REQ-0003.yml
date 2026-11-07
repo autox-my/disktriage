@@ -5,10 +5,13 @@ claim_id: REQ-0003
 statement: "The tool shall not trigger a TCC prompt during triage."
 applicability: []
 relations: []
+evidence: process
+tests: []
 rationale:
   source: diskdoctor.md#L63
   date: 2026-11-06
   rejected_alternatives: []
-  assumptions: []
+  assumptions:
+    - "Platform property, not a unit-testable behaviour. docs/collectors-observations.md §1 records smartctl on the internal disk with no prompt; docs/p0-runbook.md §3 row 7 records that TCC is evaluated at launch and denies (never prompts); the triage path issues no raw-device probe (RawDeviceProbe is used only by check and image)."
 pins:
   modality: "SHALL-NOT"

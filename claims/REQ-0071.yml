@@ -11,4 +11,4 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
-  - "DiskTriageGuardTests.GuardDecisionTests::REQ0071_dissentsOnlyForExternalPhysicalDisks()"
+  - "DiskTriageGuardTests.GuardDecisionTests::REQ0071_REQ0073_dissentsOnlyForExternalPhysicalDisks()"

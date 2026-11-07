@@ -13,5 +13,5 @@ rationale:
 pins:
   modality: "SHALL-NOT"
 tests:
-  - "DiskTriageCLITests.CopyCommandTests::REQ0128_REQ0134_REQ0136_copiesAndAttributes()"
-  - "DiskTriageCLITests.CopyCommandTests::REQ0130_REQ0131_REQ0134_noMapfileMakesNoClaim()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0091_REQ0093_REQ0128_REQ0134_REQ0136_copiesAndAttributes()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0092_REQ0095_REQ0130_REQ0131_REQ0134_noMapfileMakesNoClaim()"

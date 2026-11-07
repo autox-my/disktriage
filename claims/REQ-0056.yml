@@ -10,3 +10,11 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.CLITests::`REQ-0056 REQ0057_REQ0058 --json prints the same verdict as JSON on stdout and keeps progress on stderr`()"
+  - "DiskTriageCLITests.CheckCommandTests::REQ0056_jsonCarriesTheVerdict()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0056_REQ0136_jsonReportHasStableSections()"
+  - "DiskTriageCLITests.ImageCommandTests::REQ0056_jsonCarriesThePlan()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0056_REQ0090_REQ0091_REQ0116_mapfileReportsDamage()"
+  - "DiskTriageCLITests.LiveCLITests::REQ0056_listJSONCarriesTheFields()"
+  - "DiskTriageGuardTests.GuardCommandTests::REQ0056_jsonPrintsDecisionsThenASummary()"

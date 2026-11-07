@@ -28,8 +28,8 @@ struct NTFSToolsTests {
         }
     }
 
-    @Test("REQ0114 write flags, ntfsfix, mount paths and relative tools are rejected")
-    func REQ0114_rejectsEverythingElse() {
+    @Test("REQ0089_REQ0098_REQ0114 write flags, ntfsfix, mount paths and relative tools are rejected")
+    func REQ0089_REQ0098_REQ0114_rejectsEverythingElse() {
         let rejected: [[String]] = [
             [],
             ["/opt/ntfs/bin/ntfsfix", "-n", "/images/plain.img"],

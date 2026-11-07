@@ -28,8 +28,8 @@ struct InspectCommandTests {
     }
 
     // REQ-0111: inspect takes images only.
-    @Test("REQ0111 inspect refuses a /dev node with a usage error")
-    func REQ0111_refusesADeviceNode() {
+    @Test("REQ0055_REQ0111 inspect refuses a /dev node with a usage error")
+    func REQ0055_REQ0111_refusesADeviceNode() {
         let result = runInspect(
             arguments: ["/dev/rdisk9"],
             dependencies: inspectDependencies(tools: ScriptedNTFSTools())
@@ -43,8 +43,8 @@ struct InspectCommandTests {
 
     // REQ-0111 / REQ-0123: the textual path may look ordinary; the symlink
     // target is what the /dev refusal must see.
-    @Test("REQ0111_REQ0123 a symlink to a device node is refused")
-    func REQ0111_REQ0123_symlinkToADeviceIsRefused() throws {
+    @Test("REQ0055_REQ0111_REQ0123 a symlink to a device node is refused")
+    func REQ0055_REQ0111_REQ0123_symlinkToADeviceIsRefused() throws {
         let directory = URL(fileURLWithPath: try temp.makeDirectory("link"))
         let link = directory.appendingPathComponent("ordinary.img").path
         try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: "/dev/null")
@@ -83,8 +83,8 @@ struct InspectCommandTests {
     }
 
     // REQ-0121: missing tools are a precondition error, never a mount fallback.
-    @Test("REQ0121 missing ntfs-3g tools exit 30 with the prefix hint")
-    func REQ0121_missingToolsExitThirty() throws {
+    @Test("REQ0088_REQ0121 missing ntfs-3g tools exit 30 with the prefix hint, never a mount fallback")
+    func REQ0088_REQ0121_missingToolsExitThirty() throws {
         let image = try makeBareNTFSImage()
         defer { try? FileManager.default.removeItem(atPath: image) }
 
@@ -266,8 +266,8 @@ struct InspectCommandTests {
     }
 
     // REQ-0116: the mapfile's `-` extents are the volume-level damage note.
-    @Test("REQ0116 a mapfile reports its unreadable extents and bytes")
-    func REQ0116_mapfileReportsDamage() throws {
+    @Test("REQ0056_REQ0090_REQ0091_REQ0116 a mapfile reports its unreadable extents and bytes")
+    func REQ0056_REQ0090_REQ0091_REQ0116_mapfileReportsDamage() throws {
         let image = try makeBareNTFSImage()
         defer { try? FileManager.default.removeItem(atPath: image) }
         try Data(try Self.fixture("ntfs-damaged.mapfile.txt").utf8)
@@ -459,8 +459,8 @@ struct InspectCommandTests {
     }
 
     // REQ-0113: inspection is read-only; the source hash is unchanged.
-    @Test("REQ0113 inspecting a bare image never writes it")
-    func REQ0113_bareInspectionIsReadOnly() throws {
+    @Test("REQ0009_REQ0010_REQ0088_REQ0113 inspecting a bare image never writes it")
+    func REQ0009_REQ0010_REQ0088_REQ0113_bareInspectionIsReadOnly() throws {
         let image = try makeBareNTFSImage()
         defer { try? FileManager.default.removeItem(atPath: image) }
         let before = try sha256(path: image)

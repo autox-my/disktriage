@@ -10,3 +10,6 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0027 REQ-0033 a hidden SMART with no other signal is BRIDGE suspicion`()"
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0027 REQ-0039 a low-confidence MEDIA exits 0 with a warning`()"

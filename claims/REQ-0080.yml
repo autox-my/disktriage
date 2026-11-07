@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0080_REQ0083_REQ0086_twoPassesUseTheRawNodeAndNoDirectIO()"

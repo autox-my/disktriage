@@ -85,8 +85,8 @@ struct HistoryCLITests {
     }
 
     // REQ-0159
-    @Test("REQ0159 --no-history neither reads nor writes the store")
-    func REQ0159_noHistoryDisablesTheStore() throws {
+    @Test("REQ0009_REQ0159 --no-history neither reads nor writes the store")
+    func REQ0009_REQ0159_noHistoryDisablesTheStore() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -103,8 +103,8 @@ struct HistoryCLITests {
     }
 
     // REQ-0155
-    @Test("REQ0155 a device with no serial has no key: no read, no write, and a reason")
-    func REQ0155_noSerialMeansNoKey() throws {
+    @Test("REQ0017_REQ0155 a device with no serial has no key: no read, no write, and a reason")
+    func REQ0017_REQ0155_noSerialMeansNoKey() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let spy = SpyHistoryStore()
@@ -143,8 +143,8 @@ struct HistoryCLITests {
     }
 
     // REQ-0159
-    @Test("REQ0159 --from never reads or writes the store")
-    func REQ0159_recordedSignalSetNeverTouchesTheStore() {
+    @Test("REQ0042_REQ0159 triage --from never reads or writes the store")
+    func REQ0042_REQ0159_recordedSignalSetNeverTouchesTheStore() {
         let spy = SpyHistoryStore()
 
         let result = run(

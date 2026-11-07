@@ -13,6 +13,6 @@ rationale:
 pins:
   modality: "SHALL"
 tests:
-  - "DiskTriageCLITests.InspectCommandTests::REQ0111_REQ0123_symlinkToADeviceIsRefused()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0055_REQ0111_REQ0123_symlinkToADeviceIsRefused()"
   - "DiskTriageCLITests.InspectCommandTests::REQ0123_relativeImagePathIsResolvedBeforeThePolicy()"
   - "DiskTriageCLITests.InspectCommandTests::REQ0123_relativeMapfileAndWorkingCopyAreResolved()"

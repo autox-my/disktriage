@@ -216,8 +216,8 @@ struct GuardCommandTests {
         #expect(recorder.stderr.contains { $0.contains("probe reads") })
     }
 
-    @Test("--json prints one object per decision and a final summary on stdout")
-    func jsonPrintsDecisionsThenASummary() throws {
+    @Test("REQ0056 --json prints one object per decision and a final summary on stdout")
+    func REQ0056_jsonPrintsDecisionsThenASummary() throws {
         let recorder = GuardRecorder()
         let result = runGuard(
             arguments: ["--seconds", "2", "--json"],
@@ -312,8 +312,8 @@ struct GuardCommandTests {
         #expect(recorder.stderr.contains { $0.contains("diskarbitrationd resumed (pid 42") })
     }
 
-    @Test("suspend holds the daemon when a new raw disk node is present")
-    func suspendHoldsWhenANewNodeAppeared() {
+    @Test("REQ0074 suspend holds the daemon and tells the operator to unplug when a new raw disk node is present")
+    func REQ0074_suspendHoldsWhenANewNodeAppeared() {
         let recorder = GuardRecorder()
         let signaling = FakeProcessSignaling(pid: 42, states: ["T"])
         let result = runGuard(

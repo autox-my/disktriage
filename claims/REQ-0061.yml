@@ -14,5 +14,5 @@ tests:
   - "DiskTriageCLITests.CheckCommandTests::REQ0061_REQ0067_REQ0068_deniedExitsOne()"
   - "DiskTriageCollectorsTests.CheckRunnerTests::REQ0061_REQ0062_deniedRunIsNotCached()"
   - "DiskTriageCoreTests.CheckReportTests::REQ0061_jsonCarriesTheVerdict()"
-  - "DiskTriageCoreTests.FDAStateTests::REQ0061_REQ0067_REQ0068_EPERMIsDeniedAndNamesTheTerminal()"
   - "DiskTriageCoreTests.FDAStateTests::REQ0061_noProbeIsNeverGranted()"
+  - "DiskTriageCoreTests.FDAStateTests::REQ0064_REQ0061_REQ0067_REQ0068_EPERMIsDeniedAndNamesTheTerminal()"

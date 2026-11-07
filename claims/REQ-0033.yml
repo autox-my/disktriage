@@ -14,5 +14,5 @@ pins:
   value: "12"
   unit: "none"
 tests:
-  - "DiskTriageCoreTests.ClassifierTests::`REQ-0033 a hidden SMART with no other signal is BRIDGE suspicion`()"
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0027 REQ-0033 a hidden SMART with no other signal is BRIDGE suspicion`()"
   - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0033 a bridge that hides SMART with no other signal exits 12`()"

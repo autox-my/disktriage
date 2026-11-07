@@ -2,11 +2,14 @@
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0074
-statement: "The tool shall instruct a physical disconnect when the unmount hangs."
+statement: "The guard --suspend teardown shall instruct a physical disconnect when a raw disk node is still present."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L427
+  source: diskdoctor.md#mount-guard
   date: 2026-11-06
-  rejected_alternatives: []
+  rejected_alternatives:
+    - "Instruct a disconnect when the unmount hangs: there is no unmount; the same instruction is printed when a suspend teardown would strand a disk that is still attached."
   assumptions: []
+tests:
+  - "DiskTriageGuardTests.GuardCommandTests::REQ0074_suspendHoldsWhenANewNodeAppeared()"

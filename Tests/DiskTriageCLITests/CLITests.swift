@@ -8,7 +8,7 @@ struct CLITests {
 
     // REQ-0057, REQ-0058, REQ-0059
     @Test
-    func `REQ0057_REQ0058_REQ0059 triage --from puts the MiNaH transcript on stdout and exits 10`() throws {
+    func `REQ-0065 REQ0057_REQ0058_REQ0059 triage --from puts the MiNaH transcript on stdout and exits 10`() throws {
         let result = run(arguments: ["triage", "--from", fixturePath("minah.json")])
         let expected = String(
             decoding: try Data(contentsOf: URL(fileURLWithPath: fixturePath("minah.transcript.txt"))),
@@ -24,7 +24,7 @@ struct CLITests {
 
     // REQ-0057, REQ-0058
     @Test
-    func `REQ0057_REQ0058 --json prints the same verdict as JSON on stdout and keeps progress on stderr`() throws {
+    func `REQ-0056 REQ0057_REQ0058 --json prints the same verdict as JSON on stdout and keeps progress on stderr`() throws {
         let result = run(arguments: ["triage", "--from", fixturePath("minah.json"), "--json"])
 
         #expect(result.exitCode == 10, "the exit code does not depend on --json")

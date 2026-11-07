@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0018 REQ-0019 a null history never fires the rising-reallocated rule`()"

@@ -67,8 +67,8 @@ struct SnapshotStoreTests {
     }
 
     // REQ-0156
-    @Test("REQ0156 the device key is the full SHA-256 of the serial, never the raw serial")
-    func REQ0156_keyIsTheFullSha256OfTheSerial() {
+    @Test("REQ0017_REQ0156 the device key is the full SHA-256 of the serial, never the BSD name or raw serial")
+    func REQ0017_REQ0156_keyIsTheFullSha256OfTheSerial() {
         #expect(SnapshotStore.key(forSerial: Self.serial) == Self.key)
         #expect(SnapshotStore.key(forSerial: Self.serial).count == 64, "full hash, never truncated")
     }

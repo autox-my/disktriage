@@ -19,8 +19,8 @@ struct ImagingExecutionTests {
 
     // MARK: - Happy path
 
-    @Test("REQ0076_REQ0077_REQ0083 the sidecar exists before the first read and both passes run")
-    func REQ0076_REQ0077_REQ0083_sidecarBeforeReadAndTwoPasses() throws {
+    @Test("REQ0010_REQ0075_REQ0076_REQ0077_REQ0083 the sidecar exists before the first read and both passes run")
+    func REQ0010_REQ0075_REQ0076_REQ0077_REQ0083_sidecarBeforeReadAndTwoPasses() throws {
         let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
@@ -127,6 +127,57 @@ struct ImagingExecutionTests {
         #expect(object["resume_command"] == nil)
     }
 
+    // REQ-0075: imaging hands each pass to a real subprocess, not to in-process
+    // I/O. The shipped launcher is posix_spawn; a harmless child proves it.
+    @Test("REQ0075 the shipped launcher starts a real child process")
+    func REQ0075_shippedLauncherSpawnsARealProcess() throws {
+        let handle = try PosixDdrescueLauncher().launch(argv: ["/bin/sh", "-c", "exit 7"])
+        var exit: Int32?
+        for _ in 0..<400 {
+            exit = handle.poll()
+            if exit != nil { break }
+            Thread.sleep(forTimeInterval: 0.005)
+        }
+        #expect(handle.pid > 0, "a real pid")
+        #expect(exit == 7, "the child ran and its status is observed")
+    }
+
+    // REQ-0082: no SMART poll happens while the passes run. With --override the
+    // triage attempt is skipped, so any smartctl call would be an imaging poll.
+    @Test("REQ0082 imaging never polls SMART during either pass")
+    func REQ0082_imagingNeverPollsSMART() throws {
+        let directory = try temp.makeDirectory()
+        let image = directory + "/disk8.img"
+        let mapfile = image + ".mapfile"
+        let base = scriptedExecutor()
+        let recorder = CLIExecutor { command in base.run(command) }
+        let launcher = FakeDdrescueLauncher()
+        let pass1 = FakeDdrescueProcess()
+        pass1.ticks = [{
+            writeMapfile(mapfile, rescued: Self.size, total: Self.size, pass: 1, finished: true)
+            return nil
+        }]
+        let pass2 = FakeDdrescueProcess()
+        pass2.ticks = [{
+            writeMapfile(mapfile, rescued: Self.size, total: Self.size, pass: 2, finished: true)
+            return nil
+        }]
+        launcher.handles = [pass1, pass2]
+
+        let result = execute(
+            image: image,
+            mapfile: mapfile,
+            environment: FakeImagingEnvironment(),
+            launcher: launcher,
+            extra: ["--override"],
+            executor: recorder
+        )
+
+        #expect(result.exitCode == 0)
+        #expect(recorder.commands.contains { if case .smartctl = $0 { return true }; return false } == false,
+                "no SMART query was issued during imaging")
+    }
+
     // MARK: - Consent and preconditions
 
     @Test("reading a failing drive is refused without --accept-risk")
@@ -196,8 +247,8 @@ struct ImagingExecutionTests {
         }
     }
 
-    @Test("REQ0043 a denied Full Disk Access blocks imaging with the degraded message")
-    func REQ0043_deniedFDABlocks() {
+    @Test("REQ0043_REQ0066 a denied Full Disk Access blocks imaging with the degraded message")
+    func REQ0043_REQ0066_deniedFDABlocks() {
         let environment = FakeImagingEnvironment()
         environment.fda = FDAStatus(
             state: .denied,
@@ -889,6 +940,7 @@ struct ImagingExecutionTests {
         launcher: FakeDdrescueLauncher,
         probe: (any ImageDestinationProbing)? = nil,
         extra: [String] = [],
+        executor: CLIExecutor = scriptedExecutor(),
         now: @escaping () -> Date = Date.init,
         pollInterval: TimeInterval = 0.01,
         signalGrace: TimeInterval = 0.2,
@@ -914,7 +966,7 @@ struct ImagingExecutionTests {
                 "disk8", "--to", destination, "--no-dry-run",
                 "--accept-risk", "--confirm-serial", "ABCD",
             ] + extra,
-            executor: scriptedExecutor(),
+            executor: executor,
             now: now,
             destinationProbe: destinationProbe,
             writeFile: { path, data in try data.write(to: URL(fileURLWithPath: path)) },

@@ -11,7 +11,7 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
-  - "DiskTriageCLITests.ImageCommandTests::REQ0047_REQ0048_REQ0076_REQ0083_dryRunPrintsTheCommand()"
+  - "DiskTriageCLITests.ImageCommandTests::REQ0009_REQ0047_REQ0048_REQ0076_REQ0083_dryRunPrintsTheCommand()"
   - "DiskTriageCLITests.ImageCommandTests::REQ0076_mapfileCanBeOverridden()"
-  - "DiskTriageCLITests.ImagingExecutionTests::REQ0076_REQ0077_REQ0083_sidecarBeforeReadAndTwoPasses()"
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0010_REQ0075_REQ0076_REQ0077_REQ0083_sidecarBeforeReadAndTwoPasses()"
   - "DiskTriageCLITests.ImagingMapfileTests::REQ0076_parsesARealDdrescueMapfile()"

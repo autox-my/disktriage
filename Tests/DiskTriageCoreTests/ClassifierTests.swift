@@ -10,7 +10,7 @@ struct ClassifierTests {
     // MARK: - MEDIA and confidence
 
     @Test
-    func `REQ-0025 MiNaH is MEDIA at high confidence because two sources agree`() throws {
+    func `REQ-0016 REQ-0025 MiNaH is MEDIA at high confidence because two sources agree`() throws {
         let verdict = classify(try fixture("minah.json"))
 
         let media = try #require(cause(.media, in: verdict), "MEDIA cause")
@@ -89,7 +89,7 @@ struct ClassifierTests {
     }
 
     @Test
-    func `REQ-0018 a null history never fires the rising-reallocated rule`() throws {
+    func `REQ-0018 REQ-0019 a null history never fires the rising-reallocated rule`() throws {
         let set = try fixture("stable-reallocated.json")
         let verdict = classify(set)
         let media = try #require(cause(.media, in: verdict), "MEDIA cause")
@@ -101,7 +101,7 @@ struct ClassifierTests {
     }
 
     @Test
-    func `REQ-0039 a low-confidence MEDIA exits 0 with a warning`() throws {
+    func `REQ-0027 REQ-0039 a low-confidence MEDIA exits 0 with a warning`() throws {
         let verdict = classify(try fixture("stable-reallocated.json"))
         let media = try #require(cause(.media, in: verdict), "MEDIA cause")
 
@@ -150,14 +150,24 @@ struct ClassifierTests {
     }
 
     @Test
-    func `REQ-0030 a clean drive is 'no actionable fault found', never 'healthy'`() throws {
-        let verdict = classify(try fixture("clean.json"))
+    func `REQ-0008 REQ-0030 REQ-0100 a clean drive is 'no actionable fault found', never 'healthy' and never a score`() throws {
+        let signals = try fixture("clean.json")
+        let verdict = classify(signals)
 
         #expect(verdict.code == .noActionableFault, "exit 0")
         #expect(verdict.causes.isEmpty, "no cause to report")
         #expect(verdict.headline.lowercased().contains("no actionable fault"), "headline")
         #expect(!verdict.headline.lowercased().contains("healthy"), "never healthy")
         #expect(!verdict.headline.lowercased().contains("safe"), "never safe")
+
+        // REQ-0008: no health score exists, in either rendering. REQ-0100: and
+        // nothing implies the disk is safe without evidence.
+        let json = Renderer.json(verdict)
+        #expect(!json.contains("\"score\""), "no health score field")
+        #expect(!json.contains("\"health\""), "no health value")
+        let tty = Renderer.tty(signals, verdict).lowercased()
+        #expect(!tty.contains("health score"), "no health score line")
+        #expect(!tty.contains("disk is safe"), "never implies the disk is safe")
     }
 
     @Test
@@ -181,7 +191,7 @@ struct ClassifierTests {
     }
 
     @Test
-    func `REQ-0041 a denied permission is a status, not the verdict, when a verdict exists`() throws {
+    func `REQ-0002 REQ-0041 a denied permission is a status, not the verdict, when a verdict exists`() throws {
         let set = try fixture("minah.json")
         #expect(set.permissions?.rawRead == .denied, "raw read denied")
 
@@ -192,7 +202,7 @@ struct ClassifierTests {
     // MARK: - The other branches
 
     @Test
-    func `REQ-0033 a hidden SMART with no other signal is BRIDGE suspicion`() throws {
+    func `REQ-0027 REQ-0033 a hidden SMART with no other signal is BRIDGE suspicion`() throws {
         let verdict = classify(try fixture("bridge-hides-smart.json"))
 
         let bridge = try #require(cause(.bridge, in: verdict), "BRIDGE cause")
@@ -282,6 +292,59 @@ struct ClassifierTests {
         #expect(!verdict.headline.isEmpty, "message")
         #expect(!unknown.cheapestTest.isEmpty, "prescription")
         #expect(!unknown.falsifiedBy.isEmpty, "falsifier")
+    }
+
+    // REQ-0007: the top hypothesis is named with its evidence, the observation
+    // that would falsify it and the single cheapest next test. The JSON carries
+    // the same three fields the struct does.
+    @Test
+    func `REQ-0007 the top hypothesis carries evidence, a falsifier and the cheapest test`() throws {
+        let verdict = classify(try fixture("minah.json"))
+        let top = try #require(verdict.causes.first, "the top hypothesis")
+        #expect(top.causeClass == .media, "MEDIA is the top hypothesis")
+        #expect(!top.evidence.isEmpty, "evidence")
+        #expect(!top.falsifiedBy.isEmpty, "falsifier")
+        #expect(!top.cheapestTest.isEmpty, "cheapest next test")
+
+        let json = Renderer.json(verdict)
+        #expect(json.contains("\"falsified_by\""), "the falsifier is in the JSON")
+        #expect(json.contains("\"cheapest_test\""), "the cheapest test is in the JSON")
+    }
+
+    // REQ-0096: a FILESYSTEM verdict hands off repair of a copy of the image,
+    // never the original image or the device.
+    @Test
+    func `REQ-0096 the FILESYSTEM prescription targets a copy of the image`() throws {
+        let verdict = classify(try fixture("filesystem-only.json"))
+        let next = try #require(verdict.next, "the FILESYSTEM prescription")
+        #expect(next.why.contains("copy of the image"), "a copy, not the original")
+        #expect(!next.command.contains("/dev/"), "never the device")
+        #expect(Renderer.json(verdict).contains("copy of the image"), "the JSON says the same")
+    }
+
+    // REQ-0097: there is no native NTFS repair on macOS, so the tool prints a
+    // hand-off against a copy and does not perform the repair.
+    @Test
+    func `REQ-0097 an NTFS repair is a hand-off on a copy, never performed`() throws {
+        let set = try decode("""
+        {
+          "schema_version": 1, "collected_at": "2026-11-06T00:14:02Z",
+          "device": { "status": "ok", "bsd": "disk9", "media": "hdd", "bus": "usb" },
+          "smart": { "status": "ok", "pending": 0, "reallocated": 0,
+                     "uncorrectable": 0, "history": null },
+          "fs": { "status": "ok", "type": "ntfs", "mounted": false, "readable": false }
+        }
+        """)
+        let verdict = classify(set)
+        #expect(verdict.code == .filesystemOnly, "exit 13")
+
+        let tty = Renderer.tty(set, verdict).lowercased()
+        #expect(tty.contains("ntfsfix") || tty.contains("chkdsk"), "the NTFS repair hand-off is printed")
+        #expect(tty.contains("copy of the image"), "against a copy")
+        #expect(tty.contains("never"), "the tool never performs it")
+
+        let json = Renderer.json(verdict)
+        #expect(json.contains("ntfsfix") || json.contains("chkdsk"), "the JSON carries the hand-off")
     }
 }
 

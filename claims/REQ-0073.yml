@@ -2,11 +2,15 @@
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0073
-statement: "The tool shall unmount an already-mounted target volume with a hard timeout."
+statement: "The guard command shall prevent a mount for an external physical disk without unmounting or ejecting a volume."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L427
+  source: diskdoctor.md#mount-guard
   date: 2026-11-06
-  rejected_alternatives: []
+  rejected_alternatives:
+    - "diskutil unmountDisk with a hard timeout (plan §8): not implemented. The guard never writes to a disk, and --suspend prevents both probe and mount from the start, so an unmount cannot hang; a later change may add it explicitly."
   assumptions: []
+tests:
+  - "DiskTriageCollectorsTests.CommandPolicyTests::REQ0001_REQ0005_REQ0006_REQ0073_noMountUnmountOrDriverLoadIsAllowed()"
+  - "DiskTriageGuardTests.GuardDecisionTests::REQ0071_REQ0073_dissentsOnlyForExternalPhysicalDisks()"
