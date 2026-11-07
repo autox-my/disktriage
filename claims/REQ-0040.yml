@@ -6,7 +6,7 @@ statement: "The tool shall report every finding in the JSON causes and aggravato
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#fault-classes-and-prescriptions
+  source: diskdoctor.md#exit-codes
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

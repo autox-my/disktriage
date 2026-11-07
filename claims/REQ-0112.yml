@@ -6,7 +6,7 @@ statement: "The inspect command shall refuse a non-regular input file."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#6-cli
+  source: docs/sdlc.md#cli-decisions-p3c-inspect
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

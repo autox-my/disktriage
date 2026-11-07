@@ -6,7 +6,7 @@ statement: "The inspect command shall exit 30 when the volume cannot be opened."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#imaging
+  source: docs/sdlc.md#cli-decisions-p3c-inspect
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

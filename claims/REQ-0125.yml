@@ -6,7 +6,7 @@ statement: "The copy command shall refuse a device node as its input."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#inspection
+  source: docs/sdlc.md#cli-decisions-p3c-copy
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

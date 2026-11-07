@@ -6,7 +6,7 @@ statement: "The image command shall complete with the same outcome when diskarbi
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#mount-guard
+  source: docs/sdlc.md#the-stopped-da-rule-reaches-the-rest-of-the-image-path-p3b-follow-up
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

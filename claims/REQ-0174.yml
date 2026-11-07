@@ -6,7 +6,7 @@ statement: "The check command shall not call diskutil or create a DiskArbitratio
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#self-test-disktriage-check
+  source: docs/sdlc.md#check-does-not-wait-on-a-stopped-diskarbitrationd-p3-follow-up
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

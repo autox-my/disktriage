@@ -6,7 +6,7 @@ statement: "The tool shall assign medium confidence from a single strong source 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#5-triage-decision-tree
+  source: diskdoctor.md#confidence-rules
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

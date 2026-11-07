@@ -6,7 +6,7 @@ statement: "The tool shall allow imaging of unsupported media with a caveat that
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#exit-codes
+  source: diskdoctor.md#6-cli
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
