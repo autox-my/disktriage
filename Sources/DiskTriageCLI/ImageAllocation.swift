@@ -135,6 +135,12 @@ private func overlapBytes(_ extent: MapfileExtent, _ ranges: [ByteRange]) -> Int
 struct Stage0Domain {
     let domain: NTFSAllocationDomain
     let geometrySource: BootSectorSource
+    /// The geometry that supplied the cluster size and the cluster count, so
+    /// the scope report prints the parsed values instead of re-deriving them.
+    let geometry: NTFSBootGeometry
+    /// The bytes the `$MFT`'s own physical data runs occupy (the volume
+    /// metadata that is inside the used bytes).
+    let mftBytes: Int64
     let partitionOffset: Int64
     let partitionLength: Int64
     /// Every extent stage 0 read, so the used-only scope can include the
@@ -403,9 +409,16 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
     )
     switch outcome {
     case .known(let domain):
+        let clusterBytes = Int64(geometry.clusterSize)
+        let mftBytes = mftData.residentData.map { Int64($0.count) }
+            ?? mftData.runs.reduce(0) { total, run in
+                run.isSparse ? total : total + run.clusterCount * clusterBytes
+            }
         return .known(Stage0Domain(
             domain: domain,
             geometrySource: selection.source,
+            geometry: geometry,
+            mftBytes: mftBytes,
             partitionOffset: partitionOffset,
             partitionLength: partitionLength,
             readExtents: mergeExtents(readExtents)

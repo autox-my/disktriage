@@ -1,0 +1,17 @@
+# REQ-0225 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0225
+statement: "The image command shall refuse --scope-report combined with --used-only as a usage error with exit 2."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "2"
+  unit: "none"
+tests:
+  - "DiskTriageCLITests.ScopeReportTests::REQ0225_scopeReportWithUsedOnlyIsUsageError()"

@@ -33,6 +33,10 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
     /// the NTFS staging existed still decodes; `--used-only` is deliberately
     /// not part of the resume identity (REQ-0207).
     public let allocation: ImageSidecarAllocation?
+    /// What a `--scope-report` run learned. Optional and additive: a full run
+    /// reads it for the record and re-runs stage 0 as it always does
+    /// (REQ-0227).
+    public let scopeReport: ImageSidecarScopeReport?
 
     public init(
         schema: String,
@@ -41,7 +45,8 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
         command: [String]? = nil,
         limitBytes: Int64? = nil,
         minReadRateBytesPerSecond: Int64? = nil,
-        allocation: ImageSidecarAllocation? = nil
+        allocation: ImageSidecarAllocation? = nil,
+        scopeReport: ImageSidecarScopeReport? = nil
     ) {
         self.schema = schema
         self.device = device
@@ -50,6 +55,7 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
         self.limitBytes = limitBytes
         self.minReadRateBytesPerSecond = minReadRateBytesPerSecond
         self.allocation = allocation
+        self.scopeReport = scopeReport
     }
 
     enum CodingKeys: String, CodingKey {
@@ -60,6 +66,92 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
         case limitBytes = "limit_bytes"
         case minReadRateBytesPerSecond = "min_read_rate_bytes_per_second"
         case allocation
+        case scopeReport = "scope_report"
+    }
+}
+
+/// The stage-0 scope report the sidecar keeps. Same twelve keys as the JSON
+/// `scope_report` object, with `null` (never an omitted key) for an ETA that
+/// could not be computed.
+public struct ImageSidecarScopeReport: Codable, Equatable, Sendable {
+    public let geometrySource: String
+    public let clusterBytes: Int64
+    public let totalClusters: Int64
+    public let usedClusters: Int64
+    public let freeClusters: Int64
+    public let usedBytes: Int64
+    public let freeBytes: Int64
+    public let usedExtents: Int
+    public let mftBytes: Int64
+    public let etaLowSeconds: Double?
+    public let etaHighSeconds: Double?
+    public let etaBasis: String
+
+    public init(
+        geometrySource: String,
+        clusterBytes: Int64,
+        totalClusters: Int64,
+        usedClusters: Int64,
+        freeClusters: Int64,
+        usedBytes: Int64,
+        freeBytes: Int64,
+        usedExtents: Int,
+        mftBytes: Int64,
+        etaLowSeconds: Double?,
+        etaHighSeconds: Double?,
+        etaBasis: String
+    ) {
+        self.geometrySource = geometrySource
+        self.clusterBytes = clusterBytes
+        self.totalClusters = totalClusters
+        self.usedClusters = usedClusters
+        self.freeClusters = freeClusters
+        self.usedBytes = usedBytes
+        self.freeBytes = freeBytes
+        self.usedExtents = usedExtents
+        self.mftBytes = mftBytes
+        self.etaLowSeconds = etaLowSeconds
+        self.etaHighSeconds = etaHighSeconds
+        self.etaBasis = etaBasis
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case geometrySource = "geometry_source"
+        case clusterBytes = "cluster_bytes"
+        case totalClusters = "total_clusters"
+        case usedClusters = "used_clusters"
+        case freeClusters = "free_clusters"
+        case usedBytes = "used_bytes"
+        case freeBytes = "free_bytes"
+        case usedExtents = "used_extents"
+        case mftBytes = "mft_bytes"
+        case etaLowSeconds = "eta_low_seconds"
+        case etaHighSeconds = "eta_high_seconds"
+        case etaBasis = "eta_basis"
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(geometrySource, forKey: .geometrySource)
+        try container.encode(clusterBytes, forKey: .clusterBytes)
+        try container.encode(totalClusters, forKey: .totalClusters)
+        try container.encode(usedClusters, forKey: .usedClusters)
+        try container.encode(freeClusters, forKey: .freeClusters)
+        try container.encode(usedBytes, forKey: .usedBytes)
+        try container.encode(freeBytes, forKey: .freeBytes)
+        try container.encode(usedExtents, forKey: .usedExtents)
+        try container.encode(mftBytes, forKey: .mftBytes)
+        try container.encode(etaBasis, forKey: .etaBasis)
+        if let etaLowSeconds {
+            try container.encode(etaLowSeconds, forKey: .etaLowSeconds)
+        } else {
+            try container.encodeNil(forKey: .etaLowSeconds)
+        }
+        if let etaHighSeconds {
+            try container.encode(etaHighSeconds, forKey: .etaHighSeconds)
+        } else {
+            try container.encodeNil(forKey: .etaHighSeconds)
+        }
     }
 }
 

@@ -85,6 +85,9 @@ func image(
         case "--used-only":
             options.usedOnly = true
             index += 1
+        case "--scope-report":
+            options.scopeReport = true
+            index += 1
         case "--no-dry-run":
             options.sawNoDryRun = true
             index += 1
@@ -118,6 +121,13 @@ func image(
 
     if options.sawDryRun && options.sawNoDryRun {
         return usageError("--dry-run and --no-dry-run cannot both be given")
+    }
+    // A scope report stops after stage 0; --used-only describes a stage-2
+    // decision it never reaches, so the combination is a usage error
+    // (REQ-0225).
+    if options.scopeReport && options.usedOnly {
+        return usageError("--scope-report cannot be combined with --used-only "
+            + "(a scope report never runs a used-cluster stage)")
     }
     // Dry-run is the default in the first release (REQ-0048).
     let dryRun = !options.sawNoDryRun
@@ -219,6 +229,12 @@ func image(
             minReadRateBytesPerSecond: resolvedMinReadRate,
             usedOnly: options.usedOnly
         )
+        // A scope report stops after stage 0, so only that command is part of
+        // its plan; printing stage 1/2 commands would plan reads it never makes
+        // (REQ-0221).
+        if options.scopeReport {
+            stages = stages.filter { $0.stage == 0 }
+        }
         let bus = assumedBusSpeed(bus: source.bus)
         eta = etaRange(
             deviceBytes: imageBytes ?? size,
@@ -286,6 +302,7 @@ func image(
             limitGiB: options.limitGiB,
             minReadRateBytesPerSecond: resolvedMinReadRate,
             usedOnly: options.usedOnly,
+            scopeReport: options.scopeReport,
             previousAllocation: facts.sidecar?.allocation
         )
         return runImaging(
@@ -313,6 +330,7 @@ func image(
             passes: passes,
             stages: stages,
             usedOnly: options.usedOnly,
+            scopeReport: options.scopeReport,
             partialLimitBytes: partialLimitBytes,
             minReadRateBytesPerSecond: resolvedMinReadRate,
             reasons: reasons
@@ -339,6 +357,7 @@ func image(
         passes: passes,
         stages: stages,
         usedOnly: options.usedOnly,
+        scopeReport: options.scopeReport,
         partialLimitBytes: partialLimitBytes,
         minReadRateBytesPerSecond: resolvedMinReadRate,
         reasons: reasons
@@ -367,6 +386,7 @@ private struct ImageOptions {
     var sawDryRun = false
     var sawNoDryRun = false
     var usedOnly = false
+    var scopeReport = false
 }
 
 // MARK: - Confirmation
@@ -433,12 +453,14 @@ private func renderTTY(
     passes: [DdrescuePass],
     stages: [PlannedStage],
     usedOnly: Bool,
+    scopeReport: Bool,
     partialLimitBytes: Int64?,
     minReadRateBytesPerSecond: Int64?,
     reasons: [String]
 ) -> String {
     var lines: [String] = []
-    lines.append("$ disktriage image \(source.bsd) --to \(destination) --dry-run")
+    lines.append("$ disktriage image \(source.bsd) --to \(destination) --dry-run"
+        + (scopeReport ? " --scope-report" : ""))
     lines.append("")
 
     lines.append(field("DEVICE", source.bsd))
@@ -511,7 +533,14 @@ private func renderTTY(
             + "(the terminal app if you launched this from one)."
     ))
 
-    if let eta {
+    if scopeReport {
+        lines.append("")
+        lines.append(field(
+            "ETA",
+            "--scope-report prints the stage-1 ETA from the used bytes after stage 0, "
+                + "at the assumed bus speed"
+        ))
+    } else if let eta {
         lines.append("")
         var text = "\(durationRange(low: eta.lowSeconds, high: eta.highSeconds)) pass 1 only, "
             + "\(eta.basis); pass 2 adds time for unreadable regions."
@@ -543,7 +572,11 @@ private func renderTTY(
             }
         }
         lines.append("")
-        if usedOnly {
+        if scopeReport {
+            lines.append("STAGE 1 / STAGE 2  not run: --scope-report stops after stage 0")
+            lines.append("SCOPE    stage 0 only (--scope-report): the allocation, no used or "
+                + "free cluster read")
+        } else if usedOnly {
             lines.append("SCOPE    used clusters + metadata (free space NOT imaged: --used-only)")
         } else {
             lines.append("SCOPE    whole device (the allocation-aware order; "
@@ -551,7 +584,12 @@ private func renderTTY(
         }
         lines.append("")
     }
-    if passes.isEmpty {
+    if scopeReport {
+        // A scope report never falls back to a read: it prints the allocation
+        // or nothing.
+        lines.append("FALLBACK: not used by --scope-report; a failed stage 0 prints the "
+            + "reason and exits 1")
+    } else if passes.isEmpty {
         lines.append("PASS 1 / PASS 2  not built: the block size or size is unknown")
     } else {
         lines.append("FALLBACK: plain whole-device passes (non-NTFS, or stage 0 cannot read the bitmap)")
@@ -621,12 +659,14 @@ private func renderJSON(
     passes: [DdrescuePass],
     stages: [PlannedStage],
     usedOnly: Bool,
+    scopeReport: Bool,
     partialLimitBytes: Int64?,
     minReadRateBytesPerSecond: Int64?,
     reasons: [String]
 ) -> String {
     struct Document: Encodable {
         let dryRun: Bool
+        let scopeReport: Bool
         let status: String
         let source: Source
         let triage: Triage
@@ -643,6 +683,7 @@ private func renderJSON(
 
         enum CodingKeys: String, CodingKey {
             case dryRun = "dry_run"
+            case scopeReport = "scope_report"
             case status, source, triage, caveat, destination, confirmation, eta, limit, passes, stages, scope, reasons
             case minReadRateBytesPerSecond = "min_read_rate_bytes_per_second"
         }
@@ -745,6 +786,7 @@ private func renderJSON(
 
     let document = Document(
         dryRun: true,
+        scopeReport: scopeReport,
         status: status,
         source: Document.Source(
             bsd: source.bsd,
@@ -796,9 +838,11 @@ private func renderJSON(
                 note: $0.note
             )
         },
-        scope: usedOnly
-            ? "used clusters + metadata (free space NOT imaged: --used-only)"
-            : "whole device",
+        scope: scopeReport
+            ? "stage 0 only (--scope-report): the allocation, no used or free cluster read"
+            : usedOnly
+                ? "used clusters + metadata (free space NOT imaged: --used-only)"
+                : "whole device",
         reasons: reasons
     )
 
@@ -829,6 +873,9 @@ private let imageUsage = "usage: disktriage image <disk> --to <file> [options]\n
     + "                          SSD/flash/NVMe; 0 disables)\n"
     + "  --used-only             NTFS: stop after the allocated clusters and\n"
     + "                          metadata; free space is NOT imaged\n"
+    + "  --scope-report          NTFS: run stage 0 only, print the allocation\n"
+    + "                          (used/free clusters and bytes) and stop; needs\n"
+    + "                          the same consent as --no-dry-run\n"
     + "  --override              skip the triage-attempt requirement explicitly\n"
     + "  --dry-run               print the command; do not execute (default)\n"
     + "  --no-dry-run            run the two passes; needs root and --accept-risk\n"

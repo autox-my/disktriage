@@ -1,0 +1,16 @@
+# REQ-0227 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0227
+statement: "A scope report shall record its report in the image sidecar so a later full imaging run can resume from it."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeReportTests::REQ0227_sidecarRecordsTheReportAndAFullRunResumes()"

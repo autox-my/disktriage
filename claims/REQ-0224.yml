@@ -1,0 +1,17 @@
+# REQ-0224 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0224
+statement: "A scope report whose stage 0 fails shall exit 1 with the typed reason and without an allocation."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L516
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "1"
+  unit: "none"
+tests:
+  - "DiskTriageCLITests.ScopeReportTests::REQ0221_REQ0224_bitmapFailurePrintsTheReasonAndNoNumbers()"
