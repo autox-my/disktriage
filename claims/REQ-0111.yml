@@ -1,0 +1,16 @@
+# REQ-0111 — diskdoctor.md §6 images only
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0111
+statement: "The inspect command shall refuse a device node as its input."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L368
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0111_refusesADeviceNode()"

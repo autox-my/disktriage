@@ -164,13 +164,14 @@ public struct LiveCheckProbes: CheckProbing {
     // MARK: - Resolution
 
     /// `DISKTRIAGE_NTFS_PREFIX` first (the bench-built tree is not assumed),
-    /// then PATH, then the usual Homebrew and system directories.
+    /// then PATH, then the usual Homebrew and system directories. The ntfs-3g
+    /// names use the shared locator `inspect` also uses, so the self-test and
+    /// inspection cannot drift apart.
     private func resolve(_ name: String, ntfs: Bool) -> String? {
-        var directories: [String] = []
-        if ntfs, let prefix = environment["DISKTRIAGE_NTFS_PREFIX"], !prefix.isEmpty {
-            directories.append(prefix)
-            directories.append(prefix + "/bin")
+        if ntfs {
+            return NTFSToolLocator.resolve(name, environment: environment)
         }
+        var directories: [String] = []
         if let path = environment["PATH"] {
             directories += path.split(separator: ":").map(String.init)
         }

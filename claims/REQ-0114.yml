@@ -1,0 +1,17 @@
+# REQ-0114 — diskdoctor.md §8 inspection
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0114
+statement: "The inspect command shall run the ntfs-3g tools read-only without mounting the image."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L511
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0114_allowsOnlyReadOnlyShapes()"
+  - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0114_rejectsEverythingElse()"

@@ -1,0 +1,2 @@
+ntfs_mst_post_read_fixup_warn: magic: 0x00000000  size: 4096   usa_ofs: 0  usa_count: 0: Invalid argument
+Corrupt index block signature: vcn 0 inode 66

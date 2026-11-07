@@ -19,6 +19,9 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
     case logShowCompact(last: String)
     /// `disktriage check`: a resolved tool's `--version`.
     case toolVersion(path: String)
+    /// `disktriage inspect`: one read-only ntfs-3g tool invocation. The path is
+    /// resolved (absolute) by the caller so a sanitised PATH cannot choose it.
+    case ntfsTool(path: String, arguments: [String])
 
     public enum SmartQuery: String, Sendable, Equatable, Hashable {
         case info = "-i"
@@ -55,6 +58,8 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
             return ["/usr/bin/log", "show", "--last", last, "--style", "compact"]
         case .toolVersion(let path):
             return [path, "--version"]
+        case .ntfsTool(let path, let arguments):
+            return [path] + arguments
         }
     }
 }
@@ -82,6 +87,8 @@ public struct CommandPolicy: Sendable {
     /// The self-test's narrower additions: `--version`, `listFilesystems` and
     /// a tiny compact `log show`. These shapes are never available to triage.
     public static let check = CommandPolicy(kind: .check)
+    /// `inspect`: only the read-only ntfs-3g shapes, on an image file.
+    public static let inspect = CommandPolicy(kind: .inspect)
 
     /// Test-only escape used to drive the real-process timeout, output and
     /// environment tests. It is internal, so no product caller can reach it.
@@ -90,6 +97,7 @@ public struct CommandPolicy: Sendable {
     private enum Kind: Sendable {
         case triage
         case check
+        case inspect
     }
 
     private let allowsEverything: Bool
@@ -117,6 +125,9 @@ public struct CommandPolicy: Sendable {
         guard let executable = argv.first, !argv.isEmpty else {
             return .rejected(.notAllowListed)
         }
+        if kind == .inspect {
+            return evaluateNtfsTool(argv)
+        }
         switch executable {
         case "/usr/sbin/diskutil":
             return evaluateDiskutil(Array(argv.dropFirst()))
@@ -139,6 +150,28 @@ public struct CommandPolicy: Sendable {
             if kind == .check {
                 return evaluateCheckTool(argv)
             }
+            return .rejected(.notAllowListed)
+        }
+    }
+
+    /// Inspect-only: the exact read-only shapes the NTFS tools use. The image
+    /// must be an absolute path outside `/dev`; `-f/--force`, `ntfsfix` and any
+    /// other tool are rejected before exec.
+    private func evaluateNtfsTool(_ argv: [String]) -> PolicyDecision {
+        guard argv.count == 3, argv[0].hasPrefix("/") else {
+            return .rejected(.notAllowListed)
+        }
+        let tool = (argv[0] as NSString).lastPathComponent
+        let image = argv[2]
+        guard image.hasPrefix("/"), !image.hasPrefix("/dev/") else {
+            return .rejected(.notAllowListed)
+        }
+        switch tool {
+        case "ntfsinfo":
+            return argv[1] == "-m" ? .allowed : .rejected(.notAllowListed)
+        case "ntfsls":
+            return (argv[1] == "-l" || argv[1] == "-R") ? .allowed : .rejected(.notAllowListed)
+        default:
             return .rejected(.notAllowListed)
         }
     }

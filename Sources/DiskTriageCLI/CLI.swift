@@ -34,7 +34,8 @@ public func run(
     executor: any CommandExecuting = ProcessRunner(timeout: 30),
     now: @escaping () -> Date = Date.init,
     destinationProbe: (any ImageDestinationProbing)? = nil,
-    imaging: ImagingDependencies? = nil
+    imaging: ImagingDependencies? = nil,
+    inspectDependencies: InspectDependencies? = nil
 ) -> CLIResult {
     guard let command = arguments.first else {
         return rootHelp()
@@ -62,7 +63,9 @@ public func run(
     case "guard":
         let result = runGuard(arguments: rest)
         return CLIResult(stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode)
-    case "inspect", "copy":
+    case "inspect":
+        return runInspect(arguments: rest, dependencies: inspectDependencies)
+    case "copy":
         return planned(command, rest)
     default:
         return usageError("unknown command '\(command)'")
@@ -414,7 +417,7 @@ private func rootHelp() -> CLIResult {
             + "  triage <disk>   classify a device, or --from <signalset.json>\n"
             + "  list            list whole disks; no health judgement\n"
             + "  image    image a device to a file (dry-run default)\n"
-            + "  inspect  inspect an image read-only         (planned P2)\n"
+            + "  inspect  inspect an image read-only (NTFS, ntfs-3g tools)\n"
             + "  copy     copy an image with a manifest      (planned P3)\n"
             + "  check    permissions and tooling self-test\n"
             + "  guard    hold mounts; start it before connecting the disk\n"

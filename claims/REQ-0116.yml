@@ -1,0 +1,16 @@
+# REQ-0116 — diskdoctor.md §8 damage notes
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0116
+statement: "The inspect command shall report unreadable extents and bytes from the mapfile."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L533
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0116_mapfileReportsDamage()"

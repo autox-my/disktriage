@@ -1,0 +1,4 @@
+       0 Nov  6 23:02 2026 deep
+       0 Nov  6 23:02 2026 docs
+       0 Nov  6 23:02 2026 empty-dir
+       0 Nov  6 23:02 2026 media

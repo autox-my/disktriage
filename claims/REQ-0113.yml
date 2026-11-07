@@ -1,0 +1,17 @@
+# REQ-0113 — diskdoctor.md §8 inspection
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0113
+statement: "The inspect command shall not write the source image."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L519
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0113_bareInspectionIsReadOnly()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0118_REQ0113_restoreWritesOnlyTheWorkingCopy()"
