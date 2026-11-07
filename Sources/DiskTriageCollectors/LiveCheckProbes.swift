@@ -14,14 +14,19 @@ public struct LiveCheckProbes: CheckProbing {
     /// triage's. Injected with the executor in tests so no binary is executed.
     private let checkRunner: any CommandExecuting
     private let environment: [String: String]
+    /// The running executable's path, resolved for the keg-relative libexec
+    /// lookup. Injected in tests; `Bundle.main.executablePath` in production.
+    private let executablePath: String?
 
     public init(
         executor: any CommandExecuting = ProcessRunner(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        versionRunner: (any CommandExecuting)? = nil
+        versionRunner: (any CommandExecuting)? = nil,
+        executablePath: String? = Bundle.main.executablePath
     ) {
         self.executor = executor
         self.environment = environment
+        self.executablePath = executablePath
         // The self-test's own read-only shapes; 30 s covers the tiny log probe.
         self.checkRunner = versionRunner
             ?? ProcessRunner(policy: .check, timeout: 30, outputLimit: 1_048_576)
@@ -68,7 +73,9 @@ public struct LiveCheckProbes: CheckProbing {
             guard let version = firstLine(result.stdout) ?? (ntfs ? firstLine(result.stderr) : nil) else {
                 return .unverifiable("\(path) --version printed nothing")
             }
-            return .pass(version)
+            // The ntfs row names the location as well as the version: the
+            // Homebrew keg's libexec is not on PATH, so "found" must say where.
+            return .pass(ntfs ? "\(version) (at \(path))" : version)
         case .timeout:
             return .unverifiable("\(path) --version did not answer within 30 s")
         case .notFound:
@@ -216,12 +223,17 @@ public struct LiveCheckProbes: CheckProbing {
     // MARK: - Resolution
 
     /// `DISKTRIAGE_NTFS_PREFIX` first (the bench-built tree is not assumed),
-    /// then PATH, then the usual Homebrew and system directories. The ntfs-3g
-    /// names use the shared locator `inspect` also uses, so the self-test and
-    /// inspection cannot drift apart.
+    /// then the installing keg's `libexec/ntfs-3g` beside the resolved
+    /// executable, then PATH and the usual Homebrew and system directories.
+    /// The ntfs-3g names use the shared locator `inspect` also uses, so the
+    /// self-test and inspection cannot drift apart.
     private func resolve(_ name: String, ntfs: Bool) -> String? {
         if ntfs {
-            return NTFSToolLocator.resolve(name, environment: environment)
+            return NTFSToolLocator.resolve(
+                name,
+                environment: environment,
+                executablePath: executablePath
+            )
         }
         var directories: [String] = []
         if let path = environment["PATH"] {
@@ -243,13 +255,13 @@ public struct LiveCheckProbes: CheckProbing {
     /// that does not name them turns "the prefix was not exported" into
     /// "the tool is missing".
     private func searchDescription(ntfs: Bool) -> String {
-        var parts: [String] = []
-        if ntfs, let prefix = environment[NTFSToolLocator.prefixVariable], !prefix.isEmpty {
-            parts.append("\(NTFSToolLocator.prefixVariable)=\(prefix) (bin/, sbin/)")
+        if ntfs {
+            return NTFSToolLocator.searchDescription(
+                environment: environment,
+                executablePath: executablePath
+            )
         }
-        parts.append("PATH")
-        parts.append("/opt/homebrew/bin, /usr/local/bin, /usr/bin, /bin, /sbin")
-        return parts.joined(separator: ", ")
+        return "PATH, /opt/homebrew/bin, /usr/local/bin, /usr/bin, /bin, /sbin"
     }
 
     private func firstLine(_ text: String) -> String? {

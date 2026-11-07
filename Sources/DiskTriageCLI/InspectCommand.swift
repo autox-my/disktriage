@@ -16,25 +16,34 @@ public struct InspectDependencies: Sendable {
     /// the tests never change the process's working directory, which is global
     /// state a parallel suite must not touch.
     public var currentDirectory: String
+    /// The running executable, resolved for the keg-relative libexec lookup.
+    public var executablePath: String?
 
     public init(
         fileSystem: any InspectFileSystem = LiveInspectFileSystem(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
         tools: (any NTFSToolRunning)? = nil,
         resolveTools: Bool = true,
-        currentDirectory: String = FileManager.default.currentDirectoryPath
+        currentDirectory: String = FileManager.default.currentDirectoryPath,
+        executablePath: String? = Bundle.main.executablePath
     ) {
         self.fileSystem = fileSystem
         self.environment = environment
         self.tools = tools
         self.resolveTools = resolveTools
         self.currentDirectory = currentDirectory
+        self.executablePath = executablePath
     }
 
     public static func live(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        executablePath: String? = Bundle.main.executablePath
     ) -> InspectDependencies {
-        InspectDependencies(fileSystem: LiveInspectFileSystem(), environment: environment)
+        InspectDependencies(
+            fileSystem: LiveInspectFileSystem(),
+            environment: environment,
+            executablePath: executablePath
+        )
     }
 }
 
@@ -346,6 +355,9 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
                 30,
                 "the ntfs-3g tools were not found: set DISKTRIAGE_NTFS_PREFIX to a built "
                     + "prefix (with bin/ntfsinfo and bin/ntfsls) or add them to PATH. "
+                    + "A Homebrew install keeps them in "
+                    + "\(installedNTFSLocation(executablePath: dependencies.executablePath))/bin; "
+                    + "check that directory or reinstall. "
                     + "inspect never falls back to mounting the image."
             )
         }
@@ -740,12 +752,27 @@ private func resolveTools(
         return (injected, nil)
     }
     guard dependencies.resolveTools,
-          let chain = NTFSToolLocator.locate(environment: dependencies.environment),
-          let live = NTFSToolRunner.live(environment: dependencies.environment)
+          let chain = NTFSToolLocator.locate(
+              environment: dependencies.environment,
+              executablePath: dependencies.executablePath
+          ),
+          let live = NTFSToolRunner.live(
+              environment: dependencies.environment,
+              executablePath: dependencies.executablePath
+          )
     else {
         return (nil, nil)
     }
     return (live, (chain.ntfsinfo, chain.ntfsls))
+}
+
+/// The location the Homebrew formula installs into, or a placeholder when the
+/// executable path is unknown. The missing-tools message names it explicitly:
+/// the old "not found" left a user with a keg-private tree no search path
+/// covered.
+func installedNTFSLocation(executablePath: String?) -> String {
+    NTFSToolLocator.installedPrefix(executablePath: executablePath)
+        ?? "<install prefix>/libexec/ntfs-3g"
 }
 
 /// A policy rejection is never a mystery: the message names the tool, the

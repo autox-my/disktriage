@@ -123,6 +123,17 @@ struct CLITests {
         }
     }
 
+    // REQ-0248: one version string, printed by both spellings, exit 0.
+    @Test("REQ0248 --version and version print the single-source version and exit 0")
+    func REQ0248_versionIsSingleSourced() {
+        for arguments in [["--version"], ["version"]] {
+            let result = run(arguments: arguments)
+            #expect(result.exitCode == 0, "\(arguments): a version is not a verdict")
+            #expect(result.stdout == "disktriage 0.1.0\n", "\(arguments): \(result.stdout)")
+            #expect(result.stderr.isEmpty, "\(arguments): nothing on stderr")
+        }
+    }
+
     @Test
     func `copy without an image or --to is a usage error`() {
         let noImage = run(arguments: ["copy"])

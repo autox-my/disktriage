@@ -1,0 +1,16 @@
+# REQ-0250 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0250
+statement: "The check command shall report the ntfs-3g tools as found when they are installed in the keg's libexec beside the running executable."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0250_selfTestFindsInstalledLibexec()"

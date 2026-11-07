@@ -1,0 +1,16 @@
+# REQ-0248 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0248
+statement: "The CLI shall print the single-source version as disktriage <version> and exit 0 for both --version and version."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CLITests::REQ0248_versionIsSingleSourced()"

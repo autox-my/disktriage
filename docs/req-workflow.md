@@ -207,10 +207,10 @@ only if that is impossible).
 ## Current state
 
 <!-- req-counts:begin -->
-- 242 claims total.
-- 196 pins held (`req gate --format json`, `pins_hold.checked`).
-- 241 claims have a non-empty `tests:` list.
-- 1 claims are process-evidenced (`evidence: process`).
+- 251 claims total.
+- 205 pins held (`req gate --format json`, `pins_hold.checked`).
+- 245 claims have a non-empty `tests:` list.
+- 6 claims are process-evidenced (`evidence: process`).
 - 0 claims are unlinked: no linked test and no process evidence.
 <!-- req-counts:end -->
 

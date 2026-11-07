@@ -1,0 +1,16 @@
+# REQ-0251 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0251
+statement: "The command policy shall accept an ntfs-3g tool path only when it is absolute and its basename is one of the four allow-listed tool names."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0251_libexecPathIsAllowListed()"

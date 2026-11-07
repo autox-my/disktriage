@@ -10,4 +10,6 @@ DerivedData/
 *.map
 # real SignalSet captures contain serials; only redacted fixtures are committed
 captures/
+# packaging output (tarball, generated formula, verification reports)
+dist/
 .env

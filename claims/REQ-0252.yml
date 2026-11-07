@@ -1,0 +1,17 @@
+# REQ-0252 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0252
+statement: "The Homebrew formula shall declare smartmontools and ddrescue as runtime dependencies."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions:
+    - "A formula declaration is packaging process evidence, not a unit-testable Swift behaviour. docs/packaging.md and docs/adr/0022-homebrew-packaging.md record the declaration; scripts/package.sh verify audits the generated formula."
+pins:
+  modality: "SHALL"
