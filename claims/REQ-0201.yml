@@ -1,0 +1,16 @@
+# REQ-0201 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0201
+statement: "Stage 0 shall read the partition table, the primary and backup boot sectors, the first sixteen $MFT records and the $Bitmap data through ddrescue domain mapfiles into the main mapfile."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageTests::REQ0201_stageZeroReadsMetadataBeforeUsedClusters()"

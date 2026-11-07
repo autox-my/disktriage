@@ -453,6 +453,40 @@ struct NTFSAllocationTests {
             partitionLength: 4096
         ) == .failure(.mftOutsidePartition(mftOffset: 16_384, partitionLength: 4096)))
     }
+
+    // REQ-0210
+    @Test("REQ0210 a $Bitmap that does not mark the $MFT's own clusters used is not trusted")
+    func REQ0210_bitmapMustMarkTheMFTRunsUsed() throws {
+        let geometry = try NTFSBootGeometry.parse(fixtureData("ntfs-disk-boot-primary.bin")).get()
+        let mft = try NTFSMFTRecord.dataAttribute(
+            in: fixtureData("ntfs-disk-mft-record-0.bin"),
+            bytesPerSector: 512,
+            volumeClusters: geometry.totalClusters
+        ).get()
+
+        // A zeroed $Bitmap parses as "nothing is used", including the MFT and
+        // the metadata the parser just read. That is a corrupt bitmap, not a
+        // licence to skip every cluster as free.
+        #expect(NTFSAllocation.allocationDomain(
+            geometry: geometry,
+            mftRuns: mft.runs,
+            usedClusters: [],
+            partitionOffset: 1_048_576,
+            partitionLength: 67_108_864
+        ) == .failure(.mftClustersNotMarkedUsed(cluster: 4)))
+
+        let used = try NTFSBitmap.usedClusters(
+            fixtureData("ntfs-disk-bitmap.bin"),
+            totalClusters: geometry.totalClusters
+        ).get()
+        #expect((try? NTFSAllocation.allocationDomain(
+            geometry: geometry,
+            mftRuns: mft.runs,
+            usedClusters: used,
+            partitionOffset: 1_048_576,
+            partitionLength: 67_108_864
+        ).get()) != nil, "the real bitmap marks the MFT clusters used")
+    }
 }
 
 // MARK: - Fixtures and hand-built bytes

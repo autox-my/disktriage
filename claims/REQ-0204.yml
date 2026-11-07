@@ -1,0 +1,16 @@
+# REQ-0204 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0204
+statement: "The --used-only flag shall stop imaging after the used clusters and metadata and report that free space was not imaged."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageTests::REQ0204_usedOnlySkipsStageTwo()"

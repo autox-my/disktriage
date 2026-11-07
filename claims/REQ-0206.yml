@@ -1,0 +1,16 @@
+# REQ-0206 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0206
+statement: "The imager shall clip every stage domain to the --limit extent before it is written to a domain mapfile."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageTests::REQ0206_domainsAreClippedToTheLimit()"

@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import DiskTriageCore
 import DiskTriageCollectors
 
 /// One ddrescue process, as the supervisor sees it. `poll` is non-blocking so
@@ -195,6 +196,8 @@ public struct PassResult: Equatable, Sendable {
 /// A concise stderr progress line's data.
 public struct ImagingProgress: Equatable, Sendable {
     public let pass: Int
+    /// 0 for a plain whole-device pass, 1 or 2 for the allocation-aware stages.
+    public let stage: Int
     public let rescuedBytes: Int64
     /// `*` plus `/`: read errors seen but not yet trimmed or scraped.
     public let failedBytes: Int64
@@ -206,6 +209,7 @@ public struct ImagingProgress: Equatable, Sendable {
 
     public init(
         pass: Int,
+        stage: Int = 0,
         rescuedBytes: Int64,
         failedBytes: Int64 = 0,
         failedExtents: Int = 0,
@@ -214,6 +218,7 @@ public struct ImagingProgress: Equatable, Sendable {
         percent: Double
     ) {
         self.pass = pass
+        self.stage = stage
         self.rescuedBytes = rescuedBytes
         self.failedBytes = failedBytes
         self.failedExtents = failedExtents
@@ -236,6 +241,11 @@ public struct DdrescueSupervisor {
         /// accounting is clipped to this range so ddrescue's unbounded `-s`
         /// tail never reaches the summary or the stop rule (REQ-0108).
         public let mapfileLimitBytes: Int64?
+        /// The current stage's domain. When present, the progress line's
+        /// percentage and byte counts are computed over this scope, not the
+        /// whole device (REQ-0212), while the final summary keeps the
+        /// whole-device numbers in JSON.
+        public let scope: [ByteRange]?
         public let pollInterval: TimeInterval
         public let signalGrace: TimeInterval
         public let readMapfile: (String) -> String?
@@ -250,6 +260,7 @@ public struct DdrescueSupervisor {
             devicePath: String,
             deviceSize: Int64,
             mapfileLimitBytes: Int64? = nil,
+            scope: [ByteRange]? = nil,
             pollInterval: TimeInterval,
             signalGrace: TimeInterval,
             readMapfile: @escaping (String) -> String?,
@@ -263,6 +274,7 @@ public struct DdrescueSupervisor {
             self.devicePath = devicePath
             self.deviceSize = deviceSize
             self.mapfileLimitBytes = mapfileLimitBytes
+            self.scope = scope
             self.pollInterval = pollInterval
             self.signalGrace = signalGrace
             self.readMapfile = readMapfile
@@ -325,14 +337,19 @@ public struct DdrescueSupervisor {
                         )
                     }
                 }
+                let scoped = configuration.scope.map {
+                    scopeAccounting(snapshot: current, scope: $0)
+                }
                 configuration.progress(ImagingProgress(
                     pass: pass.pass,
-                    rescuedBytes: current.rescuedBytes,
-                    failedBytes: current.failedBytes,
-                    failedExtents: current.failedExtents.count,
-                    badBytes: current.badBytes,
-                    remainingBytes: current.remainingBytes,
-                    percent: current.rescuedFraction * 100
+                    stage: pass.stage,
+                    rescuedBytes: scoped?.rescuedBytes ?? current.rescuedBytes,
+                    failedBytes: scoped?.failedBytes ?? current.failedBytes,
+                    failedExtents: scoped?.failedExtents ?? current.failedExtents.count,
+                    badBytes: scoped?.badBytes ?? current.badBytes,
+                    remainingBytes: scoped?.remainingBytes ?? current.remainingBytes,
+                    percent: scoped.map { $0.rescuedFraction * 100 }
+                        ?? current.rescuedFraction * 100
                 ))
             }
 
@@ -456,6 +473,14 @@ public struct ImagingDependencies {
     public var sleep: (TimeInterval) -> Void
     public var readMapfile: (String) -> String?
     public var interruptRequested: () -> Bool
+    /// The live path enables the allocation-aware NTFS stages. An explicitly
+    /// constructed dependency set keeps the plain two-pass behaviour unless it
+    /// opts in, so the older fake-ddrescue tests keep their scope and the new
+    /// NTFS tests state that they exercise the staging.
+    public var allocationAware: Bool
+    /// Reads bytes back out of the image after a stage-0 ddrescue run. The
+    /// library is pure; the caller does this I/O.
+    public var readImage: (String, Int64, Int) -> Data?
 
     public init(
         environment: any ImagingEnvironmentProbing,
@@ -466,7 +491,20 @@ public struct ImagingDependencies {
         readMapfile: @escaping (String) -> String? = {
             try? String(contentsOfFile: $0, encoding: .utf8)
         },
-        interruptRequested: @escaping () -> Bool = { InterruptMonitor.shared.isRequested }
+        interruptRequested: @escaping () -> Bool = { InterruptMonitor.shared.isRequested },
+        allocationAware: Bool = false,
+        readImage: @escaping (String, Int64, Int) -> Data? = { path, offset, length in
+            guard offset >= 0, length >= 0,
+                  let handle = FileHandle(forReadingAtPath: path)
+            else { return nil }
+            defer { try? handle.close() }
+            do {
+                try handle.seek(toOffset: UInt64(offset))
+                return try handle.read(upToCount: length) ?? Data()
+            } catch {
+                return nil
+            }
+        }
     ) {
         self.environment = environment
         self.launcher = launcher
@@ -475,13 +513,16 @@ public struct ImagingDependencies {
         self.sleep = sleep
         self.readMapfile = readMapfile
         self.interruptRequested = interruptRequested
+        self.allocationAware = allocationAware
+        self.readImage = readImage
     }
 
     public static func live(executor: any CommandExecuting) -> ImagingDependencies {
         InterruptMonitor.shared.install()
         return ImagingDependencies(
             environment: LiveImagingEnvironment(executor: executor),
-            launcher: PosixDdrescueLauncher()
+            launcher: PosixDdrescueLauncher(),
+            allocationAware: true
         )
     }
 }

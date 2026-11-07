@@ -1,0 +1,16 @@
+# REQ-0214 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0214
+statement: "A --used-only run with ddrescue shall copy every cluster the $Bitmap marks used and leave the free clusters zero."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageLiveTests::REQ0214_usedOnlyCopiesUsedClustersAndNoFreeSpace()"

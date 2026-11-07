@@ -28,7 +28,7 @@ public let usageExitCode: Int32 = 2
 public func run(
     arguments: [String],
     readFile: (String) throws -> Data = { try Data(contentsOf: URL(fileURLWithPath: $0)) },
-    writeFile: (String, Data) throws -> Void = { path, data in
+    writeFile: @escaping (String, Data) throws -> Void = { path, data in
         try data.write(to: URL(fileURLWithPath: path))
     },
     executor: any CommandExecuting = ProcessRunner(timeout: 30),

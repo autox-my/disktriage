@@ -1,0 +1,16 @@
+# REQ-0217 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0217
+statement: "The image summary shall not describe a --used-only image as a complete image of the device."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageTests::REQ0208_REQ0217_summaryScopeNeverClaimsAWholeDevice()"

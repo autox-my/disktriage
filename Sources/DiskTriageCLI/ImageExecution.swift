@@ -12,6 +12,8 @@ struct ImagingPlan {
     let mapfile: String
     let source: ImageSource
     let passes: [DdrescuePass]
+    /// The stage 0..2 commands the dry run printed, recorded in the sidecar.
+    let plannedStages: [PlannedStage]
     let destinationChecks: [DestinationCheck]
     let triageAttempted: Bool
     let confirmationInstruction: String?
@@ -30,6 +32,20 @@ struct ImagingPlan {
     /// The pass-1 `ddrescue -a` threshold, `nil` when disabled. Informational
     /// in the sidecar, never part of the resume identity (REQ-0183).
     let minReadRateBytesPerSecond: Int64?
+    /// Stop after stage 1; free space is not imaged (REQ-0204).
+    let usedOnly: Bool
+    /// The previous run's stage state, for a resume. `--used-only` itself is
+    /// not identity; the stage state is informational (REQ-0207).
+    let previousAllocation: ImageSidecarAllocation?
+}
+
+/// One stage line in the human and JSON summary.
+struct ImagingStageReport: Equatable, Sendable {
+    let stage: Int
+    let name: String
+    /// `done`, `failed`, `skipped`, `not run`, ...
+    let status: String
+    let detail: String?
 }
 
 /// The final summary: stdout and `--json` are two renderings of this value.
@@ -63,6 +79,20 @@ struct ImagingSummary {
     /// The pass-1 slow-zone threshold in bytes/s, `nil` when disabled
     /// (REQ-0182).
     let minReadRateBytesPerSecond: Int64?
+    /// What this run asked the imager to cover (REQ-0208). Defaults to the
+    /// whole device when no allocation stage was involved.
+    let scope: String
+    let stages: [ImagingStageReport]
+    let allocation: ImageSidecarAllocation?
+    /// The scope's accounting (REQ-0212); `nil` means the whole-device numbers
+    /// above are the scope.
+    let scopeTotalBytes: Int64?
+    let scopeRescuedBytes: Int64?
+    let scopeFailedBytes: Int64?
+    let scopeFailedExtents: Int?
+    let scopeBadBytes: Int64?
+    let scopeBadExtents: Int?
+    let scopeRemainingBytes: Int64?
 
     init(
         status: String,
@@ -86,7 +116,17 @@ struct ImagingSummary {
         stop: Pass2Stop?,
         partialLimitBytes: Int64?,
         deviceBytes: Int64?,
-        minReadRateBytesPerSecond: Int64? = nil
+        minReadRateBytesPerSecond: Int64? = nil,
+        scope: String = "whole device",
+        stages: [ImagingStageReport] = [],
+        allocation: ImageSidecarAllocation? = nil,
+        scopeTotalBytes: Int64? = nil,
+        scopeRescuedBytes: Int64? = nil,
+        scopeFailedBytes: Int64? = nil,
+        scopeFailedExtents: Int? = nil,
+        scopeBadBytes: Int64? = nil,
+        scopeBadExtents: Int? = nil,
+        scopeRemainingBytes: Int64? = nil
     ) {
         self.status = status
         self.exitCode = exitCode
@@ -110,15 +150,27 @@ struct ImagingSummary {
         self.partialLimitBytes = partialLimitBytes
         self.deviceBytes = deviceBytes
         self.minReadRateBytesPerSecond = minReadRateBytesPerSecond
+        self.scope = scope
+        self.stages = stages
+        self.allocation = allocation
+        self.scopeTotalBytes = scopeTotalBytes
+        self.scopeRescuedBytes = scopeRescuedBytes
+        self.scopeFailedBytes = scopeFailedBytes
+        self.scopeFailedExtents = scopeFailedExtents
+        self.scopeBadBytes = scopeBadBytes
+        self.scopeBadExtents = scopeBadExtents
+        self.scopeRemainingBytes = scopeRemainingBytes
     }
 
     var isComplete: Bool { exitCode == 0 }
     var isPartial: Bool { partialLimitBytes != nil }
 
     /// `complete` is only honest for a full image. A partial run that finished
-    /// says so, and never claims the whole device (REQ-0106).
+    /// says so, and never claims the whole device (REQ-0106); a used-only run
+    /// says the free space was not imaged (REQ-0208).
     var stoppedDisplay: String {
-        if status == "complete" || status.hasPrefix("partial image complete") {
+        if status == "complete" || status.hasPrefix("partial image complete")
+            || status.hasPrefix("used-only image complete") {
             return status
         }
         if stopped == .stoppedOnItsOwn, let code = stopExitCode {
@@ -149,7 +201,7 @@ func runImaging(
     _ plan: ImagingPlan,
     dependencies: ImagingDependencies?,
     executor: any CommandExecuting,
-    writeFile: (String, Data) throws -> Void,
+    writeFile: @escaping (String, Data) throws -> Void,
     now: @escaping () -> Date
 ) -> CLIResult {
     // Consent first: a forgotten --accept-risk must not probe a device to find
@@ -200,23 +252,41 @@ func runImaging(
         deviceBytes: plan.source.sizeBytes,
         limitBytes: plan.limitBytes
     )
+    let imageLimit = imageBytes ?? plan.source.sizeBytes ?? 0
     let sidecarPath = plan.image + ".disktriage.json"
-    let sidecar = ImageSidecar(
-        schema: "disktriage.image/1",
-        device: ImageSidecarDevice(
-            model: plan.source.model,
-            serialSHA256: plan.source.serial.map(imageSerialHash),
-            sizeBytes: plan.source.sizeBytes ?? 0
-        ),
-        createdAt: iso8601String(startedAt),
-        command: plan.passes.map(\.line),
-        limitBytes: partialLimitBytes,
-        minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond
+    let timeoutSeconds = 90
+
+    var allocation = ImageSidecarAllocation(
+        usedOnly: plan.usedOnly,
+        mode: "unknown",
+        stage0: "not-started",
+        stage1: "not-started",
+        stage2: "not-started"
     )
-    do {
+
+    func persistSidecar() throws {
+        let sidecar = ImageSidecar(
+            schema: "disktriage.image/1",
+            device: ImageSidecarDevice(
+                model: plan.source.model,
+                serialSHA256: plan.source.serial.map(imageSerialHash),
+                sizeBytes: plan.source.sizeBytes ?? 0
+            ),
+            createdAt: iso8601String(startedAt),
+            command: dependencies.allocationAware
+                ? plan.plannedStages.flatMap(\.lines)
+                : plan.passes.map(\.line),
+            limitBytes: partialLimitBytes,
+            minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond,
+            allocation: allocation
+        )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try writeFile(sidecarPath, try encoder.encode(sidecar))
+    }
+
+    do {
+        try persistSidecar()
     } catch {
         return CLIResult(
             stdout: "",
@@ -226,59 +296,489 @@ func runImaging(
         )
     }
 
+    func updateAllocation(
+        mode: String? = nil,
+        stage0: String? = nil,
+        reason: String? = nil,
+        geometrySource: String? = nil,
+        stage1: String? = nil,
+        stage2: String? = nil
+    ) {
+        allocation = ImageSidecarAllocation(
+            usedOnly: plan.usedOnly,
+            mode: mode ?? allocation.mode,
+            stage0: stage0 ?? allocation.stage0,
+            stage0Reason: reason ?? allocation.stage0Reason,
+            geometrySource: geometrySource ?? allocation.geometrySource,
+            stage1: stage1 ?? allocation.stage1,
+            stage2: stage2 ?? allocation.stage2
+        )
+        do {
+            try persistSidecar()
+        } catch {
+            progress.append(
+                "disktriage: warning: cannot update the sidecar: \(error.localizedDescription)"
+            )
+        }
+    }
+
     let progressLog = ProgressLog()
-    let supervisor = DdrescueSupervisor(
-        launcher: dependencies.launcher,
-        configuration: .init(
-            mapfilePath: plan.mapfile,
-            devicePath: plan.rawDevice,
-            // The stop rule's 0.01% threshold and remaining-time projection are
-            // about the image being written, so a partial run uses the limit
-            // as its "device" size (REQ-0107).
-            deviceSize: imageBytes ?? plan.source.sizeBytes ?? 0,
-            mapfileLimitBytes: partialLimitBytes,
-            pollInterval: dependencies.pollInterval,
-            signalGrace: dependencies.signalGrace,
-            readMapfile: dependencies.readMapfile,
-            deviceExists: { environment.deviceExists($0) },
-            now: now,
-            sleep: dependencies.sleep,
-            interruptRequested: dependencies.interruptRequested,
-            progress: { progressLog.record($0) }
-        )
-    )
 
-    guard plan.passes.count == 2 else {
-        return CLIResult(
-            stdout: "",
-            stderr: "disktriage: the two-pass command could not be built\n",
-            exitCode: 30
+    func makeSupervisor(
+        _ pass: DdrescuePass,
+        scope: [ByteRange]?
+    ) -> DdrescueSupervisor {
+        DdrescueSupervisor(
+            launcher: dependencies.launcher,
+            configuration: .init(
+                mapfilePath: plan.mapfile,
+                devicePath: plan.rawDevice,
+                // The stop rule's 0.01% threshold and remaining-time projection
+                // are about the image being written, so a partial run uses the
+                // limit as its "device" size (REQ-0107).
+                deviceSize: imageBytes ?? plan.source.sizeBytes ?? 0,
+                mapfileLimitBytes: partialLimitBytes,
+                scope: scope,
+                pollInterval: dependencies.pollInterval,
+                signalGrace: dependencies.signalGrace,
+                readMapfile: dependencies.readMapfile,
+                deviceExists: { environment.deviceExists($0) },
+                now: now,
+                sleep: dependencies.sleep,
+                interruptRequested: dependencies.interruptRequested,
+                progress: { progressLog.record($0) }
+            )
         )
     }
 
-    progress.append("disktriage: pass 1 (\(plan.passes[0].line)) started")
-    var result = supervisor.run(plan.passes[0], applyStopRule: false)
-    var passReached = 1
-    progress.append(contentsOf: progressLog.drain())
-    progress.append("disktriage: pass 1 \(passOutcome(result))")
+    /// A pass that never ran (everything was already done) is complete for the
+    /// requested scope; the snapshot is evidence, not a fabricated rescue.
+    func currentPassResult() -> PassResult {
+        let snapshot = dependencies.readMapfile(plan.mapfile).flatMap {
+            DdrescueMapfile.parse($0, limitBytes: partialLimitBytes)
+        }
+        return PassResult(pass: 2, reason: .complete, snapshot: snapshot)
+    }
 
-    if result.reason == .complete {
-        passReached = 2
-        progress.append("disktriage: pass 2 (\(plan.passes[1].line)) started")
-        result = supervisor.run(plan.passes[1], applyStopRule: true)
+    var stageReports: [ImagingStageReport] = []
+    var lastPass: DdrescuePass?
+    var passReached = 0
+
+    func runPlainPasses() -> PassResult {
+        guard plan.passes.count == 2 else {
+            return PassResult(
+                pass: 1,
+                reason: .launchFailed,
+                launchError: "the two-pass command could not be built"
+            )
+        }
+        progress.append("disktriage: pass 1 (\(plan.passes[0].line)) started")
+        lastPass = plan.passes[0]
+        passReached = 1
+        var result = makeSupervisor(plan.passes[0], scope: nil)
+            .run(plan.passes[0], applyStopRule: false)
         progress.append(contentsOf: progressLog.drain())
-        progress.append("disktriage: pass 2 \(passOutcome(result))")
+        progress.append("disktriage: pass 1 \(passOutcome(result))")
+        if result.reason == .complete {
+            passReached = 2
+            progress.append("disktriage: pass 2 (\(plan.passes[1].line)) started")
+            lastPass = plan.passes[1]
+            result = makeSupervisor(plan.passes[1], scope: nil)
+                .run(plan.passes[1], applyStopRule: true)
+            progress.append(contentsOf: progressLog.drain())
+            progress.append("disktriage: pass 2 \(passOutcome(result))")
+        }
+        return result
     }
 
+    /// Runs a stage from `startPass` (1 or 2). Returns the first non-complete
+    /// pass or the last complete one.
+    func runStage(
+        _ number: Int,
+        passes: [DdrescuePass],
+        scope: [ByteRange],
+        startPass: Int
+    ) -> PassResult {
+        var result = PassResult(pass: startPass, reason: .complete)
+        for pass in passes where pass.pass >= startPass {
+            lastPass = pass
+            passReached = pass.pass
+            progress.append(
+                "disktriage: stage \(number) pass \(pass.pass) (\(pass.line)) started"
+            )
+            result = makeSupervisor(pass, scope: scope)
+                .run(pass, applyStopRule: pass.pass == 2)
+            progress.append(contentsOf: progressLog.drain())
+            progress.append("disktriage: stage \(number) pass \(pass.pass) \(passOutcome(result))")
+            if result.reason != .complete { return result }
+        }
+        return result
+    }
+
+    var scope = "whole device"
+    var scopeRanges: [ByteRange]? = [ByteRange(position: 0, size: imageLimit)]
+    var result: PassResult
+
+    if dependencies.allocationAware {
+        let stage0 = runStage0(Stage0Context(
+            deviceSize: plan.source.sizeBytes ?? 0,
+            imageBytes: imageLimit,
+            rawDevice: plan.rawDevice,
+            image: plan.image,
+            mapfile: plan.mapfile,
+            blockSize: plan.source.blockSize ?? 512,
+            timeoutSeconds: timeoutSeconds,
+            limitBytes: partialLimitBytes,
+            writeFile: writeFile,
+            readImage: dependencies.readImage,
+            run: { pass, extentScope in
+                lastPass = pass
+                passReached = max(passReached, 1)
+                progress.append(
+                    "disktriage: stage 0 (\(pass.line)) started"
+                )
+                let value = makeSupervisor(pass, scope: extentScope)
+                    .run(pass, applyStopRule: false)
+                progress.append(contentsOf: progressLog.drain())
+                progress.append("disktriage: stage 0 \(passOutcome(value))")
+                return value
+            },
+            progress: { progress.append($0) }
+        ))
+
+        switch stage0 {
+        case .stopped(let stopped):
+            result = stopped
+            updateAllocation(stage0: "interrupted", reason: stopped.reason.rawValue)
+            stageReports = [ImagingStageReport(
+                stage: 0,
+                name: "metadata",
+                status: "stopped",
+                detail: stopped.reason.rawValue
+            )]
+        case .failed(let reason):
+            progress.append("disktriage: stage 0 failed: \(reason); falling back to whole-device passes")
+            updateAllocation(
+                mode: "whole-device",
+                stage0: "failed",
+                reason: reason,
+                stage1: "plain",
+                stage2: "plain"
+            )
+            stageReports = [
+                ImagingStageReport(stage: 0, name: "metadata", status: "failed", detail: reason),
+                ImagingStageReport(
+                    stage: 1,
+                    name: "used clusters + metadata",
+                    status: "not run",
+                    detail: "the allocation is unknown; free space was not skipped"
+                ),
+                ImagingStageReport(
+                    stage: 2,
+                    name: "rest of the device",
+                    status: "plain whole-device passes",
+                    detail: nil
+                ),
+            ]
+            scope = "whole device (allocation unknown: \(reason))"
+            scopeRanges = [ByteRange(position: 0, size: imageLimit)]
+            result = runPlainPasses()
+        case .known(let stage0):
+            updateAllocation(
+                mode: "allocation-aware",
+                stage0: "done",
+                geometrySource: stage0.geometrySource.rawValue
+            )
+            stageReports.append(ImagingStageReport(
+                stage: 0,
+                name: "metadata",
+                status: "done",
+                detail: "geometry source \(stage0.geometrySource.rawValue)"
+            ))
+
+            let usedScope = clipExtents(
+                stage0.readExtents + stage0.domain.used,
+                to: imageLimit
+            )
+            let previousAllocation = plan.previousAllocation
+            let resumeMode = previousAllocation?.mode == "allocation-aware"
+
+            // Stage 1: used clusters + metadata.
+            if resumeMode, previousAllocation?.stage1 == "done" {
+                progress.append("disktriage: stage 1 already complete; resuming after it")
+                updateAllocation(stage1: "done")
+                stageReports.append(ImagingStageReport(
+                    stage: 1,
+                    name: "used clusters + metadata",
+                    status: "done",
+                    detail: "already complete"
+                ))
+            } else {
+                let startPass = resumeMode && previousAllocation?.stage1 == "pass2" ? 2 : 1
+                updateAllocation(stage1: startPass == 2 ? "pass2" : "pass1")
+                let mapfile = plan.image + ".domain-stage1.mapfile"
+                let stageOneDomain = clipExtents(stage0.domain.used, to: imageLimit)
+                do {
+                    let text = DdrescueDomainMapfile.render(
+                        domain: stageOneDomain,
+                        deviceSize: plan.source.sizeBytes ?? imageLimit
+                    )
+                    try writeFile(mapfile, Data(text.utf8))
+                } catch {
+                    result = PassResult(
+                        pass: startPass,
+                        reason: .launchFailed,
+                        launchError: "cannot write \(mapfile): \(error.localizedDescription)"
+                    )
+                    stageReports.append(ImagingStageReport(
+                        stage: 1,
+                        name: "used clusters + metadata",
+                        status: "failed",
+                        detail: result.launchError
+                    ))
+                    return finishImaging(
+                        plan: plan,
+                        result: result,
+                        stageReports: stageReports,
+                        allocation: allocation,
+                        scope: scope,
+                        scopeRanges: scopeRanges,
+                        partialLimitBytes: partialLimitBytes,
+                        startedAt: startedAt,
+                        passReached: passReached,
+                        lastPass: lastPass,
+                        progress: progress,
+                        now: now
+                    )
+                }
+                let passes = ddrescueStagePasses(
+                    rawDevice: plan.rawDevice,
+                    image: plan.image,
+                    mapfile: plan.mapfile,
+                    domainMapfile: mapfile,
+                    blockSize: plan.source.blockSize ?? 512,
+                    stage: 1,
+                    timeoutSeconds: timeoutSeconds,
+                    limitBytes: partialLimitBytes,
+                    minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond
+                )
+                result = runStage(1, passes: passes, scope: usedScope, startPass: startPass)
+                if result.reason != .complete {
+                    updateAllocation(stage1: result.reason == .complete ? "done" : "pass\(passReached)")
+                    stageReports.append(ImagingStageReport(
+                        stage: 1,
+                        name: "used clusters + metadata",
+                        status: result.reason.rawValue,
+                        detail: result.launchError ?? result.reason.rawValue
+                    ))
+                    return finishImaging(
+                        plan: plan,
+                        result: result,
+                        stageReports: stageReports,
+                        allocation: allocation,
+                        scope: scope,
+                        scopeRanges: scopeRanges,
+                        partialLimitBytes: partialLimitBytes,
+                        startedAt: startedAt,
+                        passReached: passReached,
+                        lastPass: lastPass,
+                        progress: progress,
+                        now: now
+                    )
+                }
+                updateAllocation(stage1: "done")
+                stageReports.append(ImagingStageReport(
+                    stage: 1,
+                    name: "used clusters + metadata",
+                    status: "done",
+                    detail: "\(stage0.domain.usedClusters.count) used cluster runs"
+                ))
+            }
+            scope = "used clusters + metadata (free space NOT imaged: --used-only)"
+            scopeRanges = usedScope
+
+            // Stage 2: the rest of the device last, skipped with --used-only.
+            if plan.usedOnly {
+                updateAllocation(stage2: "skipped")
+                stageReports.append(ImagingStageReport(
+                    stage: 2,
+                    name: "rest of the device",
+                    status: "skipped by --used-only",
+                    detail: "free space is not imaged"
+                ))
+                result = currentPassResult()
+            } else if resumeMode, previousAllocation?.stage2 == "done" {
+                progress.append("disktriage: stage 2 already complete")
+                updateAllocation(stage2: "done")
+                stageReports.append(ImagingStageReport(
+                    stage: 2,
+                    name: "rest of the device",
+                    status: "done",
+                    detail: "already complete"
+                ))
+                result = currentPassResult()
+            } else {
+                let startPass = resumeMode && previousAllocation?.stage2 == "pass2" ? 2 : 1
+                updateAllocation(stage2: startPass == 2 ? "pass2" : "pass1")
+                let mapfile = plan.image + ".domain-stage2.mapfile"
+                let complement = complementExtents(
+                    clipExtents(stage0.domain.used, to: imageLimit),
+                    upTo: imageLimit
+                )
+                do {
+                    let text = DdrescueDomainMapfile.render(
+                        domain: complement,
+                        deviceSize: plan.source.sizeBytes ?? imageLimit
+                    )
+                    try writeFile(mapfile, Data(text.utf8))
+                } catch {
+                    result = PassResult(
+                        pass: startPass,
+                        reason: .launchFailed,
+                        launchError: "cannot write \(mapfile): \(error.localizedDescription)"
+                    )
+                    stageReports.append(ImagingStageReport(
+                        stage: 2,
+                        name: "rest of the device",
+                        status: "failed",
+                        detail: result.launchError
+                    ))
+                    return finishImaging(
+                        plan: plan,
+                        result: result,
+                        stageReports: stageReports,
+                        allocation: allocation,
+                        scope: scope,
+                        scopeRanges: scopeRanges,
+                        partialLimitBytes: partialLimitBytes,
+                        startedAt: startedAt,
+                        passReached: passReached,
+                        lastPass: lastPass,
+                        progress: progress,
+                        now: now
+                    )
+                }
+                let passes = ddrescueStagePasses(
+                    rawDevice: plan.rawDevice,
+                    image: plan.image,
+                    mapfile: plan.mapfile,
+                    domainMapfile: mapfile,
+                    blockSize: plan.source.blockSize ?? 512,
+                    stage: 2,
+                    timeoutSeconds: timeoutSeconds,
+                    limitBytes: partialLimitBytes,
+                    minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond
+                )
+                result = runStage(2, passes: passes, scope: complement, startPass: startPass)
+                if result.reason != .complete {
+                    updateAllocation(stage2: "pass\(passReached)")
+                    stageReports.append(ImagingStageReport(
+                        stage: 2,
+                        name: "rest of the device",
+                        status: result.reason.rawValue,
+                        detail: result.launchError ?? result.reason.rawValue
+                    ))
+                    return finishImaging(
+                        plan: plan,
+                        result: result,
+                        stageReports: stageReports,
+                        allocation: allocation,
+                        scope: scope,
+                        scopeRanges: scopeRanges,
+                        partialLimitBytes: partialLimitBytes,
+                        startedAt: startedAt,
+                        passReached: passReached,
+                        lastPass: lastPass,
+                        progress: progress,
+                        now: now
+                    )
+                }
+                updateAllocation(stage2: "done")
+                stageReports.append(ImagingStageReport(
+                    stage: 2,
+                    name: "rest of the device",
+                    status: "done",
+                    detail: nil
+                ))
+                scope = "whole device"
+                scopeRanges = [ByteRange(position: 0, size: imageLimit)]
+            }
+        }
+    } else {
+        // An explicitly constructed dependency set that did not opt in. The
+        // live path always enables the allocation-aware stages.
+        let reason = "the allocation-aware stage 0 is not enabled in this dependency set"
+        updateAllocation(
+            mode: "whole-device",
+            stage0: "not-started",
+            reason: reason,
+            stage1: "plain",
+            stage2: "plain"
+        )
+        stageReports = [
+            ImagingStageReport(stage: 0, name: "metadata", status: "not run", detail: reason),
+        ]
+        scope = "whole device (allocation unknown: \(reason))"
+        // Keep the legacy whole-device rendering for an injected dependency set
+        // that did not opt into staging (the older fake-ddrescue tests).
+        scopeRanges = nil
+        result = runPlainPasses()
+    }
+
+    return finishImaging(
+        plan: plan,
+        result: result,
+        stageReports: stageReports,
+        allocation: allocation,
+        scope: scope,
+        scopeRanges: scopeRanges,
+        partialLimitBytes: partialLimitBytes,
+        startedAt: startedAt,
+        passReached: passReached,
+        lastPass: lastPass,
+        progress: progress,
+        now: now
+    )
+}
+
+/// Builds the summary and renders it. Shared by the normal end and the early
+/// exits after a stopped stage.
+private func finishImaging(
+    plan: ImagingPlan,
+    result: PassResult,
+    stageReports: [ImagingStageReport],
+    allocation: ImageSidecarAllocation,
+    scope: String,
+    scopeRanges: [ByteRange]?,
+    partialLimitBytes: Int64?,
+    startedAt: Date,
+    passReached: Int,
+    lastPass: DdrescuePass?,
+    progress: [String],
+    now: () -> Date
+) -> CLIResult {
+    var progress = progress
+    let usedOnlyComplete = plan.usedOnly && allocation.mode == "allocation-aware"
     let status: String
     if result.reason == .launchFailed {
         status = "tool-error"
     } else if result.reason == .complete {
-        status = partialLimitBytes.map {
-            "partial image complete (first \(partialExtentLabel($0)))"
-        } ?? "complete"
+        if usedOnlyComplete {
+            status = partialLimitBytes.map {
+                "used-only partial image complete (first \(partialExtentLabel($0)); free space not imaged)"
+            } ?? "used-only image complete (free space not imaged)"
+        } else {
+            status = partialLimitBytes.map {
+                "partial image complete (first \(partialExtentLabel($0)))"
+            } ?? "complete"
+        }
     } else {
         status = "incomplete"
+    }
+
+    let snapshot = result.snapshot
+    let accounting = scopeRanges.flatMap { ranges in
+        snapshot.map { scopeAccounting(snapshot: $0, scope: ranges) }
     }
 
     let summary = ImagingSummary(
@@ -287,26 +787,36 @@ func runImaging(
             : result.reason == .complete ? 0 : 1,
         image: plan.image,
         mapfile: plan.mapfile,
-        sidecar: sidecarPath,
-        rescuedBytes: result.snapshot?.rescuedBytes,
-        failedBytes: result.snapshot?.failedBytes,
-        failedExtents: result.snapshot?.failedExtents.count,
-        badBytes: result.snapshot?.badBytes,
-        badExtents: result.snapshot?.badExtents.count,
-        remainingBytes: result.snapshot?.remainingBytes,
-        remainingExtents: result.snapshot?.remainingExtents.count,
+        sidecar: plan.image + ".disktriage.json",
+        rescuedBytes: snapshot?.rescuedBytes,
+        failedBytes: snapshot?.failedBytes,
+        failedExtents: snapshot?.failedExtents.count,
+        badBytes: snapshot?.badBytes,
+        badExtents: snapshot?.badExtents.count,
+        remainingBytes: snapshot?.remainingBytes,
+        remainingExtents: snapshot?.remainingExtents.count,
         elapsedSeconds: now().timeIntervalSince(startedAt),
-        passReached: passReached,
+        passReached: max(passReached, 1),
         stopped: result.reason,
         stopExitCode: result.reason == .stoppedOnItsOwn ? result.exitCode : nil,
         stopTimeout: result.reason == .stoppedOnItsOwn
-            ? ddrescueTimeoutArgument(plan.passes[passReached - 1].argv)
+            ? lastPass.flatMap { ddrescueTimeoutArgument($0.argv) }
             : nil,
         resumeCommand: result.reason == .complete ? nil : resumeCommand(plan),
         stop: result.stop,
         partialLimitBytes: partialLimitBytes,
         deviceBytes: plan.source.sizeBytes,
-        minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond
+        minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond,
+        scope: scope,
+        stages: stageReports,
+        allocation: allocation,
+        scopeTotalBytes: accounting?.totalBytes,
+        scopeRescuedBytes: accounting?.rescuedBytes,
+        scopeFailedBytes: accounting?.failedBytes,
+        scopeFailedExtents: accounting?.failedExtents,
+        scopeBadBytes: accounting?.badBytes,
+        scopeBadExtents: accounting?.badExtents,
+        scopeRemainingBytes: accounting?.remainingBytes
     )
 
     if let launchError = result.launchError {
@@ -330,10 +840,25 @@ final class ProgressLog {
     private var lastKey: String?
 
     func record(_ progress: ImagingProgress) {
-        let key = "\(progress.pass)-\(progress.rescuedBytes)-\(progress.failedBytes)-"
-            + "\(progress.badBytes)-\(progress.remainingBytes)"
+        let key = "\(progress.stage)-\(progress.pass)-\(progress.rescuedBytes)-"
+            + "\(progress.failedBytes)-\(progress.badBytes)-\(progress.remainingBytes)"
         guard key != lastKey else { return }
         lastKey = key
+        if progress.stage > 0 {
+            lines.append(String(
+                format: "disktriage: stage %d pass %d: %.1f%% of scope rescued (%@), "
+                    + "%@ bad, %@ failed (%d extents), %@ remaining in scope",
+                progress.stage,
+                progress.pass,
+                progress.percent,
+                bytes(progress.rescuedBytes),
+                bytes(progress.badBytes),
+                bytes(progress.failedBytes),
+                progress.failedExtents,
+                bytes(progress.remainingBytes)
+            ))
+            return
+        }
         lines.append(String(
             format: "disktriage: pass %d: %.1f%% rescued (%@), %@ bad, %@ failed (%d extents), %@ remaining",
             progress.pass,
@@ -374,15 +899,34 @@ func renderImagingTTY(_ summary: ImagingSummary) -> String {
     lines.append(pad("IMAGE", 10) + summary.image)
     lines.append(pad("MAPFILE", 10) + summary.mapfile)
     lines.append(pad("SIDECAR", 10) + summary.sidecar)
-    lines.append(pad("RESCUED", 10) + optionalBytes(summary.rescuedBytes))
-    lines.append(pad("FAILED", 10)
-        + "\(optionalBytes(summary.failedBytes)) in \(optionalCount(summary.failedExtents)) extents "
-        + "(read errors seen; not yet trimmed or scraped)")
-    lines.append(pad("BAD", 10)
-        + "\(optionalBytes(summary.badBytes)) in \(optionalCount(summary.badExtents)) extents (confirmed)")
-    let remaining = summary.remainingBytes.map { bytes($0) } ?? "unknown"
-    let extents = summary.remainingExtents.map(String.init) ?? "unknown"
-    lines.append(pad("REMAINING", 10) + "\(remaining) in \(extents) extents")
+    lines.append(pad("SCOPE", 10) + summary.scope)
+    for stage in summary.stages {
+        let title = "STAGE \(stage.stage)"
+        let detail = stage.detail.map { ": \($0)" } ?? ""
+        lines.append(pad(title, 10) + "\(stage.name): \(stage.status)\(detail)")
+    }
+    if summary.scopeTotalBytes != nil {
+        lines.append(pad("RESCUED", 10) + optionalBytes(summary.scopeRescuedBytes)
+            + " of " + optionalBytes(summary.scopeTotalBytes) + " in scope")
+        lines.append(pad("FAILED", 10)
+            + "\(optionalBytes(summary.scopeFailedBytes)) in "
+            + "\(optionalCount(summary.scopeFailedExtents)) extents "
+            + "(read errors seen; not yet trimmed or scraped)")
+        lines.append(pad("BAD", 10)
+            + "\(optionalBytes(summary.scopeBadBytes)) in "
+            + "\(optionalCount(summary.scopeBadExtents)) extents (confirmed)")
+        lines.append(pad("REMAINING", 10) + "\(optionalBytes(summary.scopeRemainingBytes)) in scope")
+    } else {
+        lines.append(pad("RESCUED", 10) + optionalBytes(summary.rescuedBytes))
+        lines.append(pad("FAILED", 10)
+            + "\(optionalBytes(summary.failedBytes)) in \(optionalCount(summary.failedExtents)) extents "
+            + "(read errors seen; not yet trimmed or scraped)")
+        lines.append(pad("BAD", 10)
+            + "\(optionalBytes(summary.badBytes)) in \(optionalCount(summary.badExtents)) extents (confirmed)")
+        let remaining = summary.remainingBytes.map { bytes($0) } ?? "unknown"
+        let extents = summary.remainingExtents.map(String.init) ?? "unknown"
+        lines.append(pad("REMAINING", 10) + "\(remaining) in \(extents) extents")
+    }
     lines.append(pad("ELAPSED", 10) + String(format: "%.1f s", summary.elapsedSeconds))
     lines.append(pad("PASS", 10) + "reached \(summary.passReached)")
     if let limit = summary.partialLimitBytes {
@@ -415,6 +959,7 @@ func renderImagingJSON(_ summary: ImagingSummary) -> String {
         "image": summary.image,
         "mapfile": summary.mapfile,
         "sidecar": summary.sidecar,
+        "scope": summary.scope,
         "elapsed_seconds": summary.elapsedSeconds,
         "pass_reached": summary.passReached,
         "stopped": summary.stoppedDisplay,
@@ -422,6 +967,35 @@ func renderImagingJSON(_ summary: ImagingSummary) -> String {
         "zero_filled": "unreadable regions are zero-filled in the image; "
             + "a volume-level damage report is the next step",
     ]
+    if !summary.stages.isEmpty {
+        object["stages"] = summary.stages.map { stage -> [String: Any] in
+            var value: [String: Any] = [
+                "stage": stage.stage,
+                "name": stage.name,
+                "status": stage.status,
+            ]
+            if let detail = stage.detail { value["detail"] = detail }
+            return value
+        }
+    }
+    if let allocation = summary.allocation {
+        object["allocation"] = [
+            "used_only": allocation.usedOnly,
+            "mode": allocation.mode,
+            "stage0": allocation.stage0,
+            "stage0_reason": allocation.stage0Reason.map { $0 as Any } ?? NSNull(),
+            "geometry_source": allocation.geometrySource.map { $0 as Any } ?? NSNull(),
+            "stage1": allocation.stage1,
+            "stage2": allocation.stage2,
+        ]
+    }
+    if let total = summary.scopeTotalBytes { object["scope_bytes"] = total }
+    if let rescued = summary.scopeRescuedBytes { object["scope_rescued_bytes"] = rescued }
+    if let failed = summary.scopeFailedBytes { object["scope_failed_bytes"] = failed }
+    if let extents = summary.scopeFailedExtents { object["scope_failed_extents"] = extents }
+    if let bad = summary.scopeBadBytes { object["scope_bad_bytes"] = bad }
+    if let extents = summary.scopeBadExtents { object["scope_bad_extents"] = extents }
+    if let remaining = summary.scopeRemainingBytes { object["scope_remaining_bytes"] = remaining }
     if let rescued = summary.rescuedBytes { object["rescued_bytes"] = rescued }
     if let failed = summary.failedBytes { object["failed_bytes"] = failed }
     if let extents = summary.failedExtents { object["failed_extents"] = extents }
@@ -472,6 +1046,7 @@ private func resumeCommand(_ plan: ImagingPlan) -> String {
     if let limit = plan.limitGiB {
         parts += ["--limit", String(limit)]
     }
+    if plan.usedOnly { parts.append("--used-only") }
     if plan.override { parts.append("--override") }
     if plan.noGuardCheck { parts.append("--no-guard-check") }
     return parts.joined(separator: " ")

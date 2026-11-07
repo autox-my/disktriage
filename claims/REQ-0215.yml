@@ -1,0 +1,16 @@
+# REQ-0215 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0215
+statement: "A --used-only run shall use the backup boot sector for geometry when the primary boot sector is zeroed and still copy every used cluster."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageLiveTests::REQ0215_backupBootSectorLive()"

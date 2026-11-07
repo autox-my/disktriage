@@ -29,6 +29,10 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
     /// resume is allowed, so it is never part of the identity check
     /// (diskdoctor.md §8, "Defer slow zones"; REQ-0183/REQ-0184).
     public let minReadRateBytesPerSecond: Int64?
+    /// The allocation-aware stage state. Optional so a sidecar written before
+    /// the NTFS staging existed still decodes; `--used-only` is deliberately
+    /// not part of the resume identity (REQ-0207).
+    public let allocation: ImageSidecarAllocation?
 
     public init(
         schema: String,
@@ -36,7 +40,8 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
         createdAt: String? = nil,
         command: [String]? = nil,
         limitBytes: Int64? = nil,
-        minReadRateBytesPerSecond: Int64? = nil
+        minReadRateBytesPerSecond: Int64? = nil,
+        allocation: ImageSidecarAllocation? = nil
     ) {
         self.schema = schema
         self.device = device
@@ -44,6 +49,7 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
         self.command = command
         self.limitBytes = limitBytes
         self.minReadRateBytesPerSecond = minReadRateBytesPerSecond
+        self.allocation = allocation
     }
 
     enum CodingKeys: String, CodingKey {
@@ -53,6 +59,53 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
         case createdAt = "created_at"
         case limitBytes = "limit_bytes"
         case minReadRateBytesPerSecond = "min_read_rate_bytes_per_second"
+        case allocation
+    }
+}
+
+/// The stage state the sidecar records so an interrupted run resumes at the
+/// right stage. Strings, not enums: an unknown value from a later version is
+/// read as "not started", never as a crash.
+public struct ImageSidecarAllocation: Codable, Equatable, Sendable {
+    public let usedOnly: Bool
+    /// `allocation-aware` or `whole-device` (the stage-0 fallback).
+    public let mode: String
+    /// `not-started | done | failed`.
+    public let stage0: String
+    public let stage0Reason: String?
+    /// `primary | backup`, `nil` when stage 0 did not select a boot sector.
+    public let geometrySource: String?
+    /// `not-started | pass1 | pass2 | done | skipped | plain`.
+    public let stage1: String
+    /// `not-started | pass1 | pass2 | done | skipped | plain`.
+    public let stage2: String
+
+    public init(
+        usedOnly: Bool,
+        mode: String,
+        stage0: String,
+        stage0Reason: String? = nil,
+        geometrySource: String? = nil,
+        stage1: String,
+        stage2: String
+    ) {
+        self.usedOnly = usedOnly
+        self.mode = mode
+        self.stage0 = stage0
+        self.stage0Reason = stage0Reason
+        self.geometrySource = geometrySource
+        self.stage1 = stage1
+        self.stage2 = stage2
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case usedOnly = "used_only"
+        case mode
+        case stage0
+        case stage0Reason = "stage0_reason"
+        case geometrySource = "geometry_source"
+        case stage1
+        case stage2
     }
 }
 
@@ -85,11 +138,11 @@ struct ImageSource: Equatable, Sendable {
     let bus: String?
     let media: String?
 
-    init(identity: DeviceIdentity) {
+    init(identity: DeviceIdentity, sizeBytesOverride: Int64? = nil) {
         bsd = identity.bsd
         model = identity.model
         serial = identity.serial?.trimmingCharacters(in: .whitespacesAndNewlines)
-        sizeBytes = identity.sizeBytes
+        sizeBytes = sizeBytesOverride ?? identity.sizeBytes
         blockSize = identity.blockSize
         bus = identity.bus
         media = identity.media
@@ -678,10 +731,14 @@ func etaRange(
 
 public struct DdrescuePass: Equatable, Sendable {
     public let pass: Int
+    /// 0 for the plain fallback (or a whole-device pass), 0 for stage 0's
+    /// metadata reads, 1 or 2 for the allocation-aware stages.
+    public let stage: Int
     public let argv: [String]
 
-    public init(pass: Int, argv: [String]) {
+    public init(pass: Int, argv: [String], stage: Int = 0) {
         self.pass = pass
+        self.stage = stage
         self.argv = argv
     }
 
@@ -735,6 +792,78 @@ func ddrescuePasses(
     return [
         DdrescuePass(pass: 1, argv: argv("-n", minReadRate: minReadRateBytesPerSecond)),
         DdrescuePass(pass: 2, argv: argv("-r3", minReadRate: nil)),
+    ]
+}
+
+/// The stage-0 metadata read. No `-n`/`-r3`: these are small, targeted reads,
+/// and `-m` is the only thing that decides what is copied. `-a` is not used
+/// either: a metadata read is not a fast sweep (REQ-0205).
+func ddrescueStage0Command(
+    rawDevice: String,
+    image: String,
+    mapfile: String,
+    domainMapfile: String,
+    blockSize: Int64,
+    timeoutSeconds: Int = 90,
+    limitBytes: Int64? = nil
+) -> [String] {
+    var arguments = [
+        "caffeinate", "-dimsu",
+        "ddrescue",
+        "-b", String(blockSize),
+        "-O",
+        "-K", "65536",
+        "-T", String(timeoutSeconds),
+        "-m", domainMapfile,
+    ]
+    if let limitBytes {
+        arguments += ["-s", String(limitBytes)]
+    }
+    arguments += [rawDevice, image, mapfile]
+    return arguments
+}
+
+/// One allocation-aware stage's two passes. Pass 1 carries `-n` and, when it is
+/// not disabled, `-a`; pass 2 carries `-r3` and never `-a`, because coming back
+/// to the deferred zones is its purpose (REQ-0205). `-m` restricts both to the
+/// stage's domain mapfile.
+func ddrescueStagePasses(
+    rawDevice: String,
+    image: String,
+    mapfile: String,
+    domainMapfile: String,
+    blockSize: Int64,
+    stage: Int,
+    timeoutSeconds: Int = 90,
+    limitBytes: Int64? = nil,
+    minReadRateBytesPerSecond: Int64? = nil
+) -> [DdrescuePass] {
+    func argv(_ mode: String, minReadRate: Int64?) -> [String] {
+        var arguments = [
+            "caffeinate", "-dimsu",
+            "ddrescue", mode,
+            "-b", String(blockSize),
+            "-O",
+            "-K", "65536",
+            "-T", String(timeoutSeconds),
+        ]
+        if let minReadRate {
+            arguments += ["-a", String(minReadRate)]
+        }
+        arguments += ["-m", domainMapfile]
+        if let limitBytes {
+            arguments += ["-s", String(limitBytes)]
+        }
+        arguments += [rawDevice, image, mapfile]
+        return arguments
+    }
+    return [
+        DdrescuePass(
+            pass: 1,
+            argv: argv("-n", minReadRate: minReadRateBytesPerSecond),
+            stage: stage
+        ),
+        DdrescuePass(pass: 2, argv: argv("-r3", minReadRate: nil), stage: stage),
     ]
 }
 
