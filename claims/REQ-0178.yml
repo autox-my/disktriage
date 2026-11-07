@@ -1,0 +1,16 @@
+# REQ-0178 — diskdoctor.md §8 imaging `--min-read-rate`
+# Authored from the plan's "Defer slow zones" bullet.
+schema: req.claim/2
+claim_id: REQ-0178
+statement: "The image command shall accept --min-read-rate only as a non-negative integer MB/s rate no greater than 10000 and refuse any other value as a usage error."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "10000"
+tests:
+  - "DiskTriageCLITests.MinReadRateTests::REQ0178_flagParsing()"

@@ -1,0 +1,18 @@
+# REQ-0182 — diskdoctor.md §8 imaging `--min-read-rate`
+# The plan says the value is printed in the command; it also reaches every plan
+# and summary surface.
+schema: req.claim/2
+claim_id: REQ-0182
+statement: "The image command shall print the resolved minimum read rate in the dry-run command, the human plan, the JSON plan and the final summary."
+applicability: []
+relations:
+  - type: "refines"
+    to: "REQ-0179"
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+tests:
+  - "DiskTriageCLITests.MinReadRateTests::REQ0182_finalSummaryReportsTheValue()"
+  - "DiskTriageCLITests.MinReadRateTests::REQ0182_jsonPlanKey()"

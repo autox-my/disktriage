@@ -1,0 +1,16 @@
+# REQ-0181 — diskdoctor.md §8 imaging `--min-read-rate`
+# "0 disables" means the flag is omitted, never `-a 0`.
+schema: req.claim/2
+claim_id: REQ-0181
+statement: "The image command shall omit the ddrescue -a flag when the minimum read rate is 0."
+applicability: []
+relations:
+  - type: "refines"
+    to: "REQ-0180"
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+tests:
+  - "DiskTriageCLITests.MinReadRateTests::REQ0180_REQ0181_dryRunDefaultsAndZero()"
