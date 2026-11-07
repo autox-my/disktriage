@@ -6,7 +6,7 @@ statement: "The copy command shall stream each file's bytes from the tool in bou
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#cli-decisions-p3c-streaming-copy
+  source: docs/adr/0007-stream-copy-bytes.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

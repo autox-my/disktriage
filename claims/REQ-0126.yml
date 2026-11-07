@@ -6,7 +6,7 @@ statement: "The copy command shall not overwrite an existing destination file."
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#cli-decisions-p3c-copy
+  source: docs/adr/0005-copy-ntfs-file-tree.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

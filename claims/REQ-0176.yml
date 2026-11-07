@@ -6,7 +6,7 @@ statement: "The check command shall report a row skipped because diskarbitration
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#check-does-not-wait-on-a-stopped-diskarbitrationd-p3-follow-up
+  source: docs/adr/0012-check-skips-stopped-diskarbitration.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

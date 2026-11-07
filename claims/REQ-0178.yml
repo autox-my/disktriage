@@ -6,7 +6,7 @@ statement: "The image command shall accept --min-read-rate only as a non-negativ
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#deferring-slow-zones---min-read-rate-p3b-follow-up
+  source: docs/adr/0013-defer-slow-zones-min-read-rate.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

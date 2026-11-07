@@ -6,7 +6,7 @@ statement: "The scope report shall report unknown clusters, bytes and extents se
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#an-unfinished-bitmap-byte-is-unknown-allocation-never-free-v39
+  source: docs/adr/0019-unfinished-bitmap-byte-is-unknown.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

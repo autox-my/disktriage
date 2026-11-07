@@ -6,7 +6,7 @@ statement: "The MFT record parser shall apply the update sequence array fixups b
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#allocation-aware-ntfs-stage-0-is-a-pure-library-v38
+  source: docs/adr/0014-allocation-aware-ntfs-stage-0.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

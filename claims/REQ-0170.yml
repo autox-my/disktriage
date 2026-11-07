@@ -6,7 +6,7 @@ statement: "The destination rule shall report an unresolved backing whole disk a
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#the-stopped-da-rule-reaches-the-rest-of-the-image-path-p3b-follow-up
+  source: docs/adr/0009-stopped-da-rule-across-the-image-path.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

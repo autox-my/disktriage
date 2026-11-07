@@ -6,7 +6,7 @@ statement: "The gate shall compare the disktriage-* directories in the temporary
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md
+  source: docs/adr/0017-test-temp-directories.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

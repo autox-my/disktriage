@@ -6,7 +6,7 @@ statement: "The device collector shall leave the serial absent when the ioreg tr
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#identity-while-diskarbitration-is-stopped-p3b-follow-up
+  source: docs/adr/0008-identity-while-diskarbitration-is-stopped.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []
