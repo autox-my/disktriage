@@ -1,0 +1,18 @@
+# REQ-0159 — diskdoctor.md §4, §6 history only for live collection
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0159
+statement: "The triage command shall use the snapshot store only for live device collection, reading the prior snapshot before classification and writing the new snapshot after, unless --no-history is given."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L355
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.HistoryCLITests::REQ0150_REQ0151_REQ0159_storeWrittenPriorDrivesTheTrendRule()"
+  - "DiskTriageCLITests.HistoryCLITests::REQ0159_noHistoryDisablesTheStore()"
+  - "DiskTriageCLITests.HistoryCLITests::REQ0159_recordedSignalSetNeverTouchesTheStore()"

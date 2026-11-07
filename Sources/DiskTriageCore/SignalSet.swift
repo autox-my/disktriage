@@ -143,6 +143,12 @@ public struct SmartHistory: Codable, Equatable, Sendable {
     public let pending: Int?
     public let reallocated: Int?
 
+    public init(recordedAt: Date? = nil, pending: Int? = nil, reallocated: Int? = nil) {
+        self.recordedAt = recordedAt
+        self.pending = pending
+        self.reallocated = reallocated
+    }
+
     enum CodingKeys: String, CodingKey {
         case recordedAt = "recorded_at"
         case pending, reallocated
@@ -318,6 +324,16 @@ public extension JSONDecoder {
     }
 }
 
+public extension JSONEncoder {
+    /// The canonical encoder for a `SignalSet` or a snapshot record: ISO-8601
+    /// timestamps, so a snapshot's date means the same on write and read.
+    static func disktriage() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+}
+
 public extension SignalSet {
     /// A copy safe to commit as a fixture: the device serial is replaced by
     /// the caller's hash and every measurement is preserved (REQ-0060).
@@ -345,6 +361,41 @@ public extension SignalSet {
             collectedAt: collectedAt,
             device: redactedDevice,
             smart: smart,
+            io: io,
+            log: log,
+            drivers: drivers,
+            permissions: permissions,
+            fs: fs,
+            symptoms: symptoms,
+            collectorNotes: collectorNotes,
+            synthetic: synthetic
+        )
+    }
+
+    /// Returns the same set with `smart.history` attached from a local snapshot.
+    ///
+    /// A history is only meaningful beside a measured SMART section; when SMART
+    /// is not `ok` this returns the set unchanged, so a bridge that hides SMART
+    /// can never show a trend from an older reading (diskdoctor.md §4, §5).
+    func attachingSmartHistory(_ history: SmartHistory?) -> SignalSet {
+        guard let smart, smart.status == .ok, let history else { return self }
+        let updated = SmartSignals(
+            status: smart.status,
+            overall: smart.overall,
+            pending: smart.pending,
+            reallocated: smart.reallocated,
+            uncorrectable: smart.uncorrectable,
+            powerOnHours: smart.powerOnHours,
+            rawReadErrors: smart.rawReadErrors,
+            errorLog: smart.errorLog,
+            selfTest: smart.selfTest,
+            history: history
+        )
+        return SignalSet(
+            schemaVersion: schemaVersion,
+            collectedAt: collectedAt,
+            device: device,
+            smart: updated,
             io: io,
             log: log,
             drivers: drivers,

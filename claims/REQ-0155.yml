@@ -1,0 +1,19 @@
+# REQ-0155 — diskdoctor.md §4 a device without a serial has no key
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0155
+statement: "The triage command shall not read or write the snapshot store when the device serial is unavailable."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L168
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.HistoryCLITests::REQ0155_historyDirNeedsAValue()"
+  - "DiskTriageCLITests.HistoryCLITests::REQ0155_noSerialMeansNoKey()"
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0155_directoryPrecedence()"
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0155_permissionsAndDefaultPath()"

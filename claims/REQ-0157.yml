@@ -1,0 +1,19 @@
+# REQ-0157 — diskdoctor.md §4 snapshot retention
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0157
+statement: "The snapshot store shall keep at most 50 snapshots per device."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L164
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+  operator: "LE"
+  value: "50"
+  unit: "none"
+tests:
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0157_capsAtFiftyPerDevice()"

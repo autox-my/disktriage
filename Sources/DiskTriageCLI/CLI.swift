@@ -36,7 +36,8 @@ public func run(
     destinationProbe: (any ImageDestinationProbing)? = nil,
     imaging: ImagingDependencies? = nil,
     inspectDependencies: InspectDependencies? = nil,
-    copyDependencies: CopyDependencies? = nil
+    copyDependencies: CopyDependencies? = nil,
+    historyStore: (any SnapshotStoring)? = nil
 ) -> CLIResult {
     guard let command = arguments.first else {
         return rootHelp()
@@ -47,7 +48,14 @@ public func run(
     case "--help", "-h", "help":
         return rootHelp()
     case "triage":
-        return triage(rest, readFile: readFile, writeFile: writeFile, executor: executor, now: now)
+        return triage(
+            rest,
+            readFile: readFile,
+            writeFile: writeFile,
+            executor: executor,
+            now: now,
+            historyStore: historyStore
+        )
     case "list":
         return list(rest, executor: executor)
     case "image":
@@ -80,7 +88,8 @@ private func triage(
     readFile: (String) throws -> Data,
     writeFile: (String, Data) throws -> Void,
     executor: any CommandExecuting,
-    now: () -> Date
+    now: () -> Date,
+    historyStore: (any SnapshotStoring)?
 ) -> CLIResult {
     if arguments.contains("--help") || arguments.contains("-h") {
         return help(triageUsage)
@@ -92,6 +101,8 @@ private func triage(
     var window = KernelLogCollector.defaultWindow
     var asJSON = false
     var local = false
+    var noHistory = false
+    var historyDirectory: String?
     var index = 0
 
     while index < arguments.count {
@@ -124,6 +135,15 @@ private func triage(
         case "--local":
             local = true
             index += 1
+        case "--no-history":
+            noHistory = true
+            index += 1
+        case "--history-dir":
+            guard index + 1 < arguments.count else {
+                return usageError("--history-dir needs a directory path")
+            }
+            historyDirectory = arguments[index + 1]
+            index += 2
         default:
             let argument = arguments[index]
             if argument.hasPrefix("-") {
@@ -200,18 +220,83 @@ private func triage(
         }
     }
 
+    // Local history is a live-only signal: a recorded set carries whatever
+    // history it was given and must never read or write the store (REQ-0159).
+    let snapshotTime = now()
+    var classifiedSignals = signals
+    var storeToWrite: (any SnapshotStoring)?
+    var pendingSnapshot: SnapshotRecord?
+    var snapshotStatus: SignalStatus?
+    if from == nil {
+        let serial = signals.device?.serial.flatMap { $0.isEmpty ? nil : $0 }
+        let smartStatus = signals.smart?.status
+        if noHistory {
+            progress.append("disktriage: history: disabled (--no-history)")
+        } else if serial == nil {
+            progress.append(
+                "disktriage: history: unavailable (no serial; no history read or snapshot written)"
+            )
+        } else if smartStatus != .ok {
+            let status = smartStatus?.rawValue ?? "not collected"
+            progress.append(
+                "disktriage: history: unavailable (SMART \(status) is not a measurement; "
+                    + "no snapshot read or written)"
+            )
+        } else {
+            let key = SnapshotStore.key(forSerial: serial ?? "")
+            let store = historyStore ?? SnapshotStore(directory: resolvedHistoryDirectory(historyDirectory))
+            let prior = store.loadPrior(key: key, before: snapshotTime)
+            for note in prior.notes {
+                progress.append("disktriage: history: \(note)")
+            }
+            if let history = SnapshotHistory.history(from: prior.record, forKey: key) {
+                classifiedSignals = signals.attachingSmartHistory(history)
+                progress.append(
+                    "disktriage: history: used (prior snapshot recorded \(historyStamp(history.recordedAt)))"
+                )
+            } else {
+                progress.append("disktriage: history: first sight (no prior snapshot for this device)")
+            }
+            pendingSnapshot = SnapshotHistory.record(from: signals, deviceKey: key, recordedAt: snapshotTime)
+            storeToWrite = store
+            snapshotStatus = smartStatus
+        }
+    }
+
     // A recorded set has no live device, so the suggested image destination is
     // derived from its name; the Appendix's transcript was rendered that way.
     let destination = from.map { "/Volumes/Scratch/\(fileStem($0)).img" }
         ?? "/Volumes/Scratch/\(fileStem(signals.device?.bsd ?? "image")).img"
-    let verdict = classify(signals, context: TriageContext(imageDestination: destination))
+    let verdict = classify(classifiedSignals, context: TriageContext(imageDestination: destination))
     let stdout = asJSON
         ? Renderer.json(verdict)
         : Renderer.tty(
-            signals,
+            classifiedSignals,
             verdict,
             timeZone: local ? TimeZone.current : TimeZone(secondsFromGMT: 0)!
         )
+
+    // The snapshot is written after classification, and a write failure is a
+    // note on stderr: it never changes the verdict or the exit code
+    // (REQ-0160).
+    if let store = storeToWrite {
+        if let record = pendingSnapshot {
+            switch store.save(record) {
+            case .written:
+                progress.append("disktriage: history: snapshot stored")
+            case .skipped(let reason):
+                progress.append("disktriage: history: snapshot not stored (\(reason))")
+            case .failed(let reason):
+                progress.append(
+                    "disktriage: history: snapshot not stored (\(reason)); the verdict is unchanged"
+                )
+            }
+        } else {
+            let status = snapshotStatus?.rawValue ?? "not collected"
+            progress.append("disktriage: history: not stored (SMART \(status) is not a measurement)")
+        }
+    }
+
     let device = signals.device?.bsd ?? "unknown device"
     progress.append("disktriage: classified \(device) as exit \(verdict.code.rawValue)")
 
@@ -220,6 +305,22 @@ private func triage(
         stderr: progress.joined(separator: "\n") + "\n",
         exitCode: Int32(verdict.code.rawValue)
     )
+}
+
+/// `--history-dir`, then `DISKTRIAGE_HISTORY_DIR`, then the documented default.
+private func resolvedHistoryDirectory(_ flag: String?) -> URL {
+    SnapshotStore.resolveDirectory(
+        flag: flag,
+        environment: ProcessInfo.processInfo.environment,
+        fallback: SnapshotStore.defaultDirectory()
+    )
+}
+
+private func historyStamp(_ date: Date?) -> String {
+    guard let date else { return "at an unknown time" }
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter.string(from: date)
 }
 
 /// Collects every section in a deterministic order. Each collector returns a
@@ -409,7 +510,8 @@ private func rootHelp() -> CLIResult {
     )
 }
 
-private let triageUsage = "usage: disktriage triage <disk> [--json] [--local] [--record <file>] [--log-window <1h>]\n"
+private let triageUsage = "usage: disktriage triage <disk> [--json] [--local] [--record <file>]\n"
+    + "                            [--log-window <1h>] [--no-history] [--history-dir <path>]\n"
     + "       disktriage triage --from <signalset.json> [--json] [--local] [--record <file>]\n"
     + "\n"
     + "Collects the read-only signals for one whole disk: diskutil identity,\n"
@@ -420,6 +522,10 @@ private let triageUsage = "usage: disktriage triage <disk> [--json] [--local] [-
     + "  --log-window <w>    unified-log window, default 1h (log show --last form)\n"
     + "  --json              print the verdict as JSON instead of the tty transcript\n"
     + "  --local             render log timestamps in the local zone (default UTC)\n"
+    + "  --no-history        do not read or write the local SMART snapshot store\n"
+    + "  --history-dir <p>   snapshot directory (default ~/Library/Application\n"
+    + "                      Support/disktriage/history; DISKTRIAGE_HISTORY_DIR also\n"
+    + "                      overrides it)\n"
 
 private let listUsage = "usage: disktriage list [--json]\n"
     + "\n"

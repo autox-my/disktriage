@@ -1,0 +1,17 @@
+# REQ-0158 — diskdoctor.md §4 unusable snapshot files
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0158
+statement: "The snapshot store shall skip a corrupt, unknown-schema or foreign-device snapshot file with a note."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L164
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.HistoryCLITests::REQ0158_corruptSnapshotIsSkippedWithANote()"
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0158_skipsUnusableFilesWithANote()"

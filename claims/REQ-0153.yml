@@ -1,0 +1,17 @@
+# REQ-0153 — diskdoctor.md §4 devices are keyed by serial
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0153
+statement: "The snapshot store shall not use a snapshot recorded for a different device key."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L168
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0153_neverCrossesKeys()"
+  - "DiskTriageCoreTests.SnapshotHistoryTests::REQ0153_historyNeverCrossesDeviceKeys()"
