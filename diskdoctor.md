@@ -510,6 +510,11 @@ Deep link:
   NTFS, the bitmap unreadable), the tool says so and falls back to the plain whole-device passes. It
   never marks free space as unneeded without having read the bitmap. Skipping free space also skips
   bad sectors in free space, which cost about 48 s each on macOS for nothing.
+- **`--scope-report`:** run stage 0 only (a few MB of reads), then print how much of the device is
+  allocated (used / free bytes and clusters, geometry source primary|backup) and an ETA range for
+  stage 1 at the assumed bus speed, and stop with exit 0. No stage 1 or 2 read happens. If stage 0
+  fails, it prints the typed reason and exits 1 (nothing was learned). It never claims the
+  allocation when the bitmap was not parsed.
 - **Do not read the failing drive in parallel.** Concurrent reads on one HDD add seeks and stress the
   drive. Parallel work belongs only after the data is in the image.
 - **Hardware note:** a generic USB 2 bridge caps reads at about 37 MB/s (measured, `Device Speed 2`).
