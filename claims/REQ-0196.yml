@@ -1,0 +1,17 @@
+# REQ-0196 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0196
+statement: "The domain mapfile writer shall emit a ddrescue mapfile that marks domain extents with + and all other device bytes with ? so the text parses with the existing mapfile parser."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationLiveTests::REQ0196_clipsAndHandlesAnEmptyDomain()"
+  - "DiskTriageCLITests.NTFSAllocationLiveTests::REQ0196_domainMapfileRoundTripsThroughTheParser()"

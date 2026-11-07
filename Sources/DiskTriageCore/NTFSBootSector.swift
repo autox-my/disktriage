@@ -43,6 +43,33 @@ public enum NTFSBootSectorValidation: Equatable, Sendable {
     }
 }
 
+/// The typed reason a boot sector is not usable. `NTFSBootSectorValidation`
+/// still carries the human reason text; the allocation-domain parser needs the
+/// typed form so a caller can act on the field that failed instead of matching
+/// prose.
+public enum NTFSBootSectorFailure: Error, Equatable, Sendable {
+    case tooShort
+    case badOEMID
+    case unsupportedBytesPerSector(Int)
+    case invalidSectorsPerCluster(Int)
+    case missingBootSignature
+
+    public var message: String {
+        switch self {
+        case .tooShort:
+            return "the boot sector is shorter than 512 bytes"
+        case .badOEMID:
+            return "the OEM ID is not 'NTFS    '"
+        case .missingBootSignature:
+            return "the 55 AA boot signature is missing"
+        case .unsupportedBytesPerSector(let value):
+            return "bytes per sector \(value) is not 512, 1024, 2048 or 4096"
+        case .invalidSectorsPerCluster(let value):
+            return "sectors per cluster \(value) is not a power of two in 1...128"
+        }
+    }
+}
+
 /// The boot-sector rules from diskdoctor.md §8. The backup-sector offset is the
 /// formula P0 row 11 measured, not one derived from the BPB: `mkntfs` leaves
 /// `total_sectors` one sector short, and the disk's last sector is the wrong
@@ -53,30 +80,37 @@ public enum NTFSBootSectorRules {
     public static let bootSignature: [UInt8] = [0x55, 0xAA]
 
     public static func validate(_ sector: Data) -> NTFSBootSectorValidation {
-        guard sector.count >= 512 else {
-            return .invalid("the boot sector is shorter than 512 bytes")
+        switch validateTyped(sector) {
+        case .success(let boot):
+            return .valid(boot)
+        case .failure(let failure):
+            return .invalid(failure.message)
         }
-        guard sector[3..<11] == Data(oemID.utf8) else {
-            return .invalid("the OEM ID is not 'NTFS    '")
-        }
+    }
+
+    /// The same rules as `validate`, with a typed reason. This is the one
+    /// implementation: `validate` is its text projection.
+    public static func validateTyped(_ sector: Data) -> Result<NTFSBootSector, NTFSBootSectorFailure> {
+        guard sector.count >= 512 else { return .failure(.tooShort) }
+        guard sector[3..<11] == Data(oemID.utf8) else { return .failure(.badOEMID) }
         guard sector[510] == bootSignature[0], sector[511] == bootSignature[1] else {
-            return .invalid("the 55 AA boot signature is missing")
+            return .failure(.missingBootSignature)
         }
         let bytesPerSector = Int(sector[0x0B]) | (Int(sector[0x0C]) << 8)
         guard allowedSectorSizes.contains(bytesPerSector) else {
-            return .invalid("bytes per sector \(bytesPerSector) is not 512, 1024, 2048 or 4096")
+            return .failure(.unsupportedBytesPerSector(bytesPerSector))
         }
         let sectorsPerCluster = Int(sector[0x0D])
         guard sectorsPerCluster >= 1,
               sectorsPerCluster <= 128,
               sectorsPerCluster & (sectorsPerCluster - 1) == 0
         else {
-            return .invalid("sectors per cluster \(sectorsPerCluster) is not a power of two in 1...128")
+            return .failure(.invalidSectorsPerCluster(sectorsPerCluster))
         }
         let totalSectors = (0..<8).reduce(UInt64(0)) { value, i in
             value | (UInt64(sector[0x28 + i]) << (8 * UInt64(i)))
         }
-        return .valid(NTFSBootSector(
+        return .success(NTFSBootSector(
             oemID: oemID,
             bytesPerSector: bytesPerSector,
             sectorsPerCluster: sectorsPerCluster,

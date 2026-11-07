@@ -1,0 +1,16 @@
+# REQ-0197 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0197
+statement: "The ddrescue domain mapfile shall restrict a live ddrescue -m run to the extents marked + in the file."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationLiveTests::REQ0197_liveDdrescueCopiesOnlyTheDomainExtents()"

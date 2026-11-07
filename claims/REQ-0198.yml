@@ -1,0 +1,16 @@
+# REQ-0198 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0198
+statement: "The allocation domain for a real NTFS image shall reproduce the used cluster runs that ntfscluster reports for the whole volume."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationLiveTests::REQ0198_realImageBitmapMatchesNtfscluster()"

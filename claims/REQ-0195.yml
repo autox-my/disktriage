@@ -1,0 +1,17 @@
+# REQ-0195 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0195
+statement: "The allocation domain builder shall report an unknown allocation, with no free extents, when stage 0 cannot read or parse the allocation metadata."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0195_rejectsAnMFTOutsideThePartition()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0195_unknownAllocationHasNoFreeExtents()"

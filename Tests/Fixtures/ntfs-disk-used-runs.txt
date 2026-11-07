@@ -1,0 +1,26 @@
+# Used (allocated) cluster runs of captures/ntfs-spike/img/part.img.
+#
+# Recorded once from the ntfs-3g tool, never recomputed by the code under test:
+#   ntfscluster -c 0-16382 -v img/part.img
+# The union of every inode's non-resident LCN runs, coalesced into contiguous
+# ranges, is exactly this list. Cross-checks recorded at the same time:
+#   ntfsinfo -m img/part.img
+#     Volume Size in Clusters: 16383
+#     Free Clusters: 4075 (24.9%)
+#   16383 - 4075 = 12308 used clusters, and these ranges sum to 12308.
+#
+# The $Bitmap stores 2048 bytes for 16383 clusters, so bit 16383 (the last bit
+# of the last byte) is past the volume and is set in the image. It is not a
+# used cluster; the ranges below stop at 16382.
+#
+# format: first-last inclusive, volume-relative LCN
+0-2
+4-3710
+4201-5224
+5737-6760
+7273-9097
+9610-11145
+11658-12681
+13194-14217
+14730-15753
+16266-16382
