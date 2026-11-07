@@ -6,7 +6,7 @@ statement: "The tool shall not mount the source device."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L59
+  source: diskdoctor.md#2-design-principles
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The tool shall mark imaging as blocked with the reason when Full Dis
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L394
+  source: diskdoctor.md#7-fda-onboarding
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

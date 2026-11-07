@@ -6,7 +6,7 @@ statement: "The tool shall assign low confidence from a weak or circumstantial s
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L265
+  source: diskdoctor.md#5-triage-decision-tree
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The tool shall distinguish EPERM from EACCES when it diagnoses a den
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L392
+  source: diskdoctor.md#rules
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

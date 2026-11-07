@@ -6,7 +6,7 @@ statement: "The FILESYSTEM prescription shall target a copy of the image rather 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L498
+  source: diskdoctor.md#repair-hand-off
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

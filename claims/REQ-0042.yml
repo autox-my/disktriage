@@ -6,7 +6,7 @@ statement: "The triage command shall not mount the source volume or write to it,
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L328
+  source: diskdoctor.md#6-cli
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

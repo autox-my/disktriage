@@ -6,7 +6,7 @@ statement: "The copy command shall hash the bytes read from the image and the by
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L483
+  source: diskdoctor.md#imaging
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

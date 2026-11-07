@@ -6,7 +6,7 @@ statement: "The permission probe shall read a 4096-byte aligned block from an in
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L390
+  source: diskdoctor.md#rules
   date: 2026-11-06
   rejected_alternatives:
     - "512-byte read: can fail with EINVAL on Apple's 4096-byte internal block after access was granted (P0 phase A)"

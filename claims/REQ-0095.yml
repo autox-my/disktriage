@@ -6,7 +6,7 @@ statement: "The copy command shall not make per-file integrity claims without re
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L491
+  source: diskdoctor.md#copy-and-damage-reporting
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

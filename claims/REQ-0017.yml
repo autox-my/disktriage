@@ -6,7 +6,7 @@ statement: "The tool shall key each device by serial or IORegistry path rather t
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L161
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

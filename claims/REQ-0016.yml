@@ -6,7 +6,7 @@ statement: "The classifier shall be a pure function over a SignalSet that is tes
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L106
+  source: diskdoctor.md#3-architecture
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

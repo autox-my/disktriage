@@ -6,7 +6,7 @@ statement: "A trend rule shall not fire without a real prior snapshot."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L159
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

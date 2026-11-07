@@ -6,7 +6,7 @@ statement: "The tool shall treat zero-filled image regions as unknown data rathe
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L471
+  source: diskdoctor.md#inspection
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

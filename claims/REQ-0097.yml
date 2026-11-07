@@ -6,7 +6,7 @@ statement: "The tool shall print an NTFS repair hand-off instead of performing t
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L499
+  source: diskdoctor.md#repair-hand-off
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

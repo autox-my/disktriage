@@ -6,7 +6,7 @@ statement: "The tool shall not imply that a disk is safe without evidence."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L52
+  source: diskdoctor.md#non-goals
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

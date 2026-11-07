@@ -6,7 +6,7 @@ statement: "The tool shall not repair a filesystem in place."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L53
+  source: diskdoctor.md#non-goals
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

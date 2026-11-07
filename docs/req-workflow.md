@@ -209,9 +209,9 @@ only if that is impossible).
 <!-- req-counts:begin -->
 - 242 claims total.
 - 196 pins held (`req gate --format json`, `pins_hold.checked`).
-- 202 claims have a non-empty `tests:` list.
-- 0 claims are process-evidenced (`evidence: process`).
-- 40 claims are unlinked: no linked test and no process evidence.
+- 241 claims have a non-empty `tests:` list.
+- 1 claims are process-evidenced (`evidence: process`).
+- 0 claims are unlinked: no linked test and no process evidence.
 <!-- req-counts:end -->
 
 These counts are generated from the corpus by `scripts/req-counts.sh`; do not edit the block by

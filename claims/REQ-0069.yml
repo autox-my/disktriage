@@ -6,7 +6,7 @@ statement: "The check command shall report root status, raw device access, remov
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L406
+  source: diskdoctor.md#self-test-disktriage-check
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

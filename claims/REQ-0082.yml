@@ -6,7 +6,7 @@ statement: "The image command shall not poll SMART while imaging."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L452
+  source: diskdoctor.md#imaging
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

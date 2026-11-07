@@ -6,7 +6,7 @@ statement: "The image command shall prevent system sleep for the duration of the
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L444
+  source: diskdoctor.md#imaging
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

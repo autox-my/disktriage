@@ -6,7 +6,7 @@ statement: "The inspection and copy commands shall consult the mapfile to identi
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L471
+  source: diskdoctor.md#inspection
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

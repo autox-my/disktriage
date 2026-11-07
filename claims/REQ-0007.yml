@@ -6,7 +6,7 @@ statement: "The tool shall name the top hypothesis with its evidence, its falsif
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L74
+  source: diskdoctor.md#2-design-principles
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

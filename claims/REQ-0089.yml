@@ -6,7 +6,7 @@ statement: "The tool shall not use a writable third-party driver to inspect an i
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L466
+  source: diskdoctor.md#mount-guard
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
