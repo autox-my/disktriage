@@ -1,0 +1,17 @@
+# REQ-0185 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0185
+statement: "The NTFS boot geometry parser shall decode the bytes per sector, sectors per cluster, total sectors, $MFT and $MFTMirr LCNs, and the signed MFT and index record sizes from a boot sector."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0185_decodesSignedAndPositiveRecordSizes()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0185_parsesTheRealDiskGeometry()"

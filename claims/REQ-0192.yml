@@ -1,0 +1,18 @@
+# REQ-0192 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0192
+statement: "The $Bitmap decoder shall read bits least-significant first, coalesce used clusters into runs, and ignore bits past the volume's cluster count."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0192_bitmapUsedRunsMatchTheRecordedToolOutput()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0192_ignoresTailBitsPastTheVolume()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0192_readsBitsLeastSignificantFirst()"

@@ -1,0 +1,448 @@
+Searching for cluster range 0-16382
+Inode: 0
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	4-34 (31)
+Inode 0 /$MFT/$DATA
+	[0xB0]
+		VCN	LCN	Length
+		0	2-2 (1)
+Inode 0 /$MFT/$BITMAP
+Inode: 1
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8191-8191 (1)
+Inode 1 /$MFTMirr/$DATA
+Inode: 2
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8192-8703 (512)
+Inode 2 /$LogFile/$DATA
+Inode: 3
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x60 skipped - attr is resident
+0x70 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 4
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	2054-2054 (1)
+Inode 4 /$AttrDef/$DATA
+Inode: 5
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+	[0x50]
+		VCN	LCN	Length
+		0	2051-2052 (2)
+Inode 5 /./$SECURITY_DESCRIPTOR
+0x90 skipped - attr is resident
+	[0xA0]
+		VCN	LCN	Length
+		0	2053-2053 (1)
+Inode 5 /./$INDEX_ALLOCATION($I30)
+0xb0 skipped - attr is resident
+Inode: 6
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	2055-2055 (1)
+Inode 6 /$Bitmap/$DATA
+Inode: 7
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	0-1 (2)
+Inode 7 /$Boot/$DATA
+Inode: 8
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x80 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+Inode: 9
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	2056-2120 (65)
+Inode 9 /$Secure/$DATA($SDS)
+0x90 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 10
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	2121-2152 (32)
+Inode 10 /$UpCase/$DATA
+0x80 skipped - attr is resident
+Inode: 11
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 12
+0x10 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 13
+0x10 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 14
+0x10 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 15
+0x10 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 24
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x90 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 25
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 26
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 64
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 65
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 66
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x90 skipped - attr is resident
+	[0xA0]
+		VCN	LCN	Length
+		0	8789-8789 (1)
+Inode 66 /media/$INDEX_ALLOCATION($I30)
+		1	7785-7785 (1)
+Inode 66 /media/$INDEX_ALLOCATION($I30)
+0xb0 skipped - attr is resident
+Inode: 67
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 68
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 69
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 70
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 71
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x90 skipped - attr is resident
+Inode: 72
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8704-8704 (1)
+Inode 72 /docs/readme.txt/$DATA
+Inode: 73
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 74
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8705-8708 (4)
+Inode 74 /docs/2026/notes.md/$DATA
+Inode: 75
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 76
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8709-8724 (16)
+Inode 76 /deep/a/b/c/leaf.dat/$DATA
+Inode: 77
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8725-8788 (64)
+Inode 77 /media/clip.dat/$DATA
+Inode: 78
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 79
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 80
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 81
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 82
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+0x80 skipped - attr is resident
+Inode: 83
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8790-8790 (1)
+Inode 83 /media/size-4095.bin/$DATA
+Inode: 84
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8791-8791 (1)
+Inode 84 /media/size-4096.bin/$DATA
+Inode: 85
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8792-8793 (2)
+Inode 85 /media/size-4097.bin/$DATA
+Inode: 86
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8794-8809 (16)
+Inode 86 /media/size-65536.bin/$DATA
+Inode: 87
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8810-8841 (32)
+Inode 87 /media/size-131072.bin/$DATA
+Inode: 88
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8842-9097 (256)
+Inode 88 /media/size-1048576.bin/$DATA
+Inode: 89
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	2153-2664 (512)
+Inode 89 /media/big.bin/$DATA
+		512	537-2050 (1514)
+Inode 89 /media/big.bin/$DATA
+		2026	3689-3710 (22)
+Inode 89 /media/big.bin/$DATA
+Inode: 90
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	9610-10121 (512)
+Inode 90 /media/frag-01.bin/$DATA
+Inode: 91
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	10122-10633 (512)
+Inode 91 /media/frag-02.bin/$DATA
+Inode: 93
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	10634-11145 (512)
+Inode 93 /media/frag-04.bin/$DATA
+Inode: 94
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	2665-3176 (512)
+Inode 94 /media/frag-05.bin/$DATA
+Inode: 96
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	3177-3688 (512)
+Inode 96 /media/frag-07.bin/$DATA
+Inode: 97
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	11658-12169 (512)
+Inode 97 /media/frag-08.bin/$DATA
+Inode: 99
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	12170-12681 (512)
+Inode 99 /media/frag-10.bin/$DATA
+Inode: 100
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	4201-4712 (512)
+Inode 100 /media/frag-11.bin/$DATA
+Inode: 102
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	4713-5224 (512)
+Inode 102 /media/frag-13.bin/$DATA
+Inode: 103
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	13194-13705 (512)
+Inode 103 /media/frag-14.bin/$DATA
+Inode: 105
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	13706-14217 (512)
+Inode 105 /media/frag-16.bin/$DATA
+Inode: 106
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	5737-6248 (512)
+Inode 106 /media/frag-17.bin/$DATA
+Inode: 108
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	6249-6760 (512)
+Inode 108 /media/frag-19.bin/$DATA
+Inode: 109
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	14730-15241 (512)
+Inode 109 /media/frag-20.bin/$DATA
+Inode: 111
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	15242-15753 (512)
+Inode 111 /media/frag-22.bin/$DATA
+Inode: 112
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	7273-7784 (512)
+Inode 112 /media/frag-23.bin/$DATA
+Inode: 114
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	16266-16382 (117)
+Inode 114 /media/frag-25.bin/$DATA
+		117	7786-8180 (395)
+Inode 114 /media/frag-25.bin/$DATA
+Inode: 115
+0x10 skipped - attr is resident
+0x30 skipped - attr is resident
+0x50 skipped - attr is resident
+	[0x80]
+		VCN	LCN	Length
+		0	8181-8190 (10)
+Inode 115 /media/frag-26.bin/$DATA
+		10	35-536 (502)
+Inode 115 /media/frag-26.bin/$DATA
+* 39 inodes found

@@ -1,0 +1,17 @@
+# REQ-0194 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0194
+statement: "The allocation domain builder shall union the $MFT runs, the metadata records region and the used clusters into merged, sorted device extents clipped to the partition and return the free complement."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0194_buildsTheDeviceDomainAndFreeComplement()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0194_mergesAdjacentAndOverlappingExtents()"

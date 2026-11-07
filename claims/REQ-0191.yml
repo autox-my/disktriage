@@ -1,0 +1,16 @@
+# REQ-0191 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0191
+statement: "The MFT record parser shall report an $ATTRIBUTE_LIST as unsupported instead of following extension records."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0191_reportsAttributeListAsUnsupported()"

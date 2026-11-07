@@ -1,0 +1,17 @@
+# REQ-0188 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0188
+statement: "The stage-0 read plan shall order the partition-table sectors, the primary boot sector and the backup boot sector before the first sixteen MFT records that become readable once the geometry is known."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0188_gptPlanIncludesTheBackupHeader()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0188_stage0PlanIsOrderedAndHasTwoSteps()"

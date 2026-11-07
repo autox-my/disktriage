@@ -1,0 +1,17 @@
+# REQ-0193 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0193
+statement: "The $Bitmap decoder shall reject a bitmap shorter than the volume needs and a data run list that is too fragmented, overlapping or past the volume end with a typed failure."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0193_rejectsABitmapShorterThanTheVolume()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0193_rejectsBadBitmapRunLists()"

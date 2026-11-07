@@ -1,0 +1,17 @@
+# REQ-0186 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0186
+statement: "The NTFS boot geometry parser shall reject a boot sector whose OEM ID, bytes per sector, sectors per cluster or 55 AA signature violates the plan's rules and report a typed failure reason."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0186_mftMustLieInsideTheVolume()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0186_rejectsInvalidGeometryWithTypedFailures()"

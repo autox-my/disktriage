@@ -1,0 +1,17 @@
+# REQ-0187 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0187
+statement: "The NTFS boot geometry selector shall validate the backup boot sector at the partition's last sector and use it, reporting that source, when the primary boot sector is invalid."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0187_fallsBackToTheBackupBootSector()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0187_prefersThePrimaryAndRejectsTwoBadSectors()"

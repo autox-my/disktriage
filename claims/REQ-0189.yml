@@ -1,0 +1,16 @@
+# REQ-0189 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0189
+statement: "The MFT record parser shall apply the update sequence array fixups before reading attributes and reject a record whose sector-tail values do not match the update sequence number."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0189_appliesFixupsAndRejectsTornRecords()"
