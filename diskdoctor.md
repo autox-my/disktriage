@@ -165,6 +165,12 @@ Notes:
   (`~/Library/Application Support/<tool>/history/`). It enables trend rules (§5) and can be
   disabled with `--no-history`. It is `null` on first sight of a drive (as in the MiNaH fixture);
   trend rules never fire without a real prior snapshot, and fixtures must not invent one.
+  Store contract: one JSON file per snapshot, written atomically, under the SHA-256 of the serial
+  (the serial is never on disk in the clear); at most 50 snapshots per device; a snapshot is
+  stored only when the SMART section status is `ok`, and only a prior snapshot with an `ok` SMART
+  section feeds the trend rules; it is used only for live collection (never `--from`, never the
+  `image` triage); a corrupt or foreign file is skipped with a note; a failed write changes
+  neither the verdict nor the exit code. `DISKTRIAGE_HISTORY_DIR` overrides the location.
 - Devices are keyed by serial / IORegistry path, never by `diskN` alone — the BSD name changes on
   reconnect.
 
@@ -453,15 +459,19 @@ Deep link:
 
 - `guard` registers a DiskArbitration mount-approval callback and dissents for target devices.
   Intended use: start it **before** connecting the drive.
-- If the volume is already mounted: `diskutil unmountDisk` with a hard timeout. If that hangs
-  (third-party driver stuck in a retrying read), say so and instruct a physical disconnect, then
-  reconnect with `guard` running.
+- `guard` never unmounts or ejects a volume: it prevents the mount and nothing else. If a volume of
+  the source is already mounted, the guard cannot help: disconnect physically and reconnect with
+  `guard` running (an unmount can hang on a third-party driver stuck in a retrying read, so the
+  tool does not attempt one). `image` refuses (exit 30) when no guard is in effect.
 - **Measured (P0 row 5):** the dissent does stop the third-party NTFS driver's *mount*, but not its
   *probe*, which runs first and reads the volume. For a disk whose first sectors are already
   failing, the probe itself can stall. A stronger guard is to suspend `diskarbitrationd`
   (`SIGSTOP`) for the whole session, which prevents both probe and mount; while it is stopped,
-  `diskutil` hangs, so collection uses `ioreg` only. **UNVERIFIED** until P0 phase C. Where neither
-  is acceptable, use the Linux rescue path (the only host on which macOS never sees the disk).
+  `diskutil` hangs, so collection and `image` use `ioreg` only (`check` marks the rows it cannot
+  read without `diskutil` UNVERIFIABLE, naming the stopped daemon). **Verified on hardware**
+  (`guard --suspend`, MiNaH, 2026-11-07): the stop held, identity came from `ioreg`, and teardown
+  resumed the daemon only after the disk node was gone; if the node is still present at teardown
+  the tool instructs a physical disconnect. Where neither is acceptable, use the Linux rescue path (the only host on which macOS never sees the disk).
 - `hdiutil attach` for inspection always uses `-nomount`, then an explicit native mount, so a
   third-party driver cannot claim the image volume.
 
@@ -478,6 +488,12 @@ Deep link:
   whole device; the free-space check, ETA and the report use the limit and say the image is partial.
   The mapfile records the limit, and resuming with a different limit is refused. A partial image is
   never reported as a complete image of the device.
+- **Mapfile statuses:** `+` finished, `?` untried, `*` failed (non-trimmed) and `/` failed
+  (non-scraped), `-` bad. Failed extents are unreadable *so far* and are provisional until trimming
+  and scraping finish; reports count failed and bad together as unreadable and never as zero.
+- **Unreadable `$Bitmap` bytes** describe clusters of unknown allocation, which count as used and
+  are read in the used-clusters stage; they are never treated as free. If more than 10% of the
+  bitmap is unreadable, `image` falls back to plain whole-device passes.
 - **Source identity confirmation** (§6): model + serial + size shown, last four of the serial typed.
 - **Prevent sleep:** hold an IOPMAssertion / `caffeinate` for the duration. A sleeping Mac drops
   the drive mid-image.
@@ -534,7 +550,8 @@ Deep link:
 
 ### Inspection
 
-- **APFS / HFS+ / exFAT / FAT:** `diskutil image attach --noMount --readOnly` (or
+- **APFS / HFS+ / exFAT / FAT:** *planned, not yet built: `inspect` and `copy` detect these and
+  refuse for now.* `diskutil image attach --noMount --readOnly` (or
   `hdiutil attach -readonly -nomount`), then an explicit native read-only mount. Never a writable
   third-party driver.
 - **NTFS:** no native mount exists on macOS 27.2. Inspect the image with the ntfs-3g userspace tools
@@ -749,6 +766,16 @@ product, and awkward on Apple Silicon.
 ---
 
 ## 14. Revision history
+
+**v3.9 (2026-11-07), after the requirement-corpus triage (plan catches up with the code):**
+
+- §8 mount guard: `guard` never unmounts (the `diskutil unmountDisk` bullet is removed); `--suspend`
+  is verified on hardware (identity via `ioreg`, teardown, disconnect instruction).
+- §8 inspection: native attach for APFS/HFS+/exFAT/FAT is marked planned, not built.
+- §8 imaging: mapfile statuses (failed `*`/`/` vs bad `-`); unreadable `$Bitmap` bytes are unknown
+  allocation, counted as used.
+- §4 history: store contract (hashed key, 50-snapshot cap, `ok`-only, live-only, failure-tolerant).
+- Implementation-level decisions stay in `docs/sdlc.md`; claims may anchor there.
 
 **v3.8 (2026-11-07), after the first real MiNaH image run and performance research:**
 
