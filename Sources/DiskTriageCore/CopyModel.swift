@@ -476,10 +476,15 @@ public enum CopyLimits {
     /// A cap on the file list, not on the volume: crossing it makes the copy
     /// partial and is reported, never silently ignored.
     public static let maxEntries = 10_000
-    /// One file larger than this is not copied (the tool buffers its stdout).
-    public static let maxFileBytes: Int64 = 1_073_741_824
-    /// The whole run's byte budget.
-    public static let maxTotalBytes: Int64 = 8_589_934_592
+    /// One byte of a copy stream, in bytes. Memory stays O(chunk): a file's
+    /// data is never buffered whole (REQ-0143).
+    public static let streamChunkBytes = 1_048_576
+    /// A per-file sanity bound, not a memory bound: 2 TiB is far above any
+    /// removable NTFS volume this tool is expected to meet. A larger file is
+    /// refused rather than truncated.
+    public static let maxFileBytes: Int64 = 2_199_023_255_552 // 2 TiB (2 * 1024^4)
+    /// One GiB in bytes: the unit of the optional `--max-bytes` run cap.
+    public static let gibibyte: Int64 = 1_073_741_824
     /// The whole run's wall-clock budget, independent of per-call timeouts.
     public static let totalTimeout: TimeInterval = 1_800
 }
@@ -603,6 +608,9 @@ public struct CopyManifest: Equatable, Sendable {
         public let bytesWritten: Int64
         public let hashesAgree: Bool
         public let manifestSHA256: String
+        /// The optional `--max-bytes` run cap, in bytes, when one was given.
+        /// Absent means no explicit byte cap (the time budget still applies).
+        public let maxBytes: Int64?
 
         public init(
             status: String,
@@ -611,7 +619,8 @@ public struct CopyManifest: Equatable, Sendable {
             bytesRead: Int64,
             bytesWritten: Int64,
             hashesAgree: Bool,
-            manifestSHA256: String
+            manifestSHA256: String,
+            maxBytes: Int64? = nil
         ) {
             self.status = status
             self.filesCopied = filesCopied
@@ -620,6 +629,7 @@ public struct CopyManifest: Equatable, Sendable {
             self.bytesWritten = bytesWritten
             self.hashesAgree = hashesAgree
             self.manifestSHA256 = manifestSHA256
+            self.maxBytes = maxBytes
         }
     }
 
@@ -694,6 +704,7 @@ public struct CopyManifest: Equatable, Sendable {
             "hashes_agree": copy.hashesAgree,
             "manifest_sha256": copy.manifestSHA256,
         ]
+        copyObject["max_bytes"] = copy.maxBytes.map { $0 } ?? NSNull()
 
         let imageObject: [String: Any] = [
             "path": image.path,

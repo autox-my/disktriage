@@ -284,19 +284,19 @@ partition parse, NTFS tool policy, mapfile parser (including the sidecar
   security descriptors and alternate data streams is not copied in v1. A
   whole-disk image is extracted to a temporary working file exactly as `inspect`
   does, so cluster numbers stay volume-relative; the temporary file is removed.
-- **File data is bytes, not text.** `ntfscat` output is captured through
-  `CommandExecuting.runData`; a UTF-8 decode would corrupt it. A file read is
-  never written when its output hit the process cap: a truncated file is a
-  failure, not a short copy.
-- **Hash while copying.** SHA-256 of the bytes returned by `ntfscat` and of the
-  bytes read back from the destination. The read-back is what proves the write
+- **File data is bytes, not text.** `ntfscat` output is streamed through
+  `ProcessRunner.stream` in bounded chunks; a UTF-8 decode would corrupt it and
+  buffering the whole stdout is not allowed (see the streaming decisions below).
+- **Hash while copying.** SHA-256 of the bytes consumed from `ntfscat` and of the
+  bytes read back from the temporary file. The read-back is what proves the write
   landed and catches a corrupting writer; a difference is `1` and the entry says
   `hash-mismatch`. The manifest digest is a SHA-256 of the entries' path, size,
   hashes and status. Output and `notes` say that equality proves the copy matches
   the **image**, not that the image matches the platter.
-- **Caps.** 10,000 listing entries, 1 GiB per file, 8 GiB per run and 1,800 s per
-  run. A cap is reported in `notes` and makes the copy **partial** (exit 1); it
-  never silently truncates a file or pretends the tree is complete.
+- **Caps.** 10,000 listing entries, 2 TiB per file, an optional
+  `--max-bytes <GiB>` run cap and 1,800 s per run. A cap is reported in `notes`
+  and makes the copy **partial** (exit 1); it never silently truncates a file or
+  pretends the tree is complete.
 - **Manifest.** `<dir>/MANIFEST.json`, schema `disktriage.copy/1`, version 1,
   tool version, `created_at`, image path and size, `image_sha256` (null by
   default with a note saying `--hash-image` was not passed; a multi-GB hash is
@@ -342,6 +342,49 @@ partition parse, NTFS tool policy, mapfile parser (including the sidecar
   `copy` (use `inspect --restore-boot-sector` on a working copy first), resume of
   an interrupted copy, and per-extent fallback attribution. File data only: a
   metadata-complete file copy (security descriptors, ADS) is a later feature.
+
+### CLI decisions (P3c, streaming `copy`)
+
+`copy` used to buffer each `ntfscat` stdout in memory. It now streams, so peak
+memory is one chunk regardless of file size. The contract did not change for
+small files: the same manifest, the same hashes, the same exit codes.
+
+- **The stream is `ProcessRunner.stream`.** It is a sibling of `runData`, not a
+  weaker path: the same `CommandPolicy` check before `exec`, the same hard
+  timeout, and the same `TERM`-then-`KILL` to the process group. stdout is read
+  non-blocking through one pipe in `CopyLimits.streamChunkBytes` (1 MiB) chunks;
+  stderr is drained concurrently and still capped by `outputLimit`. A throwing
+  sink stops the child, so a full disk never leaves a tool writing into a pipe.
+- **Memory is O(chunk).** The read-side SHA-256 is updated incrementally,
+  including the final partial chunk; the chunk is written to the temporary file
+  before it leaves the loop. `--max-bytes` and the per-file bound are checked
+  before a chunk is written, so a cap never creates a partial final file.
+- **A file is installed only after its read-back.** Data goes to
+  `.<name>.disktriage-partial.<uuid>` beside its target. `sync` fsyncs it, a
+  bounded read-back re-hashes those bytes, and only an agreeing read-back calls
+  `commit`. `commit` fsyncs again and installs with `link`+`unlink`, which is an
+  atomic no-replace operation: a file that appeared at the destination is a
+  failure, never an overwrite. Any failure, timeout or cap calls `abort`, which
+  deletes the temporary file; a process that dies leaves a visibly partial name,
+  never a plausible final one.
+- **Unfinished is `incomplete`, never copied.** A stream that ends by timeout or
+  cap, or a write/read-back failure, records `status: "incomplete"` with the
+  bytes streamed and a note saying the partial file was discarded. It is not
+  `ok`, not counted in `files_copied`, and makes `copy.status` `partial` (exit
+  1). A complete-but-corrupt write is `hash-mismatch`; a tool that never
+  produced data keeps `read-error`.
+- **Caps are not memory bounds.** The per-file sanity bound is 2 TiB and is
+  refused before a read when the listing names the size. `--max-bytes <GiB>`
+  (positive whole GiB; zero, a fraction or a non-number is usage error 2) is the
+  only run-wide byte cap; without it the 1,800 s run budget and the per-tool
+  hard timeouts remain. Hitting either prints the cap and the remaining file
+  count; the manifest's `copy.max_bytes` is the cap in bytes (null when absent).
+- **Test seams.** `CopyDependencies.chunkSize` (a tiny chunk in tests),
+  `maxBytesOverride` (a byte-level cap for sub-GiB fixtures) and
+  `CopyChunkObserving` (acquire/release around each chunk) exist so the suite
+  can prove one-chunk-at-a-time ownership without a flaky RSS measurement.
+  `catFileStreaming` is the injected tool seam; the recorded-output doubles use
+  a chunking default and the live runner overrides it with the real pipe.
 
 `scripts/check.sh` reads a JUnit report, not the runner's prose:
 

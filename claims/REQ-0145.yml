@@ -1,0 +1,16 @@
+# REQ-0145 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0145
+statement: "The copy command shall hash the bytes it reads incrementally, including the final partial chunk."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L346
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0145_hashesTheLastPartialChunk()"

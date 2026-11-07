@@ -1,0 +1,16 @@
+# REQ-0147 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0147
+statement: "The copy command shall stop a stream at its hard timeout and kill the whole process group."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L346
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.ProcessRunnerTests::REQ0147_streamingTimeoutKillsTheProcessGroup()"

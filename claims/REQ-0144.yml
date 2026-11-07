@@ -1,0 +1,17 @@
+# REQ-0144 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0144
+statement: "The copy command shall write a file to a temporary name in the destination directory and install it under its final name only after the bytes read back match."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L346
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0144_REQ0146_failedWriterLeavesNothing()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0144_readBackIsCheckedBeforeInstall()"
