@@ -89,3 +89,4 @@ what it adds.
 | [0019](0019-unfinished-bitmap-byte-is-unknown.md) | An unfinished `$Bitmap` byte is unknown allocation, never free (v3.9) | accepted | 2026-11-07 |
 | [0020](0020-requirement-checks-in-the-gate.md) | Requirement checks run in the gate (v3.9 follow-up) | accepted | 2026-11-07 |
 | [0021](0021-first-green-req-gate.md) | First green `req gate` — dispositions for the 40 unlinked claims | accepted | 2026-11-07 |
+| [0022](0022-homebrew-packaging.md) | Homebrew tap packaging, keg-relative ntfs-3g, one version | accepted | 2026-11-08 |
