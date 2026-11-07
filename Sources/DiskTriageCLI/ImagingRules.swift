@@ -129,9 +129,14 @@ public struct DestinationFacts: Equatable, Sendable {
     public let freeBytes: Int64?
     public let containerFilesystem: String?
     public let parentIsWritable: Bool?
-    /// The physical whole disk behind the destination volume (`disk0`, `disk8`).
-    public let backingWholeDisk: String?
+    /// Every physical whole disk behind the destination volume (`disk0`,
+    /// `disk8`). An APFS container can have more than one store, so this is a
+    /// set: any member equal to the source disk is a refusal.
+    public let backingWholeDisks: [String]
     public let backingError: String?
+
+    /// The single backing disk for display, when the probe found one.
+    public var backingWholeDisk: String? { backingWholeDisks.first }
 
     public init(
         destinationExists: Bool,
@@ -142,7 +147,8 @@ public struct DestinationFacts: Equatable, Sendable {
         containerFilesystem: String? = nil,
         parentIsWritable: Bool? = nil,
         backingWholeDisk: String? = nil,
-        backingError: String? = nil
+        backingError: String? = nil,
+        backingWholeDisks: [String]? = nil
     ) {
         self.destinationExists = destinationExists
         self.mapfileExists = mapfileExists
@@ -151,7 +157,7 @@ public struct DestinationFacts: Equatable, Sendable {
         self.freeBytes = freeBytes
         self.containerFilesystem = containerFilesystem
         self.parentIsWritable = parentIsWritable
-        self.backingWholeDisk = backingWholeDisk
+        self.backingWholeDisks = backingWholeDisks ?? backingWholeDisk.map { [$0] } ?? []
         self.backingError = backingError
     }
 }
@@ -183,10 +189,18 @@ public struct DestinationCheck: Equatable, Sendable {
 // MARK: - Individual destination rules
 
 /// True when the destination volume's backing whole disk is the source disk.
-/// `nil` when either side could not be resolved (fail closed upstream).
+/// `nil` when either side could not be resolved (fail closed upstream). A
+/// multi-store APFS container is a set: any store equal to the source is a
+/// refusal.
+func destinationSharesSourceDisk(backingWholeDisks: [String], sourceDisk: String?) -> Bool? {
+    guard let sourceDisk, !backingWholeDisks.isEmpty else { return nil }
+    return backingWholeDisks.contains(sourceDisk)
+}
+
+/// The single-disk form, kept for the table-driven rule tests.
 func destinationSharesSourceDisk(backingWholeDisk: String?, sourceDisk: String?) -> Bool? {
-    guard let backingWholeDisk, let sourceDisk else { return nil }
-    return backingWholeDisk == sourceDisk
+    guard let backingWholeDisk else { return nil }
+    return destinationSharesSourceDisk(backingWholeDisks: [backingWholeDisk], sourceDisk: sourceDisk)
 }
 
 /// Free space must cover the image being written, boundary included
@@ -294,20 +308,20 @@ func assessDestination(
     let recordedLimit = recordedLimitBytes(deviceBytes: source.sizeBytes, limitBytes: limitBytes)
 
     switch destinationSharesSourceDisk(
-        backingWholeDisk: facts.backingWholeDisk,
+        backingWholeDisks: facts.backingWholeDisks,
         sourceDisk: source.bsd
     ) {
     case .some(true):
         checks.append(DestinationCheck(
             name: "not on the source disk",
             outcome: .refuse,
-            detail: "destination is on \(facts.backingWholeDisk ?? source.bsd), the source disk"
+            detail: "destination is on \(facts.backingWholeDisks.joined(separator: ", ")), the source disk"
         ))
     case .some(false):
         checks.append(DestinationCheck(
             name: "not on the source disk",
             outcome: .pass,
-            detail: "destination is on \(facts.backingWholeDisk ?? "?")"
+            detail: "destination is on \(facts.backingWholeDisks.joined(separator: ", "))"
         ))
     case .none:
         let reason = facts.backingError ?? "the backing disk could not be resolved"

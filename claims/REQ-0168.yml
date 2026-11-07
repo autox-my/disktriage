@@ -1,0 +1,17 @@
+# REQ-0168 — diskdoctor.md §7 the self-test's filesystem row
+# Authored so `check` never waits on a diskutil call that hangs while diskarbitrationd is stopped.
+schema: req.claim/2
+claim_id: REQ-0168
+statement: "When diskarbitrationd is stopped, the check command's filesystem-driver row shall be UNVERIFIABLE with the reason that diskarbitrationd stopped and diskutil was skipped."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L442
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.LiveCheckProbesStoppedTests::REQ0168_filesystemRowIsUnverifiableWhenStopped()"
+  - "DiskTriageCollectorsTests.LiveCheckProbesStoppedTests::REQ0168_forcedPathSkipsListFilesystems()"

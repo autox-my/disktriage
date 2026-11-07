@@ -1,0 +1,18 @@
+# REQ-0170 — diskdoctor.md §2.3 an unresolved backing disk is not a pass
+# Authored so a network mount or an unresolvable container keeps image's fail-closed rule.
+schema: req.claim/2
+claim_id: REQ-0170
+statement: "The destination rule shall report an unresolved backing whole disk as unverifiable rather than as a pass."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L475
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0170_networkMountIsUnverifiable()"
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0170_unresolvedBackingFailsClosed()"
+  - "DiskTriageCoreTests.IORegMediaTreeTests::REQ0170_unknownMountSourcesFailClosed()"

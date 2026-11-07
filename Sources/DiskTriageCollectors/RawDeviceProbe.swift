@@ -49,13 +49,18 @@ public struct RawDeviceProbe: Sendable {
 /// a probe source; an external disk is never touched.
 public struct InternalDiskLocator: Sendable {
     private let executor: any CommandExecuting
+    private let environment: [String: String]
 
-    public init(executor: any CommandExecuting = ProcessRunner()) {
+    public init(
+        executor: any CommandExecuting = ProcessRunner(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
         self.executor = executor
+        self.environment = environment
     }
 
     public func internalRawNode() -> String? {
-        let collector = DeviceCollector(executor: executor)
+        let collector = DeviceCollector(executor: executor, environment: environment)
         let enumeration = collector.enumerate()
         guard enumeration.status == .ok else { return nil }
 

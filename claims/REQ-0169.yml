@@ -1,0 +1,18 @@
+# REQ-0169 — diskdoctor.md §8 image while DiskArbitration is stopped
+# Authored from the measured hang: the full image path must not depend on diskutil when it would block.
+schema: req.claim/2
+claim_id: REQ-0169
+statement: "The image command shall complete with the same outcome when diskarbitrationd is stopped without invoking diskutil."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L462
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0169_fullImageNeverCallsDiskutil()"
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0169_runningDaKeepsDiskutilFirst()"
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0169_runningDaKeepsDiskutilWalk()"

@@ -79,6 +79,17 @@ public struct LiveCheckProbes: CheckProbing {
     }
 
     public func filesystemDrivers() -> CheckProbe {
+        // While DiskArbitration is stopped, any `diskutil` call hangs
+        // system-wide (P0 phase C). The row is UNVERIFIABLE, never a wait.
+        let daemon = DiskArbitrationProbe(executor: executor, environment: environment)
+        if daemon.forceIOReg {
+            return .unverifiable(DiskArbitrationProbe.forcedReason)
+        }
+        if daemon.isStopped() {
+            // The row's own wording, as the CLI contract states it.
+            return .unverifiable("diskarbitrationd stopped; diskutil skipped")
+        }
+
         var thirdParty: [String]?
         var reason: String?
         do {

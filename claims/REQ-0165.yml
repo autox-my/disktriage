@@ -1,0 +1,20 @@
+# REQ-0165 — diskdoctor.md §8 enumeration without DiskArbitration
+# Authored from the P0 phase C finding that diskutil hangs while diskarbitrationd is suspended.
+schema: req.claim/2
+claim_id: REQ-0165
+statement: "The device collector shall enumerate whole disks from ioreg when diskarbitrationd is stopped or diskutil list times out."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L462
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.DeviceCollectorEnumerateIORegTests::REQ0165_apfsMediaIsVirtual()"
+  - "DiskTriageCollectorsTests.DeviceCollectorEnumerateIORegTests::REQ0165_diskutilListTimeoutFallsBack()"
+  - "DiskTriageCollectorsTests.DeviceCollectorEnumerateIORegTests::REQ0165_internalProbeUsesIOReg()"
+  - "DiskTriageCollectorsTests.DeviceCollectorEnumerateIORegTests::REQ0165_runningDAKeepsDiskutilList()"
+  - "DiskTriageCollectorsTests.DeviceCollectorEnumerateIORegTests::REQ0165_stoppedDAEnumeratesFromIOReg()"

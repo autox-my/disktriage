@@ -114,16 +114,14 @@ public enum DeviceParseError: Error, Equatable {
 /// from `diskutil info -plist`, read-only and without root (diskdoctor.md §4).
 public struct DeviceCollector: Sendable {
     private let executor: any CommandExecuting
-    /// Test-only override: `DISKTRIAGE_FORCE_IOREG=1` forces the path that
-    /// bypasses DiskArbitration, so a healthy Mac can exercise it.
-    private let forceIOReg: Bool
+    private let diskArbitration: DiskArbitrationProbe
 
     public init(
         executor: any CommandExecuting = ProcessRunner(),
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.executor = executor
-        self.forceIOReg = environment["DISKTRIAGE_FORCE_IOREG"] == "1"
+        self.diskArbitration = DiskArbitrationProbe(executor: executor, environment: environment)
     }
 
     /// `[0] enumerate` for the decision tree: whole disks only, never slices.
@@ -133,9 +131,22 @@ public struct DeviceCollector: Sendable {
 
     /// Enumeration that keeps its status: an empty list from a failed command
     /// is not "no disks attached" (diskdoctor.md §2.3).
+    ///
+    /// While DiskArbitration is stopped the list comes from ioreg; a `diskutil
+    /// list` timeout falls back the same way once, because a hung enumeration
+    /// must not block triage or the internal-disk probe.
     public func enumerate() -> DiskEnumeration {
+        if let reason = diskArbitration.diskutilSkipReason() {
+            return enumerateFromIOReg(reason: reason)
+        }
+
         let result = executor.run(.diskutilList)
         guard result.outcome == .ok else {
+            if result.outcome == .timeout {
+                return enumerateFromIOReg(
+                    reason: "diskutil list timed out after \(result.durationMs) ms; disks read from ioreg"
+                )
+            }
             return DiskEnumeration(
                 status: result.outcome.signalStatus,
                 reason: "diskutil list \(result.outcome.rawValue) after \(result.durationMs) ms"
@@ -151,21 +162,29 @@ public struct DeviceCollector: Sendable {
         return DiskEnumeration(status: .ok, disks: disks.filter(isWholeDiskName))
     }
 
-    public func collect(bsd: String) -> DeviceCollection {
-        if forceIOReg {
-            return collectFromIOReg(
-                bsd: bsd,
-                reason: "DISKTRIAGE_FORCE_IOREG=1 (test-only); diskutil skipped",
-                diskutilTimeoutMs: nil
+    /// The never-`diskutil` enumeration: whole media in the registry tree.
+    private func enumerateFromIOReg(reason: String) -> DiskEnumeration {
+        let result = executor.run(.ioregDeviceTree)
+        guard result.outcome == .ok else {
+            return DiskEnumeration(
+                status: result.outcome.signalStatus,
+                reason: reason + "; ioreg device tree \(result.outcome.rawValue) after \(result.durationMs) ms"
             )
         }
+        let disks = IORegDeviceParser.wholeDisks(result.stdout).map(\.bsd)
+        guard !disks.isEmpty else {
+            return DiskEnumeration(status: .error, reason: reason + "; ioreg device tree lists no whole disk")
+        }
+        // diskutil lists diskN in numeric order; the registry tree is in
+        // parent-first order (disk0, disk1, disk3, disk2, …). Sort so `list`
+        // reads the same either way.
+        let sorted = disks.sorted { wholeDiskUnit($0) < wholeDiskUnit($1) }
+        return DiskEnumeration(status: .ok, disks: sorted, reason: reason)
+    }
 
-        if diskArbitrationIsStopped() {
-            return collectFromIOReg(
-                bsd: bsd,
-                reason: "diskarbitrationd is stopped; diskutil skipped",
-                diskutilTimeoutMs: nil
-            )
+    public func collect(bsd: String) -> DeviceCollection {
+        if let reason = diskArbitration.diskutilSkipReason() {
+            return collectFromIOReg(bsd: bsd, reason: reason, diskutilTimeoutMs: nil)
         }
 
         let result = executor.run(.diskutilInfo(disk: bsd))
@@ -219,23 +238,6 @@ public struct DeviceCollector: Sendable {
         }
     }
 
-    /// Reads diskarbitrationd's state through the same argv shapes the guard
-    /// uses (`pgrep -x`, `ps -o stat= -p`). Only a positive stopped state
-    /// skips `diskutil`; an unknown state falls through to the normal path.
-    private func diskArbitrationIsStopped() -> Bool {
-        let pidResult = executor.run(.pgrepDiskArbitrationDaemon)
-        guard pidResult.outcome == .ok,
-              let pid = pidResult.stdout
-                  .split(whereSeparator: \.isWhitespace)
-                  .first
-                  .flatMap({ Int32($0) })
-        else { return false }
-
-        let stateResult = executor.run(.processState(pid: pid))
-        guard stateResult.outcome == .ok else { return false }
-        return ProcessState.isStopped(stateResult.stdout)
-    }
-
     /// The identity path that never calls `diskutil`. Both the stopped-daemon
     /// path and the timeout fallback land here.
     private func collectFromIOReg(
@@ -286,7 +288,7 @@ public struct DeviceCollector: Sendable {
             ejectable: parsed.ejectable,
             blockSize: parsed.blockSize,
             internalDisk: parsed.internalDisk,
-            virtualOrPhysical: nil
+            virtualOrPhysical: parsed.virtual == true ? "Virtual" : nil
         )
         return DeviceCollection(
             status: .ok,
@@ -351,4 +353,9 @@ private func busName(from protocolName: String?, isInternal: Bool?) -> String? {
 
 private func integer(_ value: Any?) -> Int64? {
     (value as? NSNumber)?.int64Value
+}
+
+/// `disk3` → 3; used only to match `diskutil list`'s ordering.
+private func wholeDiskUnit(_ name: String) -> Int {
+    Int(name.dropFirst(4)) ?? Int.max
 }

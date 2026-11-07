@@ -22,6 +22,11 @@ public struct IORegDeviceIdentity: Sendable, Equatable {
     public let ejectable: Bool?
     public let internalDisk: Bool?
     public let whole: Bool?
+    /// True for a synthesized APFS container's `AppleAPFSMedia` (the `disk3`
+    /// whose store is a real disk). The registry has no `VirtualOrPhysical`
+    /// string, but the class is enough to keep a virtual container out of the
+    /// internal-disk probe.
+    public let virtual: Bool?
 
     public init(
         bsd: String,
@@ -35,7 +40,8 @@ public struct IORegDeviceIdentity: Sendable, Equatable {
         removable: Bool? = nil,
         ejectable: Bool? = nil,
         internalDisk: Bool? = nil,
-        whole: Bool? = nil
+        whole: Bool? = nil,
+        virtual: Bool? = nil
     ) {
         self.bsd = bsd
         self.sizeBytes = sizeBytes
@@ -49,6 +55,23 @@ public struct IORegDeviceIdentity: Sendable, Equatable {
         self.ejectable = ejectable
         self.internalDisk = internalDisk
         self.whole = whole
+        self.virtual = virtual
+    }
+}
+
+/// One whole disk the registry tree exposes, used when `diskutil list` cannot
+/// be run (DiskArbitration stopped) or timed out.
+public struct IORegWholeDisk: Equatable, Sendable {
+    public let bsd: String
+    public let sizeBytes: Int64?
+    public let internalDisk: Bool?
+    public let virtual: Bool
+
+    public init(bsd: String, sizeBytes: Int64? = nil, internalDisk: Bool? = nil, virtual: Bool = false) {
+        self.bsd = bsd
+        self.sizeBytes = sizeBytes
+        self.internalDisk = internalDisk
+        self.virtual = virtual
     }
 }
 
@@ -67,7 +90,7 @@ public enum IORegDeviceParser {
         let parents = parentIndices(of: nodes)
 
         guard let mediaIndex = nodes.firstIndex(where: { node in
-            node.className == "IOMedia"
+            (node.className == "IOMedia" || node.className == "AppleAPFSMedia")
                 && dictionaryString("BSD Name", in: node.properties) == bsd
                 && boolean("Whole", in: node.properties) == true
         }) else { return nil }
@@ -120,8 +143,50 @@ public enum IORegDeviceParser {
             removable: boolean("Removable", in: media.properties),
             ejectable: boolean("Ejectable", in: media.properties),
             internalDisk: internalDisk,
-            whole: boolean("Whole", in: media.properties)
+            whole: boolean("Whole", in: media.properties),
+            virtual: isVirtualMedia(className: media.className, properties: media.properties)
         )
+    }
+
+    /// Every whole-disk `IOMedia` in an `ioreg -r -c IOBlockStorageDevice`
+    /// recording, in tree order. `virtual` marks a synthesized APFS container,
+    /// which must never be the internal probe source.
+    public static func wholeDisks(_ text: String) -> [IORegWholeDisk] {
+        let nodes = parseNodes(text)
+        guard !nodes.isEmpty else { return [] }
+        let parents = parentIndices(of: nodes)
+        var disks: [IORegWholeDisk] = []
+        var seen: Set<String> = []
+
+        for index in nodes.indices {
+            let node = nodes[index]
+            guard node.className == "IOMedia" || node.className == "AppleAPFSMedia" else { continue }
+            guard boolean("Whole", in: node.properties) == true,
+                  let bsd = string("BSD Name", in: node.properties),
+                  !bsd.isEmpty,
+                  seen.insert(bsd).inserted
+            else { continue }
+
+            let deviceIndex = ancestorChain(from: index, parents: parents)
+                .first { nodes[$0].properties.contains("\"Device Characteristics\"") }
+            let deviceProperties = deviceIndex.map { nodes[$0].properties } ?? ""
+            let protocols = dictionary("Protocol Characteristics", in: deviceProperties) ?? ""
+            let location = dictionaryString("Physical Interconnect Location", in: protocols)
+            let internalDisk: Bool?
+            switch location?.lowercased() {
+            case "internal": internalDisk = true
+            case "external": internalDisk = false
+            default: internalDisk = nil
+            }
+
+            disks.append(IORegWholeDisk(
+                bsd: bsd,
+                sizeBytes: integer("Size", in: node.properties),
+                internalDisk: internalDisk,
+                virtual: isVirtualMedia(className: node.className, properties: node.properties)
+            ))
+        }
+        return disks
     }
 }
 
@@ -302,6 +367,12 @@ private func hexBytes(_ value: String) -> [UInt8]? {
         index = next
     }
     return bytes
+}
+
+private func isVirtualMedia(className: String, properties: String) -> Bool {
+    if className == "AppleAPFSMedia" { return true }
+    // The APFS content hint is a second, class-independent signal.
+    return string("Content Hint", in: properties)?.hasPrefix("EF57347C-") == true
 }
 
 private func mediaType(_ value: String?) -> String? {

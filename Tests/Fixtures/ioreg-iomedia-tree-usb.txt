@@ -1,0 +1,32 @@
++-o Expansion Media  <class IOMedia, id 0x100000001, registered, matched, active, busy 0 (12 ms), retain 9>
+  | {
+  |   "Content" = "GUID_partition_scheme"
+  |   "Removable" = Yes
+  |   "Whole" = Yes
+  |   "Leaf" = No
+  |   "BSD Name" = "disk8"
+  |   "Ejectable" = Yes
+  |   "Preferred Block Size" = 512
+  |   "Size" = 5000981077504
+  | }
+  |
+  +-o EFI System Partition@1  <class IOMedia, id 0x100000002, registered, matched, active, busy 0 (2 ms), retain 6>
+  | | {
+  | |   "Whole" = No
+  | |   "BSD Name" = "disk8s1"
+  | |   "Size" = 209715200
+  | | }
+  |
+  +-o Macintosh HD@2  <class IOMedia, id 0x100000003, registered, matched, active, busy 0 (3 ms), retain 7>
+  | | {
+  | |   "Whole" = No
+  | |   "BSD Name" = "disk8s2"
+  | |   "Size" = 2500000000000
+  | | }
+  |
+  +-o Windows NTFS@3  <class IOMedia, id 0x100000004, registered, matched, active, busy 0 (2 ms), retain 7>
+    | {
+    |   "Whole" = No
+    |   "BSD Name" = "disk8s3"
+    |   "Size" = 2000000000000
+    | }
