@@ -1,0 +1,17 @@
+# REQ-0233 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0233
+statement: "A scope report on APFS shall require free space of the larger of 1 GiB and twice the stage-0 read budget rather than the device size."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0233_REQ0234_scopeReportFreeSpaceOnAPFS()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0233_scopeReportOnAPFSUsesTheMetadataRule()"

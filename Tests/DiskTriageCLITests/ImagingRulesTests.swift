@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import DiskTriageCore
 @testable import DiskTriageCLI
 
 /// The pure rules behind `disktriage image` (diskdoctor.md §6, §8).
@@ -376,5 +377,125 @@ struct ImagingRulesTests {
         #expect(wholeDiskName(fromDevicePath: "/dev/disk8") == "disk8")
         #expect(wholeDiskName(fromDevicePath: "/dev/rdisk8") == "disk8")
         #expect(wholeDiskName(fromDevicePath: "/dev/notadisk") == nil)
+    }
+
+    // MARK: - The scope report's destination rule
+
+    /// The 233.8 GiB device of the plan's transcript with 1.3 GiB free: the
+    /// full-size rule refuses, and a scope report must not.
+    private func scopeFacts(
+        free: Int64 = 1_396_000_000,
+        filesystem: String? = "apfs"
+    ) -> DestinationFacts {
+        DestinationFacts(
+            destinationExists: false,
+            mapfileExists: false,
+            freeBytes: free,
+            containerFilesystem: filesystem,
+            parentIsWritable: true,
+            backingWholeDisk: "disk0"
+        )
+    }
+
+    private func scopeSource() -> ImageSource {
+        ImageSource(
+            bsd: "disk8",
+            model: "Synthetic Bridge Disk",
+            serial: "SYNTH0000ABCD",
+            sizeBytes: 251_000_193_024,   // 233.7601 GiB, formatted 233.8 GiB
+            blockSize: 512
+        )
+    }
+
+    // REQ-0233
+    @Test("REQ0233 a scope report on APFS is judged by its metadata, not the device size")
+    func REQ0233_scopeReportOnAPFSUsesTheMetadataRule() {
+        let checks = assessDestination(
+            facts: scopeFacts(),
+            source: scopeSource(),
+            scopeReport: true
+        )
+        let free = checks.first { $0.name == "free space" }
+        #expect(free?.outcome == .pass, "1.3 GiB free is enough for a few MB: \(free?.detail ?? "missing")")
+        #expect(free?.detail.contains("sparse image on apfs") == true, "\(free?.detail ?? "")")
+        #expect(free?.detail.contains("metadata only") == true, "\(free?.detail ?? "")")
+        #expect(free?.detail.contains("MiB") == true, "the metadata size is named: \(free?.detail ?? "")")
+        #expect(free?.detail.contains("233.8 GiB") == false,
+                "a metadata-only report does not need the device size")
+    }
+
+    // REQ-0234
+    @Test("REQ0234 full and used-only runs keep the full-size free-space rule on APFS")
+    func REQ0234_fullRunsKeepTheFullSizeRule() {
+        // `--used-only` is a full imaging run with stage 2 skipped; it uses the
+        // same destination assessment, so the absence of `scopeReport` is the
+        // rule. A partial limit still uses the limit, as before.
+        let full = assessDestination(facts: scopeFacts(), source: scopeSource())
+        let free = full.first { $0.name == "free space" }
+        #expect(free?.outcome == .refuse, "the full device does not fit: \(free?.detail ?? "missing")")
+        #expect(free?.detail.contains("233.8 GiB") == true, "the device size is the requirement")
+        #expect(free?.detail.contains("sparse image") == false)
+
+        let partial = assessDestination(
+            facts: scopeFacts(),
+            source: scopeSource(),
+            limitBytes: 8_589_934_592
+        )
+        let partialFree = partial.first { $0.name == "free space" }
+        #expect(partialFree?.outcome == .refuse,
+                "8 GiB still does not fit in 1.3 GiB; the partial rule is unchanged")
+        #expect(partialFree?.detail.contains("8.0 GiB") == true)
+    }
+
+    // REQ-0235
+    @Test("REQ0235 a scope report on a non-APFS destination keeps the full-size rule")
+    func REQ0235_nonAPFSKeepsTheFullSizeRule() {
+        for filesystem in ["hfs", "exfat", "msdos", nil] as [String?] {
+            let checks = assessDestination(
+                facts: scopeFacts(filesystem: filesystem),
+                source: scopeSource(),
+                scopeReport: true
+            )
+            let free = checks.first { $0.name == "free space" }
+            #expect(free?.outcome == .refuse,
+                    "\(filesystem ?? "unknown") is not sparse-capable: \(free?.detail ?? "missing")")
+            #expect(free?.detail.contains("sparse image") == false,
+                    "only APFS is sparse-capable")
+        }
+    }
+
+    // REQ-0236
+    @Test("REQ0236 a scope report requires at least 1 GiB free")
+    func REQ0236_scopeReportHasAOneGiBFloor() {
+        let floor: Int64 = 1_073_741_824
+        // A 1 GiB device: 2 x its metadata budget is far below the floor, so
+        // only the floor can refuse this half-gigabyte destination.
+        let source = ImageSource(bsd: "disk8", sizeBytes: floor, blockSize: 512)
+
+        let below = assessDestination(
+            facts: scopeFacts(free: 536_870_912, filesystem: "apfs"),
+            source: source,
+            scopeReport: true
+        )
+        #expect(below.first { $0.name == "free space" }?.outcome == .refuse,
+                "512 MiB is below the floor")
+
+        let at = assessDestination(
+            facts: scopeFacts(free: floor, filesystem: "apfs"),
+            source: source,
+            scopeReport: true
+        )
+        #expect(at.first { $0.name == "free space" }?.outcome == .pass,
+                "exactly 1 GiB is enough")
+    }
+
+    @Test("the stage-0 scope budget is the bitmap bound plus fixed metadata")
+    func scopeReportBudgetIsTheBitmapBound() {
+        let device: Int64 = 251_000_193_024
+        // 1 bit per 512-byte cluster (NTFS's smallest): 61,279,344 bytes,
+        // rounded up to a byte; plus a 2 MiB fixed-metadata bound.
+        let expected: Int64 = 61_279_344 + 2_097_152
+        #expect(NTFSStage0ReadPlan.scopeReportByteBudget(deviceBytes: device) == expected)
+        #expect(NTFSStage0ReadPlan.scopeReportByteBudget(deviceBytes: 0) == 0)
     }
 }

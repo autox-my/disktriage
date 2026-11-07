@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Testing
 import DiskTriageTestSupport
 import DiskTriageCore
@@ -421,6 +422,54 @@ struct ScopeReportLiveTests {
         #expect(imageBytes < harness.deviceSize, "a metadata-only image, not the device")
     }
 
+    // REQ-0237
+    @Test(
+        "REQ0237 a scope-report image on APFS is sparse: small allocated blocks, large apparent size",
+        .enabled(
+            if: ntfsDiskImagePath() != nil && scopeDdrescuePath() != nil
+                && temporaryDirectoryIsAPFS(),
+            "ddrescue, the capture, or an APFS temp directory is absent"
+        )
+    )
+    func REQ0237_realDdrescueScopeReportImageIsSparse() throws {
+        let harness = try ScopeLiveHarness()
+        // The plan's transcript: a 233.8 GiB device into 1.3 GiB of free
+        // space. The source file stays the capture; the seam reports the full
+        // size, which only a sparse metadata-only image can fit.
+        let facts = DestinationFacts(
+            destinationExists: false,
+            mapfileExists: false,
+            freeBytes: 1_396_000_000,
+            containerFilesystem: "apfs",
+            parentIsWritable: true,
+            backingWholeDisk: "disk0"
+        )
+        let result = harness.run(
+            deviceSizeOverride: 251_000_193_024,
+            probe: DiskDestinationProbe(freeBytes: facts.freeBytes, containerFilesystem: "apfs")
+        )
+        #expect(result.exitCode == 0, "\(result.stdout)\n\(result.stderr)")
+
+        var info = stat()
+        #expect(lstat(harness.image, &info) == 0, "the image exists")
+        let allocated = Int64(info.st_blocks) * 512
+        let apparent = Int64(info.st_size)
+        #expect(apparent > 0)
+        #expect(allocated < apparent,
+                "the image is sparse: \(allocated) allocated vs \(apparent) apparent")
+        #expect(allocated < 8 * 1_048_576,
+                "stage 0 wrote metadata only, not the 233.8 GiB device")
+    }
+}
+
+private func temporaryDirectoryIsAPFS() -> Bool {
+    var stats = statfs()
+    let path = FileManager.default.temporaryDirectory.path
+    guard path.withCString({ statfs($0, &stats) }) == 0 else { return false }
+    let name = withUnsafeBytes(of: stats.f_fstypename) { raw in
+        String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
+    }
+    return name == "apfs"
 }
 
 private final class ScopeLiveHarness {
@@ -446,7 +495,11 @@ private final class ScopeLiveHarness {
         #expect(deviceSize > 0)
     }
 
-    func run(extra: [String] = []) -> CLIResult {
+    func run(
+        extra: [String] = [],
+        deviceSizeOverride: Int64? = nil,
+        probe: (any ImageDestinationProbing)? = nil
+    ) -> CLIResult {
         let dependencies = ImagingDependencies(
             environment: FakeImagingEnvironment(),
             launcher: ScopeRealDdrescueLauncher(sourcePath: source, log: log),
@@ -459,10 +512,10 @@ private final class ScopeLiveHarness {
              "--confirm-serial", "ABCD", "--scope-report"] + extra,
             executor: imagingExecutor(),
             now: { Date() },
-            destinationProbe: DiskDestinationProbe(),
+            destinationProbe: probe ?? DiskDestinationProbe(),
             writeFile: { path, data in try data.write(to: URL(fileURLWithPath: path)) },
             imaging: dependencies,
-            deviceSizeOverride: deviceSize
+            deviceSizeOverride: deviceSizeOverride ?? deviceSize
         )
     }
 }

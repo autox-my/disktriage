@@ -1,0 +1,16 @@
+# REQ-0237 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0237
+statement: "A scope-report image on APFS shall allocate far fewer blocks than its apparent size."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeReportLiveTests::REQ0237_realDdrescueScopeReportImageIsSparse()"

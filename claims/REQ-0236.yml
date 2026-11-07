@@ -1,0 +1,16 @@
+# REQ-0236 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0236
+statement: "A scope report shall require at least 1 GiB of free space."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0236_scopeReportHasAOneGiBFloor()"

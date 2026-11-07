@@ -202,7 +202,8 @@ func image(
     let checks = assessDestination(
         facts: facts,
         source: source,
-        limitBytes: requestedLimitBytes
+        limitBytes: requestedLimitBytes,
+        scopeReport: options.scopeReport
     )
 
     let confirmation = confirmationState(options: options, source: source)

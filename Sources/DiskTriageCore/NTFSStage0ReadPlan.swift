@@ -45,8 +45,7 @@ public enum NTFSStage0ReadPlan {
         partitionTable: PartitionTable? = nil,
         gptHeader: GPTHeaderLocation? = nil,
         deviceSize: Int64? = nil
-    ) -> [Stage0ReadExtent] {
-        var extents: [Stage0ReadExtent] = []
+    ) -> [Stage0ReadExtent] {        var extents: [Stage0ReadExtent] = []
 
         // Partition table sectors.
         if let partitionTable {
@@ -121,5 +120,24 @@ public enum NTFSStage0ReadPlan {
         }
 
         return extents
+    }
+
+    /// An upper bound on the bytes a stage-0 scope report reads (and therefore
+    /// on the allocated blocks it writes): the partition tables including the
+    /// GPT backup copies, both boot sectors, the first 16 `$MFT` records and the
+    /// whole `$Bitmap`.
+    ///
+    /// The bitmap is one bit per cluster. NTFS can use 512-byte clusters, the
+    /// smallest, so `deviceBytes / 512 / 8` is an upper bound for a volume no
+    /// larger than the device. The fixed 2 MiB covers two GPT copies, both boot
+    /// sectors and 16 records of up to 64 KiB each. This is a pre-read budget,
+    /// not a measurement: the real scope report parses the bitmap and reports
+    /// its exact allocation.
+    public static func scopeReportByteBudget(deviceBytes: Int64) -> Int64 {
+        guard deviceBytes > 0 else { return 0 }
+        let bitmap = (deviceBytes / 512 + 7) / 8
+        let fixedMetadata: Int64 = 2 * 1024 * 1024
+        let (total, overflow) = bitmap.addingReportingOverflow(fixedMetadata)
+        return overflow ? Int64.max : total
     }
 }
