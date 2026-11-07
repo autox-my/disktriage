@@ -737,3 +737,23 @@ First real-device run of `guard` + `image`. Healthy drive, 3 GiB partial image (
   (`0x7FFFFFFF709AFFFF`), so the summary printed ~8 EiB remaining. Mapfile accounting is now clamped to the
   limit (REQ-0108..0110).
 - **Not covered:** a drive with bad sectors under `image` (the MiNaH drive), pass 2, `guard --suspend`.
+
+### MiNaH image runs (2026-11-07, WD3200BJKT behind a generic USB 2 bridge)
+
+**Run 1: `image --limit 10` (first 10 GiB, plain passes, `guard --suspend` active).**
+- Guard held; identity came from ioreg (`diskutil` skipped while diskarbitrationd was stopped); nothing mounted.
+- Pass 1 rescued 3.2 GiB with 12 failed 64 KiB blocks (`*`) and stopped on its own after 996 s: `ddrescue -T 90`
+  (no successful read for 90 s) exits 1 and is resumable. Clean zones read at 37 MB/s (USB 2 ceiling); one
+  stretch ran at 6 MB/s for about 225 s. Each failed read cost about 48 s (20 kernel retries).
+- Kernel log: medium errors at 15 distinct LBAs in the first 3.2 GiB (first at LBA 0x800, the NTFS boot sector).
+- Defects found and fixed: failed blocks were reported as `BAD 0 bytes`; the stop was labelled "ddrescue
+  error"; `check` hung under a stopped diskarbitrationd; `ntfscat --version` prints its banner on stderr.
+- The bench script's sudo credential expired mid-run, which left the guard running; fixed with a keep-alive.
+  `guard --suspend` teardown (resume after the node is gone) was then confirmed on the scope run.
+
+**Run 2: `image --scope-report` (stage 0 only, 315 s, sparse image 10.6 MiB allocated of 320 GB apparent).**
+- Used 246.2 GB (76.9 %), free 73.9 GB, 337 used extents, `$MFT` 648 MB, geometry from the primary boot sector.
+- Allocation-aware ordering therefore saves only about 30 minutes of 2.4 h; its value is data-first order.
+- The `$Bitmap` data had 4096 unreadable bytes (32,768 clusters, 128 MiB), which stage 0 first parsed as
+  free. Now they are UNKNOWN allocation, counted as used (REQ-0238..0247).
+- Not yet done: the full image (deferred by the user), pass 2 on real bad media, the stop rule on real media.
