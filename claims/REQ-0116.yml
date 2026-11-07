@@ -13,4 +13,4 @@ rationale:
 pins:
   modality: "SHALL"
 tests:
-  - "DiskTriageCLITests.InspectCommandTests::REQ0116_mapfileReportsDamage()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0056_REQ0090_REQ0091_REQ0116_mapfileReportsDamage()"

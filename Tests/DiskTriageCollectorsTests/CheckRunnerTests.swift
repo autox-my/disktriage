@@ -90,6 +90,37 @@ struct CheckRunnerTests {
         #expect(raw?.detail.contains("no internal disk found") == true, "the reason is kept")
     }
 
+    // REQ-0006: the third-party drivers are listed, never installed.
+    // REQ-0069: root, raw access, removable volumes, the unified log, the mount
+    // guard and the driver inventory are all reported.
+    // REQ-0070: smartctl and ddrescue are reported with their versions.
+    @Test("REQ0006_REQ0069_REQ0070 every self-test row is present and the tools carry versions")
+    func REQ0006_REQ0069_REQ0070_reportsEveryRowAndToolVersion() throws {
+        let probes = ScriptedCheckProbes(raw: [.read(bytes: 4096), .read(bytes: 4096)])
+        probes.rootValue = true
+        probes.drivers = .pass("iboysoft_NTFS (/Library/Filesystems/iboysoft_NTFS.fs)")
+        let report = CheckRunner(probes: probes).run()
+
+        let ids = Set(report.rows.map(\.id))
+        for id in ["root", "raw-read", "removable-volume", "unified-log",
+                   "mount-guard", "filesystem-drivers"] {
+            #expect(ids.contains(id), "row \(id) is reported")
+        }
+
+        let root = try #require(report.rows.first { $0.id == "root" })
+        #expect(root.status == .pass, "root status")
+        let drivers = try #require(report.rows.first { $0.id == "filesystem-drivers" })
+        #expect(drivers.detail.contains("iboysoft_NTFS"), "the installed driver is named")
+        #expect(drivers.status == .pass, "the inventory is readable")
+
+        let smart = try #require(report.rows.first { $0.id == "smartctl" })
+        #expect(smart.status == .pass, "smartctl is present")
+        #expect(smart.detail.contains("smartctl 7.5"), "the version is shown")
+        let ddrescue = try #require(report.rows.first { $0.id == "ddrescue" })
+        #expect(ddrescue.status == .pass, "ddrescue is present")
+        #expect(ddrescue.detail.contains("GNU ddrescue 1.30"), "the version is shown")
+    }
+
     @Test("a partial ntfs-3g set is FAIL; a missing set is UNVERIFIABLE")
     func ntfsToolsAreThreeState() {
         let partial = ScriptedCheckProbes(raw: [.read(bytes: 4096)])

@@ -13,4 +13,4 @@ rationale:
 pins:
   modality: "SHALL"
 tests:
-  - "DiskTriageCLITests.CopyCommandTests::REQ0132_hashEqualityWording()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0094_REQ0132_hashEqualityWording()"

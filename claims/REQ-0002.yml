@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0002 REQ-0041 a denied permission is a status, not the verdict, when a verdict exists`()"

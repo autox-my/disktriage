@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCollectorsTests.CheckRunnerTests::REQ0006_REQ0069_REQ0070_reportsEveryRowAndToolVersion()"

@@ -59,8 +59,8 @@ struct CopyCommandTests {
 
     // REQ-0128 / REQ-0136: a damaged mapfile is copied with a manifest, and the
     // file whose run intersects the bad cluster is named.
-    @Test("REQ0128_REQ0136 copy hashes every file, writes a manifest, and names the damaged file")
-    func REQ0128_REQ0134_REQ0136_copiesAndAttributes() throws {
+    @Test("REQ0091_REQ0093_REQ0128_REQ0136 copy hashes every file, writes a manifest, and names the damaged file")
+    func REQ0091_REQ0093_REQ0128_REQ0134_REQ0136_copiesAndAttributes() throws {
         let image = try makeBareNTFSImage()
         let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
@@ -533,8 +533,8 @@ struct CopyCommandTests {
     }
 
     // REQ-0129: the image is only read.
-    @Test("REQ0129 copying an image never writes it")
-    func REQ0129_imageIsNeverWritten() throws {
+    @Test("REQ0009_REQ0010_REQ0129 copying an image never writes it")
+    func REQ0009_REQ0010_REQ0129_imageIsNeverWritten() throws {
         let image = try makeBareNTFSImage()
         let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
@@ -553,8 +553,8 @@ struct CopyCommandTests {
     }
 
     // REQ-0130 / REQ-0131: no mapfile is unknown damage and no per-file claim.
-    @Test("REQ0130_REQ0131 no mapfile leaves damage unknown and makes no per-file claim")
-    func REQ0130_REQ0131_REQ0134_noMapfileMakesNoClaim() throws {
+    @Test("REQ0092_REQ0095_REQ0130_REQ0131 no mapfile leaves damage unknown and makes no per-file claim")
+    func REQ0092_REQ0095_REQ0130_REQ0131_REQ0134_noMapfileMakesNoClaim() throws {
         let image = try makeBareNTFSImage()
         let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
@@ -571,6 +571,7 @@ struct CopyCommandTests {
         #expect(result.stdout.contains("damage UNKNOWN"))
         let manifest = try json(destination + "/MANIFEST.json")
         let damage = try #require(manifest["damage"] as? [String: Any])
+        #expect(damage["scope"] as? String == "volume", "damage is always scoped to the volume")
         #expect(damage["status"] as? String == "unsupported")
         #expect(damage["unreadable_extents"] is NSNull, "absent is null, never zero")
 
@@ -584,8 +585,8 @@ struct CopyCommandTests {
     }
 
     // REQ-0131 / mutation (f): a failed ntfscluster pass makes no per-file claim.
-    @Test("REQ0131 a failed ntfscluster pass makes no per-file claim on a damaged image")
-    func REQ0131_failedAttributionMakesNoClaim() throws {
+    @Test("REQ0095_REQ0131 a failed ntfscluster pass makes no per-file claim on a damaged image")
+    func REQ0095_REQ0131_failedAttributionMakesNoClaim() throws {
         let image = try makeBareNTFSImage()
         let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
@@ -615,8 +616,8 @@ struct CopyCommandTests {
 
     // REQ-0131: an incomplete mapfile leaves the damage extent unknown, so the
     // run map cannot support a per-file claim even when it succeeds.
-    @Test("REQ0131 an incomplete mapfile makes no per-file claim")
-    func REQ0131_incompleteMapfileMakesNoClaim() throws {
+    @Test("REQ0095_REQ0131 an incomplete mapfile makes no per-file claim")
+    func REQ0095_REQ0131_incompleteMapfileMakesNoClaim() throws {
         let image = try makeBareNTFSImage()
         let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
@@ -694,8 +695,8 @@ struct CopyCommandTests {
     }
 
     // REQ-0136: --json is the same report with stable section keys.
-    @Test("REQ0136 --json carries the stable copy, damage and attribution sections")
-    func REQ0136_jsonReportHasStableSections() throws {
+    @Test("REQ0056_REQ0136 --json carries the stable copy, damage and attribution sections")
+    func REQ0056_REQ0136_jsonReportHasStableSections() throws {
         let image = try makeBareNTFSImage()
         let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
@@ -728,8 +729,8 @@ struct CopyCommandTests {
     }
 
     // REQ-0132: the manifest states what hash equality proves.
-    @Test("REQ0132 the manifest says hash equality is against the image, not the platter")
-    func REQ0132_hashEqualityWording() throws {
+    @Test("REQ0094_REQ0132 the manifest says hash equality is against the image, not the platter")
+    func REQ0094_REQ0132_hashEqualityWording() throws {
         let image = try makeBareNTFSImage()
         let destination = temp.child("copy-\(UUID().uuidString)")
         defer {

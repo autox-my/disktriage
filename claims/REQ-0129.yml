@@ -13,4 +13,4 @@ rationale:
 pins:
   modality: "SHALL-NOT"
 tests:
-  - "DiskTriageCLITests.CopyCommandTests::REQ0129_imageIsNeverWritten()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0009_REQ0010_REQ0129_imageIsNeverWritten()"

@@ -11,5 +11,5 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
-  - "DiskTriageCLITests.LiveCLITests::REQ0060_recordRedactsTheSerial()"
+  - "DiskTriageCLITests.LiveCLITests::REQ0010_REQ0060_recordRedactsTheSerial()"
   - "DiskTriageCoreTests.SignalSetRedactionTests::REQ0060_redactionHashesTheSerial()"

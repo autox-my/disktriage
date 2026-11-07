@@ -14,5 +14,5 @@ pins:
   value: "0"
   unit: "none"
 tests:
-  - "DiskTriageCoreTests.ClassifierTests::`REQ-0030 a clean drive is 'no actionable fault found', never 'healthy'`()"
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0008 REQ-0030 REQ-0100 a clean drive is 'no actionable fault found', never 'healthy' and never a score`()"
   - "DiskTriageCoreTests.FixtureExpectationTests::`REQ-0030 clean counters and a readable filesystem exit 0`()"

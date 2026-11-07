@@ -2,11 +2,17 @@
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0009
-statement: "The tool shall perform read-only operations only until the user explicitly requests a write."
+statement: "The tool shall perform read-only operations until the user explicitly requests a write, apart from the optional local history snapshot."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L76
+  source: diskdoctor.md#2-design-principles
   date: 2026-11-06
-  rejected_alternatives: []
+  rejected_alternatives:
+    - "No write at all until asked: the plan makes the local history snapshot optional (§4), and it is written by default unless --no-history is given."
   assumptions: []
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0009_REQ0010_REQ0129_imageIsNeverWritten()"
+  - "DiskTriageCLITests.HistoryCLITests::REQ0009_REQ0159_noHistoryDisablesTheStore()"
+  - "DiskTriageCLITests.ImageCommandTests::REQ0009_REQ0047_REQ0048_REQ0076_REQ0083_dryRunPrintsTheCommand()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0009_REQ0010_REQ0088_REQ0113_bareInspectionIsReadOnly()"

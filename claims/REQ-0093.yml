@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0091_REQ0093_REQ0128_REQ0134_REQ0136_copiesAndAttributes()"

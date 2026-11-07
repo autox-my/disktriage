@@ -11,6 +11,6 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
-  - "DiskTriageCLITests.CLITests::`REQ0057_REQ0058_REQ0059 triage --from puts the MiNaH transcript on stdout and exits 10`()"
+  - "DiskTriageCLITests.CLITests::`REQ-0065 REQ0057_REQ0058_REQ0059 triage --from puts the MiNaH transcript on stdout and exits 10`()"
   - "DiskTriageCoreTests.RendererTests::`REQ-0059 --local renders the log window in the supplied zone`()"
   - "DiskTriageCoreTests.RendererTests::`REQ-0059 the MiNaH tty transcript is byte-for-byte the Appendix`()"

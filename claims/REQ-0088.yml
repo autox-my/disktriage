@@ -2,14 +2,18 @@
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0088
-statement: "The inspection command shall attach the image read-only and without automount, then inspect it read-only with a native driver where macOS provides one and, for NTFS, with userspace tools on the image without mounting."
+statement: "The inspection command shall inspect an NTFS image read-only with the ntfs-3g userspace tools and without mounting it."
 applicability: []
 relations: []
 rationale:
   source: diskdoctor.md#8-imaging--inspection
   date: 2026-11-06
   rejected_alternatives:
+    - "native read-only attach for APFS/HFS+/exFAT/FAT (plan §8): not implemented; those filesystems are detected and refused (docs/sdlc.md)."
     - "native mount_ntfs: absent on macOS 27.2 (P0 A2)"
     - "macFUSE with ntfs-3g mount: kernel extension or FSKit, heavy install, and a mount again"
   assumptions:
     - "ntfs-3g userspace tools work read-only on images (docs/ntfs-spike.md)"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0009_REQ0010_REQ0088_REQ0113_bareInspectionIsReadOnly()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0088_REQ0121_missingToolsExitThirty()"

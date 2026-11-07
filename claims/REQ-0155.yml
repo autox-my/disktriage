@@ -13,7 +13,7 @@ rationale:
 pins:
   modality: "SHALL-NOT"
 tests:
+  - "DiskTriageCLITests.HistoryCLITests::REQ0017_REQ0155_noSerialMeansNoKey()"
   - "DiskTriageCLITests.HistoryCLITests::REQ0155_historyDirNeedsAValue()"
-  - "DiskTriageCLITests.HistoryCLITests::REQ0155_noSerialMeansNoKey()"
   - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0155_directoryPrecedence()"
   - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0155_permissionsAndDefaultPath()"

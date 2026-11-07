@@ -13,5 +13,5 @@ rationale:
 pins:
   modality: "SHALL-NOT"
 tests:
-  - "DiskTriageCLITests.InspectCommandTests::REQ0113_bareInspectionIsReadOnly()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0009_REQ0010_REQ0088_REQ0113_bareInspectionIsReadOnly()"
   - "DiskTriageCLITests.InspectCommandTests::REQ0118_REQ0113_restoreWritesOnlyTheWorkingCopy()"

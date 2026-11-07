@@ -11,4 +11,4 @@ rationale:
   rejected_alternatives: []
   assumptions: []
 tests:
-  - "DiskTriageCLITests.ImageCommandTests::REQ0047_REQ0048_REQ0076_REQ0083_dryRunPrintsTheCommand()"
+  - "DiskTriageCLITests.ImageCommandTests::REQ0009_REQ0047_REQ0048_REQ0076_REQ0083_dryRunPrintsTheCommand()"

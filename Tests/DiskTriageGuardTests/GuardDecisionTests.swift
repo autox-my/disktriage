@@ -7,8 +7,8 @@ import DiskTriageGuard
 struct GuardDecisionTests {
 
     // REQ-0071
-    @Test("REQ0071 dissent only for an external physical disk, approve everything else")
-    func REQ0071_dissentsOnlyForExternalPhysicalDisks() throws {
+    @Test("REQ0071_REQ0073 dissent only for an external physical disk, approve everything else")
+    func REQ0071_REQ0073_dissentsOnlyForExternalPhysicalDisks() throws {
         for sample in try diskDescriptionSamples() {
             let description = DiskDescription(daDescription: sample.description)
             let expected = try #require(GuardVerdict(rawValue: sample.expected))

@@ -131,8 +131,8 @@ struct LiveCLITests {
         #expect(!lowered.contains("passed"), "never a SMART verdict in list")
     }
 
-    @Test("list --json carries the same fields")
-    func listJSONCarriesTheFields() throws {
+    @Test("REQ0056 list --json carries the same fields")
+    func REQ0056_listJSONCarriesTheFields() throws {
         let result = run(arguments: ["list", "--json"], executor: listExecutor())
 
         let object = try #require(
@@ -150,8 +150,8 @@ struct LiveCLITests {
     }
 
     // REQ-0060: --record writes only the requested path and hashes the serial.
-    @Test("REQ0060 --record writes only its file and hashes the serial")
-    func REQ0060_recordRedactsTheSerial() throws {
+    @Test("REQ0010_REQ0060 --record writes only its file and hashes the serial")
+    func REQ0010_REQ0060_recordRedactsTheSerial() throws {
         var writes: [(String, Data)] = []
         let result = run(
             arguments: ["triage", "--from", fixturePath("minah.json"), "--record", "/tmp/minah.record.json"],

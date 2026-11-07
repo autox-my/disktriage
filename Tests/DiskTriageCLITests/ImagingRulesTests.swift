@@ -78,8 +78,8 @@ struct ImagingRulesTests {
     }
 
     // REQ-0083: pass 1 is -n, pass 2 is -r3, both on /dev/rdiskN and never -d.
-    @Test("REQ0083 the two passes use -n then -r3 on the raw node, with no direct I/O")
-    func REQ0083_twoPassesUseTheRawNodeAndNoDirectIO() {
+    @Test("REQ0080_REQ0083_REQ0086 the two passes use -n then -r3 on the raw node, caffeinate, -O and -K, with no direct I/O")
+    func REQ0080_REQ0083_REQ0086_twoPassesUseTheRawNodeAndNoDirectIO() {
         #expect(rawDeviceNode(for: "disk8") == "/dev/rdisk8", "the raw character node, never /dev/diskN")
 
         let passes = ddrescuePasses(

@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0082_imagingNeverPollsSMART()"

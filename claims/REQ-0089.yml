@@ -12,3 +12,5 @@ rationale:
   assumptions: []
 pins:
   modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0089_REQ0098_REQ0114_rejectsEverythingElse()"

@@ -10,3 +10,5 @@ rationale:
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
+tests:
+  - "DiskTriageCoreTests.ClassifierTests::`REQ-0097 an NTFS repair is a hand-off on a copy, never performed`()"

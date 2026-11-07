@@ -13,8 +13,8 @@ struct FDAStateTests {
     // REQ-0061: a real read on every run; no probe can never be GRANTED.
     // REQ-0067: the terminal is named.
     // REQ-0068: the grant is called broad.
-    @Test("REQ0061_REQ0067_REQ0068 EPERM is DENIED and names the terminal, the deep link and the broad grant")
-    func REQ0061_REQ0067_REQ0068_EPERMIsDeniedAndNamesTheTerminal() {
+    @Test("REQ-0064 REQ0061_REQ0067_REQ0068 EPERM is DENIED and names the terminal, the deep link and the broad grant")
+    func REQ0064_REQ0061_REQ0067_REQ0068_EPERMIsDeniedAndNamesTheTerminal() {
         let status = FDAStateMachine.evaluate(
             first: .failed(errno: 1, message: "Operation not permitted")
         )
@@ -59,8 +59,8 @@ struct FDAStateTests {
         #expect(twice.state == .verified, "two successes in one run verify")
     }
 
-    @Test("EACCES is FDA-granted-looking with a sudo remedy, never a plain failure")
-    func EACCESMeansTCCPassedButUnixDenied() {
+    @Test("REQ0064 EACCES is FDA-granted-looking with a sudo remedy, never a plain failure")
+    func REQ0064_EACCESMeansTCCPassedButUnixDenied() {
         let status = FDAStateMachine.evaluate(
             first: .failed(errno: 13, message: "Permission denied")
         )

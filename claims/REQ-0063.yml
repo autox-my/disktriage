@@ -15,3 +15,6 @@ rationale:
 pins:
   value: "4096"
   unit: "byte"
+tests:
+  - "DiskTriageCollectorsTests.RawDeviceProbeTests::REQ0063_noInternalDiskMeansNoNode()"
+  - "DiskTriageCollectorsTests.RawDeviceProbeTests::REQ0063_probeAsksFor4096Bytes()"

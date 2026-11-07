@@ -13,6 +13,6 @@ rationale:
 pins:
   modality: "SHALL"
 tests:
-  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0156_keyIsTheFullSha256OfTheSerial()"
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0017_REQ0156_keyIsTheFullSha256OfTheSerial()"
   - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0156_snapshotOnDiskUsesTheHashOnly()"
   - "DiskTriageCoreTests.SnapshotHistoryTests::REQ0156_theRecordHasNoSerialField()"

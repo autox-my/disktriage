@@ -13,5 +13,5 @@ rationale:
 pins:
   modality: "SHALL"
 tests:
-  - "DiskTriageCLITests.CopyCommandTests::REQ0128_REQ0134_REQ0136_copiesAndAttributes()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0091_REQ0093_REQ0128_REQ0134_REQ0136_copiesAndAttributes()"
   - "DiskTriageCLITests.CopyCommandTests::REQ0128_detectsACorruptingWriter()"

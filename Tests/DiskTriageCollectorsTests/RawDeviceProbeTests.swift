@@ -7,8 +7,8 @@ import DiskTriageCore
 /// block-aligned read (docs/p0-runbook.md row 8), and no test opens a device.
 struct RawDeviceProbeTests {
 
-    @Test("the probe asks for 4096 bytes, never the plan's old 512")
-    func probeAsksFor4096Bytes() {
+    @Test("REQ0063 the probe asks for 4096 bytes from the internal node, never the plan's old 512")
+    func REQ0063_probeAsksFor4096Bytes() {
         let recorder = ProbeRecorder()
         let probe = RawDeviceProbe { node, count in
             recorder.record(node: node, count: count)
@@ -46,8 +46,8 @@ struct RawDeviceProbeTests {
         #expect(locator.internalRawNode() == "/dev/rdisk4", "the first real internal disk")
     }
 
-    @Test("no internal disk means no node, never a fallback to a suspect device")
-    func noInternalDiskMeansNoNode() {
+    @Test("REQ0063 no internal disk means no node, never a fallback to a suspect device")
+    func REQ0063_noInternalDiskMeansNoNode() {
         let list = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

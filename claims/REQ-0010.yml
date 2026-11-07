@@ -2,11 +2,17 @@
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0010
-statement: "The tool shall write only to an image file or a copy destination."
+statement: "The tool shall write only to a user-named image or recording file, a copy destination, or the optional local history store."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L76
+  source: diskdoctor.md#2-design-principles
   date: 2026-11-06
-  rejected_alternatives: []
+  rejected_alternatives:
+    - "Only an image file or a copy destination: the image's mapfile and sidecar, triage --record and the local history store are also writes the plan requires."
   assumptions: []
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0009_REQ0010_REQ0129_imageIsNeverWritten()"
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0010_REQ0075_REQ0076_REQ0077_REQ0083_sidecarBeforeReadAndTwoPasses()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0009_REQ0010_REQ0088_REQ0113_bareInspectionIsReadOnly()"
+  - "DiskTriageCLITests.LiveCLITests::REQ0010_REQ0060_recordRedactsTheSerial()"

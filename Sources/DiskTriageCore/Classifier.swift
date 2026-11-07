@@ -319,7 +319,13 @@ public func classify(_ signals: SignalSet, context: TriageContext = TriageContex
         evidenceUnavailable: unavailable,
         imagingOffered: true,
         warnings: warnings,
-        next: nextStep(for: code, causes: causes, device: device, context: context)
+        next: nextStep(
+            for: code,
+            causes: causes,
+            device: device,
+            filesystemType: signals.fs?.type,
+            context: context
+        )
     )
 }
 
@@ -547,7 +553,13 @@ private func headline(for code: ExitCode, causes: [Cause]) -> String {
     }
 }
 
-private func nextStep(for code: ExitCode, causes: [Cause], device: DeviceSignals?, context: TriageContext) -> NextStep? {
+private func nextStep(
+    for code: ExitCode,
+    causes: [Cause],
+    device: DeviceSignals?,
+    filesystemType: String?,
+    context: TriageContext
+) -> NextStep? {
     switch code {
     case .mediaRisk:
         let destination = context.imageDestination
@@ -572,9 +584,16 @@ private func nextStep(for code: ExitCode, causes: [Cause], device: DeviceSignals
             why: "the swap test is what separates link, power and bridge"
         )
     case .filesystemOnly:
+        // NTFS has no native repair on macOS, so the repair is a printed
+        // hand-off against a copy; the tool never runs it on the original or
+        // the device (diskdoctor.md §8 "Repair hand-off").
+        let why = filesystemType?.lowercased() == "ntfs"
+            ? "NTFS has no native repair on macOS: hand off to ntfsfix or chkdsk "
+                + "against a copy of the image; this tool never repairs in place"
+            : "repair a copy of the image, never the original"
         return NextStep(
             command: "disktriage inspect <image>",
-            why: "repair a copy of the image, never the original"
+            why: why
         )
     case .noActionableFault, .insufficientEvidence, .permissionDenied, .toolError:
         return nil

@@ -78,6 +78,38 @@ struct CommandPolicyTests {
         }
     }
 
+    // REQ-0001: the tool never mounts the source device. REQ-0005: it never
+    // needs a third-party filesystem driver to mount. REQ-0073: the guard
+    // never unmounts or ejects. REQ-0006: it never installs a driver.
+    //
+    // Every command the product can run goes through one of these policies, so
+    // a mount, unmount, eject, kernel-extension load or package install shape
+    // is rejected before `exec`.
+    @Test("REQ-0001_REQ-0005_REQ-0006_REQ-0073 no policy allows a mount, unmount, eject or driver install")
+    func REQ0001_REQ0005_REQ0006_REQ0073_noMountUnmountOrDriverLoadIsAllowed() {
+        let forbidden: [[String]] = [
+            ["/sbin/mount"],
+            ["/sbin/mount_ntfs", "/dev/disk4", "/Volumes/x"],
+            ["/sbin/mount_apfs", "/dev/disk4s1", "/Volumes/x"],
+            ["/usr/sbin/diskutil", "mount", "disk4"],
+            ["/usr/sbin/diskutil", "mountDisk", "disk4"],
+            ["/usr/sbin/diskutil", "unmount", "disk4"],
+            ["/usr/sbin/diskutil", "unmountDisk", "disk4"],
+            ["/usr/sbin/diskutil", "eject", "disk4"],
+            ["/usr/bin/hdiutil", "attach", "/tmp/x.img"],
+            ["/sbin/kextload", "/Library/Extensions/ms_ntfs.kext"],
+            ["/usr/bin/kmutil", "load", "-i", "/Library/Extensions/ms_ntfs.kext"],
+            ["/opt/homebrew/bin/brew", "install", "macfuse"],
+            ["/usr/bin/installer", "-pkg", "/tmp/driver.pkg", "-target", "/"],
+        ]
+
+        for policy in [CommandPolicy.triage, .check, .inspect] {
+            for argv in forbidden {
+                #expect(policy.evaluate(argv) != .allowed, "policy allowed a write shape: \(argv)")
+            }
+        }
+    }
+
     // The self-test adds three read-only shapes. It must not widen triage.
     @Test("the check policy allows versions, listFilesystems and the compact log, and nothing else")
     func checkPolicyAllowsOnlyTheSelfTestShapes() {

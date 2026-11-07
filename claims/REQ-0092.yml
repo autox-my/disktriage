@@ -2,11 +2,14 @@
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0092
-statement: "The copy command shall record damage scope as volume and attribution as none in its manifest."
+statement: "The copy manifest shall record damage scope as volume, and attribution kind as none when per-file extent mapping is unavailable."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L480
+  source: diskdoctor.md#copy-and-damage-reporting
   date: 2026-11-06
-  rejected_alternatives: []
+  rejected_alternatives:
+    - "attribution is always none: per-file ntfscluster attribution now exists, so none is only the unavailable case."
   assumptions: []
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0092_REQ0095_REQ0130_REQ0131_REQ0134_noMapfileMakesNoClaim()"

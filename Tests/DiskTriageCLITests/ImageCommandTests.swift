@@ -154,8 +154,8 @@ struct ImageCommandTests {
 
     // REQ-0047 / REQ-0048 / REQ-0076 / REQ-0083: the exact two-pass command,
     // dry-run by default, with the mapfile beside the image.
-    @Test("REQ0047_REQ0048_REQ0076_REQ0083 dry-run is the default and prints both passes")
-    func REQ0047_REQ0048_REQ0076_REQ0083_dryRunPrintsTheCommand() {
+    @Test("REQ0009_REQ0047_REQ0048_REQ0076_REQ0083 dry-run is the default and prints both passes")
+    func REQ0009_REQ0047_REQ0048_REQ0076_REQ0083_dryRunPrintsTheCommand() {
         let result = serialRun(["--confirm-serial", "ABCD"])
 
         #expect(result.exitCode == 0)
@@ -434,8 +434,8 @@ struct ImageCommandTests {
 
     // MARK: - JSON and usage
 
-    @Test("--json carries the same plan")
-    func jsonCarriesThePlan() throws {
+    @Test("REQ0056 --json carries the same plan")
+    func REQ0056_jsonCarriesThePlan() throws {
         let result = serialRun(["--confirm-serial", "ABCD", "--json"])
         #expect(result.exitCode == 0)
 
