@@ -225,7 +225,7 @@ unlinked claims), which is not a pass. `scripts/req-link.sh --check` reports dri
 keeps the lists in step with the report.
 
 For which requirement numbers belong to which feature, use `git log -- claims/` and
-[`docs/sdlc.md`](./sdlc.md): the history and the SDLC pages now carry that narrative, and this page
+[`docs/adr/`](./adr/): the decision records carry that narrative, and this page
 does not keep a hand-maintained range list.
 
 - No `.req/variants` and no `.req/projections` are committed yet; `req check` therefore runs the

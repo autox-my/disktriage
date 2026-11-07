@@ -6,7 +6,7 @@ statement: "The tool shall place every unknown-allocation cluster in the stage-1
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#an-unfinished-bitmap-byte-is-unknown-allocation-never-free-v39
+  source: docs/adr/0019-unfinished-bitmap-byte-is-unknown.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

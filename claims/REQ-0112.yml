@@ -6,7 +6,7 @@ statement: "The inspect command shall refuse a non-regular input file."
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#cli-decisions-p3c-inspect
+  source: docs/adr/0004-inspect-ntfs-read-only.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

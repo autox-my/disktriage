@@ -6,7 +6,7 @@ statement: "The inspect and copy commands shall count failed and bad mapfile ext
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#mapfile-accounting-failed-is-not-bad-p3b-follow-up
+  source: docs/adr/0010-mapfile-failed-is-not-bad.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

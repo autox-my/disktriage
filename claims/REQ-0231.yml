@@ -6,7 +6,7 @@ statement: "The gate shall answer a disktriage-* directory that existed before t
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md
+  source: docs/adr/0017-test-temp-directories.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

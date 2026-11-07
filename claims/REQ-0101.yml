@@ -6,7 +6,7 @@ statement: "The image command shall parse --limit as a positive whole number of 
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#cli-decisions-p3b
+  source: docs/adr/0003-image-cli-contract.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

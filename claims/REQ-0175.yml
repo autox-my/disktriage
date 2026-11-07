@@ -6,7 +6,7 @@ statement: "The check command's ntfs-3g row shall name the prefix and the direct
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#check-does-not-wait-on-a-stopped-diskarbitrationd-p3-follow-up
+  source: docs/adr/0012-check-skips-stopped-diskarbitration.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

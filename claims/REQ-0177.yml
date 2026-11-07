@@ -8,7 +8,7 @@ relations:
   - type: "refines"
     to: "REQ-0172"
 rationale:
-  source: docs/sdlc.md#mapfile-accounting-failed-is-not-bad-p3b-follow-up
+  source: docs/adr/0010-mapfile-failed-is-not-bad.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

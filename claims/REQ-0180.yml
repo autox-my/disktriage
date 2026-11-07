@@ -6,7 +6,7 @@ statement: "The image command shall derive the default minimum read rate from th
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#deferring-slow-zones---min-read-rate-p3b-follow-up
+  source: docs/adr/0013-defer-slow-zones-min-read-rate.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []
