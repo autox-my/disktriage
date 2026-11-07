@@ -67,19 +67,9 @@ run_build() {
     echo "PASS          swift build"
 }
 
-# Counts one report. Prints "<total> <not-passed>".
-count_report() {
-    local report="$1" total bad
-    total="$("$XMLLINT_BIN" --noout --xpath 'count(//testcase)' "$report" 2>"$LOG_DIR/xpath.log")" || {
-        echo "UNVERIFIABLE  cannot parse $report: $(tr '\n' ' ' <"$LOG_DIR/xpath.log")"
-        return 3
-    }
-    bad="$("$XMLLINT_BIN" --noout --xpath 'count(//testcase[failure or error or skipped])' "$report" 2>>"$LOG_DIR/xpath.log")" || {
-        echo "UNVERIFIABLE  cannot parse $report: $(tr '\n' ' ' <"$LOG_DIR/xpath.log")"
-        return 3
-    }
-    printf '%s %s\n' "$total" "$bad"
-}
+# Counts and decides a JUnit report. Shared with scripts/check-gate-probe.sh,
+# which proves the pass/fail/skip rule bites without running the suite.
+. "$ROOT/scripts/lib/junit-report.sh"
 
 run_tests() {
     echo "== test =="
@@ -93,7 +83,8 @@ run_tests() {
     local rc=$?
     cat "$TEST_LOG"
 
-    local report total=0 bad=0 seen=0 counts written=""
+    local report total=0 failed=0 skipped=0 seen=0 counts written=""
+    local report_total report_failed report_skipped
     for report in "$REQUESTED_REPORT" "$SWIFT_TESTING_REPORT"; do
         if [ ! -s "$report" ]; then
             continue
@@ -104,8 +95,10 @@ run_tests() {
             *) echo "$counts"; return 3 ;;
         esac
         seen=$((seen + 1))
-        total=$((total + ${counts% *}))
-        bad=$((bad + ${counts#* }))
+        read -r report_total report_failed report_skipped <<< "$counts"
+        total=$((total + report_total))
+        failed=$((failed + report_failed))
+        skipped=$((skipped + report_skipped))
         written="$written$report"$'\n'
     done
 
@@ -113,22 +106,27 @@ run_tests() {
         echo "UNVERIFIABLE  no JUnit report was written ($REQUESTED_REPORT, $SWIFT_TESTING_REPORT)"
         return 3
     fi
-    if [ "$total" -le 0 ]; then
-        echo "UNVERIFIABLE  the report carries no test cases"
-        return 3
+
+    local verdict verdict_rc
+    verdict="$(junit_verdict "$total" "$failed" "$skipped" "$rc")"
+    verdict_rc=$?
+    echo "$verdict"
+
+    # A skip is UNVERIFIABLE, and the message names the tests that did not run.
+    if [ "$verdict_rc" -eq 3 ] && [ "$skipped" -gt 0 ]; then
+        echo "skipped tests (not run, so not a pass):"
+        printf '%s' "$written" | while IFS= read -r report; do
+            [ -n "$report" ] || continue
+            skipped_names "$report" | sed 's/^/              /'
+        done
     fi
-    if [ "$bad" -ne 0 ]; then
-        echo "FAIL          $bad of $total tests failed or were skipped"
-        return 1
+
+    if [ "$verdict_rc" -eq 0 ]; then
+        printf '%s' "$written" | while IFS= read -r report; do
+            [ -n "$report" ] && echo "report        $report"
+        done
     fi
-    if [ "$rc" -ne 0 ]; then
-        echo "FAIL          swift test exited $rc although the report shows $total passing tests"
-        return 1
-    fi
-    echo "PASS          $total tests, 0 failures"
-    printf '%s' "$written" | while IFS= read -r report; do
-        [ -n "$report" ] && echo "report        $report"
-    done
+    return "$verdict_rc"
 }
 
 run_build

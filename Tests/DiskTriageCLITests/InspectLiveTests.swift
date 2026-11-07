@@ -10,9 +10,10 @@ import DiskTriageCollectors
 /// beside the checkout, or `DISKTRIAGE_NTFS_PREFIX`.
 ///
 /// When the tools are absent the test is reported as **skipped**, never as a
-/// pass. `scripts/check.sh` counts a JUnit `<skipped>` case as FAIL, so a
-/// tool-less host fails the gate rather than greying it; that is a gate
-/// property recorded in docs/sdlc.md, not a hidden pass.
+/// pass. `scripts/check.sh` answers 3 (UNVERIFIABLE) for a JUnit `<skipped>`
+/// case and names the skipped test, so a tool-less host greys the gate rather
+/// than passing or failing it; that is a gate property recorded in
+/// docs/sdlc.md, not a hidden pass.
 struct InspectLiveTests {
 
     @Test(

@@ -34,7 +34,9 @@ retired only after the replacement was measured green and mutation-checked; see
 `<dir>/junit-swift-testing.xml`, not to the requested path, and a filtered or
 empty run exits 0 with a report holding zero test cases. The gate counts the
 report with `xmllint` and answers **3** for missing/empty/zero-testcase — a
-runner that runs nothing is never a pass.
+runner that runs nothing is never a pass. A `<skipped>` case is also **3**
+(UNVERIFIABLE) and the gate names the skipped tests; a `<failure>` or `<error>`
+is **1**, even beside a skip.
 
 ## The gate's three answers — the third is not a pass
 
@@ -44,8 +46,10 @@ runner that runs nothing is never a pass.
 | **1** | FAIL | fix it; it is yours |
 | **3** | UNVERIFIABLE / SKIP | **stop and report.** Do not edit the gate, fixtures or expectations to turn grey into green. |
 
-A skipped check is never a pass, and neither is a runner that executes zero
-tests. Never `git commit --no-verify`. Never relax a gate to land a change.
+A skipped check is never a pass: it is **3**, not 0 and not 1. A real failure
+is **1**, even when a skip is also present. Neither is a runner that executes
+zero tests a pass. Never `git commit --no-verify`. Never relax a gate to land a
+change.
 
 ## TDD is mandatory for code
 

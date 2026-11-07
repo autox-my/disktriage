@@ -1,0 +1,18 @@
+# REQ-0123 — docs/sdlc.md §CLI decisions (P3c) paths
+# Authored from the inspect contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0123
+statement: "The inspect command shall resolve the image, mapfile and working-copy paths to absolute paths against the working directory before the command policy is applied."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L179
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0111_REQ0123_symlinkToADeviceIsRefused()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0123_relativeImagePathIsResolvedBeforeThePolicy()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0123_relativeMapfileAndWorkingCopyAreResolved()"

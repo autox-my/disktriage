@@ -12,17 +12,23 @@ public struct InspectDependencies: Sendable {
     /// which is how the missing-tools precondition is tested without depending
     /// on what this host has in `/opt/homebrew/bin`.
     public var resolveTools: Bool
+    /// The directory a relative path argument is resolved against. Injected so
+    /// the tests never change the process's working directory, which is global
+    /// state a parallel suite must not touch.
+    public var currentDirectory: String
 
     public init(
         fileSystem: any InspectFileSystem = LiveInspectFileSystem(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
         tools: (any NTFSToolRunning)? = nil,
-        resolveTools: Bool = true
+        resolveTools: Bool = true,
+        currentDirectory: String = FileManager.default.currentDirectoryPath
     ) {
         self.fileSystem = fileSystem
         self.environment = environment
         self.tools = tools
         self.resolveTools = resolveTools
+        self.currentDirectory = currentDirectory
     }
 
     public static func live(
@@ -80,33 +86,92 @@ public func runInspect(arguments: [String], dependencies: InspectDependencies? =
         }
     }
 
-    guard let image = options.image else {
+    guard let rawImage = options.image else {
         return usageError("inspect needs an image file (it inspects images only, never /dev/*)")
-    }
-    if isDevicePath(image) {
-        return usageError(
-            "inspect accepts an image file, not a device node: '\(image)'. "
-                + "Image the device first; inspect never reads /dev/*."
-        )
-    }
-    if let workingCopy = options.workingCopy, isDevicePath(workingCopy) {
-        return usageError("--to must be a working-copy file, not a device node: '\(workingCopy)'")
-    }
-    if let mapfile = options.mapfile, isDevicePath(mapfile) {
-        return usageError("--mapfile must be a file, not a device node: '\(mapfile)'")
-    }
-    if options.restoreBootSector && options.workingCopy == nil {
-        return usageError("--restore-boot-sector needs --to <working-copy>: the original image is never written")
-    }
-    if options.workingCopy != nil && !options.restoreBootSector {
-        return usageError("--to is only used with --restore-boot-sector")
-    }
-    if let workingCopy = options.workingCopy, workingCopy == image {
-        return usageError("--to must be a new path, not the image being inspected")
     }
 
     let dependencies = dependencies ?? .live()
+    // The command policy is absolute-only, so a relative path is a CLI concern:
+    // it is resolved against the working directory before the policy sees it.
+    let image = InspectPathRules.absolute(rawImage, currentDirectory: dependencies.currentDirectory)
+    let workingCopy = options.workingCopy.map {
+        InspectPathRules.absolute($0, currentDirectory: dependencies.currentDirectory)
+    }
+    let mapfile = options.mapfile.map {
+        InspectPathRules.absolute($0, currentDirectory: dependencies.currentDirectory)
+    }
+
+    if let refusal = deviceNodeRefusal(
+        argument: rawImage,
+        resolved: image,
+        prefix: "inspect accepts an image file, not a device node",
+        suffix: ". Image the device first; inspect never reads /dev/*."
+    ) {
+        return refusal
+    }
+    if let raw = options.workingCopy, let workingCopy, let refusal = deviceNodeRefusal(
+        argument: raw,
+        resolved: workingCopy,
+        prefix: "--to must be a working-copy file, not a device node",
+        suffix: ""
+    ) {
+        return refusal
+    }
+    if let raw = options.mapfile, let mapfile, let refusal = deviceNodeRefusal(
+        argument: raw,
+        resolved: mapfile,
+        prefix: "--mapfile must be a file, not a device node",
+        suffix: ""
+    ) {
+        return refusal
+    }
+    if options.restoreBootSector && workingCopy == nil {
+        return usageError("--restore-boot-sector needs --to <working-copy>: the original image is never written")
+    }
+    if workingCopy != nil && !options.restoreBootSector {
+        return usageError("--to is only used with --restore-boot-sector")
+    }
+    if let workingCopy, workingCopy == image {
+        return usageError("--to must be a new path, not the image being inspected")
+    }
+
+    options.image = image
+    options.workingCopy = workingCopy
+    options.mapfile = mapfile
     return inspect(image: image, options: options, dependencies: dependencies)
+}
+
+// MARK: - Paths
+
+/// CLI path rules. `absolute` resolves a relative argument against the working
+/// directory and removes `.`/`..` without following symlinks, so the path the
+/// user sees is the path in the report. `resolvingSymlinks` is used only for
+/// the `/dev` refusal: an ordinary-looking symlink to `/dev/rdiskN` is still a
+/// device node.
+enum InspectPathRules {
+    static func absolute(_ path: String, currentDirectory: String) -> String {
+        guard !path.hasPrefix("/") else {
+            return URL(fileURLWithPath: path).standardizedFileURL.path
+        }
+        let base = currentDirectory.hasSuffix("/") ? currentDirectory : currentDirectory + "/"
+        return URL(fileURLWithPath: base + path).standardizedFileURL.path
+    }
+
+    static func resolvingSymlinks(_ path: String) -> String {
+        URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+    }
+}
+
+private func deviceNodeRefusal(
+    argument: String,
+    resolved: String,
+    prefix: String,
+    suffix: String
+) -> CLIResult? {
+    let target = InspectPathRules.resolvingSymlinks(resolved)
+    guard isDevicePath(resolved) || isDevicePath(target) else { return nil }
+    let resolvedNote = target == resolved ? "" : " (resolves to '\(target)')"
+    return usageError("\(prefix): '\(argument)'\(resolvedNote)\(suffix)")
 }
 
 // MARK: - Options
@@ -397,7 +462,11 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
             report.volume.reason = "ntfsinfo disappeared before exec"
         case .policyRejected:
             report.volume.status = "error"
-            report.volume.reason = "the ntfsinfo command is not allow-listed"
+            report.volume.reason = policyRejection(
+                tool: "ntfsinfo",
+                image: sourceForTools,
+                result: volumeResult
+            )
         case .error:
             report.volume.status = "error"
             report.volume.reason = firstLine(trimmed(volumeResult.stderr))
@@ -452,7 +521,10 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
             case .timeout:
                 states.append("timeout")
                 notes.append("\(title) did not answer within its hard timeout")
-            case .denied, .notFound, .policyRejected, .error:
+            case .policyRejected:
+                states.append("error")
+                notes.append(policyRejection(tool: title, image: sourceForTools, result: result))
+            case .denied, .notFound, .error:
                 states.append("error")
                 notes.append(firstLine(trimmed(result.stderr))
                     ?? "\(title) exited \(result.exitCode.map(String.init) ?? "on a signal")")
@@ -491,13 +563,16 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
         // partial/damage note (1), and any damage note outranks a clean 0.
         var code: Int32 = 0
         var status = InspectStatus.ok
-        if report.listing.status == "timeout" || report.damage.status == "error" {
+        if report.listing.status == "timeout" || report.listing.status == "error"
+            || report.damage.status == "error" {
             code = 30
             status = .toolError
-            if let note = report.listing.note, report.listing.status == "timeout" {
-                report.message = "the listing timed out: \(note)"
+            if report.listing.status == "timeout" {
+                report.message = "the listing timed out: \(report.listing.note ?? "no message")"
+            } else if report.listing.status == "error" {
+                report.message = "the listing failed: \(report.listing.note ?? "no message")"
             } else {
-                report.message = report.damage.note ?? "a tool error stopped the inspection"
+                report.message = report.damage.note ?? "the mapfile could not be read"
             }
         } else {
             if report.listing.status == "error" || report.listing.status == "partial"
@@ -651,6 +726,15 @@ private func resolveTools(
         return (nil, nil)
     }
     return (live, (chain.ntfsinfo, chain.ntfsls))
+}
+
+/// A policy rejection is never a mystery: the message names the tool, the
+/// argument that was rejected and the violation. The policy itself stays
+/// absolute-only; this only makes its refusal legible.
+private func policyRejection(tool: String, image: String, result: CollectorResult) -> String {
+    let violation = result.policyViolation?.rawValue ?? PolicyViolation.notAllowListed.rawValue
+    return "the \(tool) command was rejected by the command policy: "
+        + "argument '\(image)' is not allow-listed (\(violation))"
 }
 
 // MARK: - Mapfile
@@ -851,7 +935,11 @@ private func renderTTY(_ report: InspectReport) -> String {
     let result: String
     switch report.status {
     case .ok:
-        result = "inspected; no damage note"
+        if report.damage.status == "unsupported" {
+            result = "inspected; damage UNKNOWN (no mapfile supplied)"
+        } else {
+            result = "inspected; no damage note"
+        }
     case .damage:
         result = "inspected; mapfile reports damage"
     case .partial:

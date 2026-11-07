@@ -16,8 +16,10 @@ bash scripts/check.sh        # 0 PASS · 1 FAIL · 3 UNVERIFIABLE
 | **1** | FAIL | fix it; it is yours |
 | **3** | UNVERIFIABLE / SKIP | **stop and report.** Never edit the gate, a fixture or an expectation to turn grey into green. |
 
-- A skipped check is never a pass. Neither is a runner that exits 0 without
-  executing a test: `check.sh` reports **3** for zero executed tests.
+- A skipped check is never a pass: `check.sh` reports **3** (UNVERIFIABLE) and
+  names the skipped tests, not 1. A real failure is **1**, even beside a skip.
+  Neither is a runner that exits 0 without executing a test: `check.sh` reports
+  **3** for zero executed tests.
 - Never read an exit status through a pipeline. `cmd | tail` reports `tail`'s
   status. Capture `$?` on the command itself.
 - Never relax the gate to land a change. A wrong check is a separate change
@@ -174,6 +176,11 @@ plan names are detected and refused, not attached (a plan gap, below).
 - **Images only.** A device path and a non-regular file are refused. The only
   writes inspect can make are to an explicitly requested `--to` working copy
   (boot-sector restore); the source image is opened read-only everywhere else.
+- **Paths.** The CLI resolves the image, `--mapfile` and `--to` against the
+  working directory to an absolute, standardized path before the command policy
+  sees it; the policy itself stays absolute-only. Symlinks are resolved for the
+  `/dev` refusal, so an ordinary-looking symlink to `/dev/rdiskN` is still a
+  usage error (2). A policy rejection names the rejected argument.
 - **Tools.** `DISKTRIAGE_NTFS_PREFIX` (a built tree with `bin/ntfsinfo` and
   `bin/ntfsls`; `sbin` too for the test's `mkntfs`), then PATH, then the usual
   Homebrew/system directories. Missing tools exit **30** with the prefix hint;
@@ -229,10 +236,10 @@ plan names are detected and refused, not attached (a plan gap, below).
   the real runner. It is enabled only when `bin/ntfsinfo`, `bin/ntfsls` and
   `sbin/mkntfs` exist (the spike tree beside the checkout, or
   `DISKTRIAGE_NTFS_PREFIX`). When they are absent it is **skipped**, never
-  passed. `scripts/check.sh` counts a JUnit `<skipped>` case as FAIL, so a
-  tool-less host fails the gate rather than greying it; that is a property of
-  the gate's "a skipped check is never a pass" rule, recorded here rather than
-  worked around.
+  passed. `scripts/check.sh` answers **3** (UNVERIFIABLE) for a `<skipped>`
+  case and names the skipped test, so a tool-less host greys the gate rather
+  than passing or failing it; that is the gate's "a skipped check is never a
+  pass" rule, and the gate is not relaxed to make the host look green.
 - **Not implemented, deliberately.** Per-file damage attribution
   (`ntfscluster`), `copy`, and native APFS/HFS+/exFAT/FAT attach. The partition
   parser and the tool runner are reusable so `copy` can build on them.
@@ -251,8 +258,12 @@ plan names are detected and refused, not attached (a plan gap, below).
   creates it.
 - A missing, empty, unparsable or **zero-testcase** report is exit **3**, even
   when the runner exited 0 — a filtered or empty run writes a report with no
-  `<testcase>` and exits 0. A report carrying a `<failure>`, `<error>` or
-  `<skipped>` case is exit **1**: a skipped test is not a pass.
+  `<testcase>` and exits 0. A report carrying a `<failure>` or `<error>` case is
+  exit **1**. A `<skipped>` case is exit **3**, and the gate names the skipped
+  tests: a skip is UNVERIFIABLE, never a pass and never a failure. A failure
+  beside a skip is still **1**.
+- The counting and the verdict live in `scripts/lib/junit-report.sh`, shared
+  with `scripts/check-gate-probe.sh`, which proves 0/1/3 from faked reports.
 - The report lives under `.build/`, which is gitignored; no artefact is added to
   the repository.
 
