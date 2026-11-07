@@ -1,0 +1,21 @@
+# REQ-0166 — diskdoctor.md §8 the destination's backing whole disk
+# Authored so the "not on the source disk" rule survives a suspended diskarbitrationd.
+schema: req.claim/2
+claim_id: REQ-0166
+statement: "The destination probe shall walk the ioreg media tree from a mounted volume through an APFS container to its physical whole disk when diskutil cannot be used."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L475
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0166_destinationTimeoutFallsBack()"
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0166_plainVolumeThroughIOReg()"
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0166_stoppedDestinationUsesIOReg()"
+  - "DiskTriageCoreTests.IORegMediaTreeTests::REQ0166_apfsVolumeResolvesThroughItsStore()"
+  - "DiskTriageCoreTests.IORegMediaTreeTests::REQ0166_multiStoreContainerNamesEveryStore()"
+  - "DiskTriageCoreTests.IORegMediaTreeTests::REQ0166_plainVolumesResolveToTheirWholeDisk()"

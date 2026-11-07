@@ -1,19 +1,31 @@
 import Foundation
 import Darwin
+import DiskTriageCore
 import DiskTriageCollectors
 
 /// The shipped destination probe: read-only `statfs` facts, file existence and
-/// one `diskutil info -plist` walk to the physical whole disk.
+/// a walk from the destination volume to its physical whole disk(s).
 ///
 /// On macOS 27.2 `diskutil info -plist <file path>` exits 1, so the plan's
 /// "diskutil info of the destination path" is satisfied by asking `statfs` for
 /// the mounted volume and then walking that volume's whole disk to its
 /// physical store (`disk3` → `disk0`). No file is created or written.
+///
+/// While DiskArbitration is stopped that walk must not run `diskutil` either:
+/// `ioreg -r -c IOMedia -w 0` carries the same parent chain (an APFS
+/// container's synthesized media is a child of its store partition), and the
+/// pure `IORegMediaTree` resolves it. A `diskutil` timeout falls back the same
+/// way once.
 public struct SystemImageDestinationProbe: ImageDestinationProbing {
     private let executor: any CommandExecuting
+    private let diskArbitration: DiskArbitrationProbe
 
-    public init(executor: any CommandExecuting = ProcessRunner()) {
+    public init(
+        executor: any CommandExecuting = ProcessRunner(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
         self.executor = executor
+        self.diskArbitration = DiskArbitrationProbe(executor: executor, environment: environment)
     }
 
     public func probe(destination: String, mapfile: String) -> DestinationFacts {
@@ -54,8 +66,12 @@ public struct SystemImageDestinationProbe: ImageDestinationProbing {
             )
         }
 
+        // The destination itself or its nearest existing parent, exactly as
+        // the plan states: a file that does not exist yet is still on the
+        // parent's filesystem.
+        let statsPath = Self.nearestExistingPath(for: destination) ?? parentDirectory
         var stats = statfs()
-        let rc = parentDirectory.withCString { statfs($0, &stats) }
+        let rc = statsPath.withCString { statfs($0, &stats) }
         guard rc == 0 else {
             return DestinationFacts(
                 destinationExists: destinationExists,
@@ -66,7 +82,7 @@ public struct SystemImageDestinationProbe: ImageDestinationProbing {
                 containerFilesystem: nil,
                 parentIsWritable: manager.isWritableFile(atPath: parentDirectory),
                 backingWholeDisk: nil,
-                backingError: "statfs \(parentDirectory) failed: \(String(cString: strerror(errno)))"
+                backingError: "statfs \(statsPath) failed: \(String(cString: strerror(errno)))"
             )
         }
 
@@ -76,8 +92,11 @@ public struct SystemImageDestinationProbe: ImageDestinationProbing {
         let filesystem = cString(&stats.f_fstypename)
         let mountDevice = cString(&stats.f_mntfromname)
 
-        var backingError: String?
-        let backing = resolveBackingDisk(mountDevice: mountDevice, error: &backingError)
+        let resolution = Self.resolveBackingDisks(
+            mountSource: mountDevice,
+            executor: executor,
+            diskutilSkipReason: diskArbitration.diskutilSkipReason()
+        )
 
         return DestinationFacts(
             destinationExists: destinationExists,
@@ -87,38 +106,138 @@ public struct SystemImageDestinationProbe: ImageDestinationProbing {
             freeBytes: freeBytes,
             containerFilesystem: filesystem,
             parentIsWritable: manager.isWritableFile(atPath: parentDirectory),
-            backingWholeDisk: backing,
-            backingError: backingError
+            backingError: resolution.error,
+            backingWholeDisks: resolution.disks
         )
     }
 
-    /// `/dev/disk3s5` → `disk3` → its physical store `disk0`. A physical whole
-    /// disk answers with itself. `nil` means the walk could not establish the
-    /// backing disk, which the destination rule treats as unknown, never pass.
-    private func resolveBackingDisk(mountDevice: String, error: inout String?) -> String? {
-        guard let whole = wholeDiskName(fromDevicePath: mountDevice) else {
-            error = "cannot map the mount device \(mountDevice) to a whole disk"
-            return nil
+    private static func nearestExistingPath(for path: String) -> String? {
+        var candidate = path
+        while true {
+            if candidate.isEmpty { candidate = "." }
+            if FileManager.default.fileExists(atPath: candidate) { return candidate }
+            if candidate == "/" || candidate == "." { return nil }
+            candidate = (candidate as NSString).deletingLastPathComponent
+        }
+    }
+}
+
+// MARK: - The backing-disk walk
+
+/// What the walk established, and why it failed when it did. `source` is only
+/// for the smoke report; the destination rule never treats it as a fact.
+struct BackingDiskResult: Equatable {
+    let disks: [String]
+    let error: String?
+    let source: String
+}
+
+extension SystemImageDestinationProbe {
+    /// Resolves the destination's physical whole disk(s).
+    ///
+    /// `diskutilSkipReason` non-nil means `diskutil` must not be run at all
+    /// (DiskArbitration stopped, or the test-only force). Otherwise the
+    /// recorded `diskutil info` walk runs first; a timeout falls back to ioreg
+    /// once, so a wedged `diskutil` cannot block the check.
+    static func resolveBackingDisks(
+        mountSource: String,
+        executor: any CommandExecuting,
+        diskutilSkipReason: String?
+    ) -> BackingDiskResult {
+        if let reason = diskutilSkipReason {
+            var result = resolveBackingDisksFromIOReg(mountSource: mountSource, executor: executor)
+            if let error = result.error {
+                result = BackingDiskResult(
+                    disks: [],
+                    error: "\(error) (\(reason))",
+                    source: result.source
+                )
+            }
+            return result
+        }
+        return resolveBackingDisksWithDiskutil(mountSource: mountSource, executor: executor)
+    }
+
+    private static func resolveBackingDisksWithDiskutil(
+        mountSource: String,
+        executor: any CommandExecuting
+    ) -> BackingDiskResult {
+        guard let whole = wholeDiskName(fromDevicePath: mountSource) else {
+            return BackingDiskResult(
+                disks: [],
+                error: "cannot map the mount device \(mountSource) to a local whole disk",
+                source: "diskutil"
+            )
         }
 
         var current = whole
         for _ in 0..<3 {
             let result = executor.run(.diskutilInfo(disk: current))
             guard result.outcome == .ok, let data = result.stdout.data(using: .utf8) else {
-                error = "diskutil info \(current) \(result.outcome.rawValue)"
-                return nil
+                if result.outcome == .timeout {
+                    var fallback = resolveBackingDisksFromIOReg(
+                        mountSource: mountSource,
+                        executor: executor
+                    )
+                    if let error = fallback.error {
+                        fallback = BackingDiskResult(
+                            disks: [],
+                            error: "diskutil info \(current) timed out after \(result.durationMs) ms; \(error)",
+                            source: fallback.source
+                        )
+                    }
+                    return fallback
+                }
+                return BackingDiskResult(
+                    disks: [],
+                    error: "diskutil info \(current) \(result.outcome.rawValue)",
+                    source: "diskutil"
+                )
             }
             guard let next = physicalBackingDisk(fromInfoPList: data, current: current) else {
-                error = "diskutil info \(current) did not name a physical backing disk"
-                return nil
+                return BackingDiskResult(
+                    disks: [],
+                    error: "diskutil info \(current) did not name a physical backing disk",
+                    source: "diskutil"
+                )
             }
             if next == current {
-                return current
+                return BackingDiskResult(disks: [current], error: nil, source: "diskutil")
             }
             current = next
         }
-        error = "the backing-disk walk did not settle"
-        return nil
+        return BackingDiskResult(
+            disks: [],
+            error: "the backing-disk walk did not settle",
+            source: "diskutil"
+        )
+    }
+
+    private static func resolveBackingDisksFromIOReg(
+        mountSource: String,
+        executor: any CommandExecuting
+    ) -> BackingDiskResult {
+        let result = executor.run(.ioregMediaTree)
+        guard result.outcome == .ok else {
+            return BackingDiskResult(
+                disks: [],
+                error: "ioreg media tree \(result.outcome.rawValue) after \(result.durationMs) ms",
+                source: "ioreg"
+            )
+        }
+        guard let tree = IORegMediaTree.parse(result.stdout) else {
+            return BackingDiskResult(
+                disks: [],
+                error: "ioreg media tree did not parse",
+                source: "ioreg"
+            )
+        }
+        switch BackingDiskResolver.resolve(mountSource: mountSource, tree: tree) {
+        case .wholeDisks(let disks):
+            return BackingDiskResult(disks: disks, error: nil, source: "ioreg")
+        case .unknown(let reason):
+            return BackingDiskResult(disks: [], error: reason, source: "ioreg")
+        }
     }
 }
 

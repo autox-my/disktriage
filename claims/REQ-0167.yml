@@ -1,0 +1,16 @@
+# REQ-0167 — diskdoctor.md §8 the source-disk comparison
+# Authored so a multi-store APFS destination cannot evade "not on the source disk".
+schema: req.claim/2
+claim_id: REQ-0167
+statement: "The destination rule shall refuse a destination whose backing whole disks include the source whole disk."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L475
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageStoppedDaEndToEndTests::REQ0167_multiStoreSourceComparison()"

@@ -15,6 +15,9 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
     /// not depend on DiskArbitration. The device node carries product/vendor/
     /// serial and its subtree carries the whole-disk IOMedia.
     case ioregDeviceTree
+    /// `ioreg -r -c IOMedia -w 0`: the full media tree, whose parent links walk
+    /// an APFS volume through its synthesized container to its physical store.
+    case ioregMediaTree
     /// `ioreg -r -c IOUSBHostDevice -w 0 -l`: the same tree rooted at the USB
     /// host device, which carries the serial string a bridge hides.
     case ioregUSBDeviceTree
@@ -56,6 +59,8 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
             return ["/usr/sbin/ioreg", "-r", "-c", "IOMedia", "-d", "1", "-w", "0"]
         case .ioregDeviceTree:
             return ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDevice", "-w", "0", "-l"]
+        case .ioregMediaTree:
+            return ["/usr/sbin/ioreg", "-r", "-c", "IOMedia", "-w", "0"]
         case .ioregUSBDeviceTree:
             return ["/usr/sbin/ioreg", "-r", "-c", "IOUSBHostDevice", "-w", "0", "-l"]
         case .pgrepDiskArbitrationDaemon:
@@ -157,6 +162,7 @@ public struct CommandPolicy: Sendable {
                  ["-r", "-c", "IOBlockStorageDriver", "-k", "Statistics", "-d", "1", "-w", "0"],
                  ["-r", "-c", "IOBlockStorageDriver", "-w", "0"],
                  ["-r", "-c", "IOMedia", "-d", "1", "-w", "0"],
+                 ["-r", "-c", "IOMedia", "-w", "0"],
                  ["-r", "-c", "IOBlockStorageDevice", "-w", "0", "-l"],
                  ["-r", "-c", "IOUSBHostDevice", "-w", "0", "-l"]:
                 return .allowed

@@ -1,0 +1,47 @@
++-o APPLE SSD AP0256Q Media  <class IOMedia, id 0x1000006f0, registered, matched, active, busy 0 (202 ms), retain 14>
+  | {
+  |   "Content" = "GUID_partition_scheme"
+  |   "Whole" = Yes
+  |   "Leaf" = No
+  |   "BSD Name" = "disk0"
+  |   "Ejectable" = No
+  |   "Preferred Block Size" = 4096
+  |   "Size" = 251000193024
+  | }
+  |
+  +-o Container@2  <class IOMedia, id 0x100000750, registered, matched, active, busy 0 (158 ms), retain 14>
+  | | {
+  | |   "Content" = "7C3457EF-0000-11AA-AA11-00306543ECAC"
+  | |   "Whole" = No
+  | |   "UUID" = "22A4B776-EAEE-4DAF-9FE3-82BFA1FD2893"
+  | |   "BSD Name" = "disk0s2"
+  | |   "Size" = 245107195904
+  | |   "Content Hint" = "7C3457EF-0000-11AA-AA11-00306543ECAC"
+  | | }
+  | |
+  | +-o AppleAPFSContainerScheme  <class AppleAPFSContainerScheme, id 0x10000075e, !registered, !matched, active, busy 0 (155 ms), retain 7>
+  |   +-o AppleAPFSMedia  <class AppleAPFSMedia, id 0x10000076b, registered, matched, active, busy 0 (154 ms), retain 13>
+  |     | {
+  |     |   "Content" = "EF57347C-0000-11AA-AA11-00306543ECAC"
+  |     |   "Whole" = Yes
+  |     |   "UUID" = "3F2D5F3B-2BB8-4411-B720-70C3EF74BB93"
+  |     |   "BSD Name" = "disk3"
+  |     |   "Size" = 245107195904
+  |     |   "Content Hint" = "EF57347C-0000-11AA-AA11-00306543ECAC"
+  |     | }
+  |     |
+  |     +-o AppleAPFSContainer  <class AppleAPFSContainer, id 0x100000791, registered, matched, active, busy 0 (83 ms), retain 33471>
+  |       +-o Data@5  <class AppleAPFSVolume, id 0x10000086a, registered, matched, active, busy 0 (1 ms), retain 42>
+  |         | {
+  |         |   "Whole" = No
+  |         |   "BSD Name" = "disk3s5"
+  |         |   "Size" = 245107195904
+  |         | }
+  |
+  +-o RecoveryOSContainer@3  <class IOMedia, id 0x100000752, registered, matched, active, busy 0 (21 ms), retain 13>
+    | {
+    |   "Whole" = No
+    |   "UUID" = "DDB7EFA0-EEF9-4D8D-83B3-E6B868FB0211"
+    |   "BSD Name" = "disk0s3"
+    |   "Size" = 5368664064
+    | }
