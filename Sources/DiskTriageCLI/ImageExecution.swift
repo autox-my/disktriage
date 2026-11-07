@@ -37,17 +37,72 @@ struct ImagingSummary {
     let mapfile: String
     let sidecar: String
     let rescuedBytes: Int64?
+    /// `*` plus `/`: read errors seen, not yet trimmed or scraped.
+    let failedBytes: Int64?
+    let failedExtents: Int?
+    /// `-`: confirmed bad.
     let badBytes: Int64?
+    let badExtents: Int?
     let remainingBytes: Int64?
     let remainingExtents: Int?
     let elapsedSeconds: Double
     let passReached: Int
     let stopped: PassStopReason
+    /// The pass's exit code; shown only when ddrescue stopped by itself.
+    let stopExitCode: Int32?
+    /// The `-T` value from the stopping pass's argv, when it has one.
+    let stopTimeout: String?
     let resumeCommand: String?
     let stop: Pass2Stop?
     /// The effective partial limit, `nil` for a full image (REQ-0106).
     let partialLimitBytes: Int64?
     let deviceBytes: Int64?
+
+    init(
+        status: String,
+        exitCode: Int32,
+        image: String,
+        mapfile: String,
+        sidecar: String,
+        rescuedBytes: Int64?,
+        failedBytes: Int64?,
+        failedExtents: Int?,
+        badBytes: Int64?,
+        badExtents: Int?,
+        remainingBytes: Int64?,
+        remainingExtents: Int?,
+        elapsedSeconds: Double,
+        passReached: Int,
+        stopped: PassStopReason,
+        stopExitCode: Int32? = nil,
+        stopTimeout: String? = nil,
+        resumeCommand: String?,
+        stop: Pass2Stop?,
+        partialLimitBytes: Int64?,
+        deviceBytes: Int64?
+    ) {
+        self.status = status
+        self.exitCode = exitCode
+        self.image = image
+        self.mapfile = mapfile
+        self.sidecar = sidecar
+        self.rescuedBytes = rescuedBytes
+        self.failedBytes = failedBytes
+        self.failedExtents = failedExtents
+        self.badBytes = badBytes
+        self.badExtents = badExtents
+        self.remainingBytes = remainingBytes
+        self.remainingExtents = remainingExtents
+        self.elapsedSeconds = elapsedSeconds
+        self.passReached = passReached
+        self.stopped = stopped
+        self.stopExitCode = stopExitCode
+        self.stopTimeout = stopTimeout
+        self.resumeCommand = resumeCommand
+        self.stop = stop
+        self.partialLimitBytes = partialLimitBytes
+        self.deviceBytes = deviceBytes
+    }
 
     var isComplete: Bool { exitCode == 0 }
     var isPartial: Bool { partialLimitBytes != nil }
@@ -55,9 +110,28 @@ struct ImagingSummary {
     /// `complete` is only honest for a full image. A partial run that finished
     /// says so, and never claims the whole device (REQ-0106).
     var stoppedDisplay: String {
-        status == "complete" || status.hasPrefix("partial image complete")
-            ? status
-            : stopped.rawValue
+        if status == "complete" || status.hasPrefix("partial image complete") {
+            return status
+        }
+        if stopped == .stoppedOnItsOwn, let code = stopExitCode {
+            return "ddrescue stopped on its own, exit \(code)"
+        }
+        return stopped.rawValue
+    }
+
+    /// The sentence that turns an exit code into a reason. `-T 90` is the
+    /// measured cause on the failing MiNaH drive: ddrescue stopped itself after
+    /// 90 s without a successful read while a bad region stalled reads.
+    var stopDetail: String? {
+        guard stopped == .stoppedOnItsOwn, let code = stopExitCode else { return nil }
+        var parts = ["exit \(code): \(DdrescueExitStatus.describe(code))"]
+        if let timeout = stopTimeout {
+            parts.append(
+                "with -T \(timeout) ddrescue stops after \(timeout) s without a successful read; "
+                    + "the drive may be stalling on a bad region; the image is resumable"
+            )
+        }
+        return parts.joined(separator: "; ")
     }
 }
 
@@ -177,14 +251,14 @@ func runImaging(
     var result = supervisor.run(plan.passes[0], applyStopRule: false)
     var passReached = 1
     progress.append(contentsOf: progressLog.drain())
-    progress.append("disktriage: pass 1 \(result.reason.rawValue)")
+    progress.append("disktriage: pass 1 \(passOutcome(result))")
 
     if result.reason == .complete {
         passReached = 2
         progress.append("disktriage: pass 2 (\(plan.passes[1].line)) started")
         result = supervisor.run(plan.passes[1], applyStopRule: true)
         progress.append(contentsOf: progressLog.drain())
-        progress.append("disktriage: pass 2 \(result.reason.rawValue)")
+        progress.append("disktriage: pass 2 \(passOutcome(result))")
     }
 
     let status: String
@@ -206,12 +280,19 @@ func runImaging(
         mapfile: plan.mapfile,
         sidecar: sidecarPath,
         rescuedBytes: result.snapshot?.rescuedBytes,
+        failedBytes: result.snapshot?.failedBytes,
+        failedExtents: result.snapshot?.failedExtents.count,
         badBytes: result.snapshot?.badBytes,
+        badExtents: result.snapshot?.badExtents.count,
         remainingBytes: result.snapshot?.remainingBytes,
         remainingExtents: result.snapshot?.remainingExtents.count,
         elapsedSeconds: now().timeIntervalSince(startedAt),
         passReached: passReached,
         stopped: result.reason,
+        stopExitCode: result.reason == .stoppedOnItsOwn ? result.exitCode : nil,
+        stopTimeout: result.reason == .stoppedOnItsOwn
+            ? ddrescueTimeoutArgument(plan.passes[passReached - 1].argv)
+            : nil,
         resumeCommand: result.reason == .complete ? nil : resumeCommand(plan),
         stop: result.stop,
         partialLimitBytes: partialLimitBytes,
@@ -239,15 +320,18 @@ final class ProgressLog {
     private var lastKey: String?
 
     func record(_ progress: ImagingProgress) {
-        let key = "\(progress.pass)-\(progress.rescuedBytes)-\(progress.badBytes)-\(progress.remainingBytes)"
+        let key = "\(progress.pass)-\(progress.rescuedBytes)-\(progress.failedBytes)-"
+            + "\(progress.badBytes)-\(progress.remainingBytes)"
         guard key != lastKey else { return }
         lastKey = key
         lines.append(String(
-            format: "disktriage: pass %d: %.1f%% rescued (%@), %@ bad, %@ remaining",
+            format: "disktriage: pass %d: %.1f%% rescued (%@), %@ bad, %@ failed (%d extents), %@ remaining",
             progress.pass,
             progress.percent,
             bytes(progress.rescuedBytes),
             bytes(progress.badBytes),
+            bytes(progress.failedBytes),
+            progress.failedExtents,
             bytes(progress.remainingBytes)
         ))
     }
@@ -260,13 +344,32 @@ final class ProgressLog {
 
 // MARK: - Rendering
 
-private func renderImagingTTY(_ summary: ImagingSummary) -> String {
+/// The per-pass stderr line. A pass ddrescue stopped by itself carries its
+/// exit code; anything else keeps the reason's own wording.
+private func passOutcome(_ result: PassResult) -> String {
+    if result.reason == .stoppedOnItsOwn, let code = result.exitCode {
+        return "ddrescue stopped on its own, exit \(code)"
+    }
+    return result.reason.rawValue
+}
+
+/// The `-T` value in a pass argv, e.g. `90` for `... -T 90 ...`.
+func ddrescueTimeoutArgument(_ argv: [String]) -> String? {
+    guard let index = argv.firstIndex(of: "-T"), index + 1 < argv.count else { return nil }
+    return argv[index + 1]
+}
+
+func renderImagingTTY(_ summary: ImagingSummary) -> String {
     var lines: [String] = []
     lines.append(pad("IMAGE", 10) + summary.image)
     lines.append(pad("MAPFILE", 10) + summary.mapfile)
     lines.append(pad("SIDECAR", 10) + summary.sidecar)
     lines.append(pad("RESCUED", 10) + optionalBytes(summary.rescuedBytes))
-    lines.append(pad("BAD", 10) + optionalBytes(summary.badBytes))
+    lines.append(pad("FAILED", 10)
+        + "\(optionalBytes(summary.failedBytes)) in \(optionalCount(summary.failedExtents)) extents "
+        + "(read errors seen; not yet trimmed or scraped)")
+    lines.append(pad("BAD", 10)
+        + "\(optionalBytes(summary.badBytes)) in \(optionalCount(summary.badExtents)) extents (confirmed)")
     let remaining = summary.remainingBytes.map { bytes($0) } ?? "unknown"
     let extents = summary.remainingExtents.map(String.init) ?? "unknown"
     lines.append(pad("REMAINING", 10) + "\(remaining) in \(extents) extents")
@@ -277,6 +380,9 @@ private func renderImagingTTY(_ summary: ImagingSummary) -> String {
             + "first \(gib(limit)) of \(gib(summary.deviceBytes)) — PARTIAL image")
     }
     lines.append(pad("STOPPED", 10) + summary.stoppedDisplay)
+    if let detail = summary.stopDetail {
+        lines.append(pad("NOTE", 10) + detail)
+    }
     if let stop = summary.stop {
         lines.append(pad("YIELD", 10)
             + "\(bytes(stop.marginalYieldBytes)) in the trailing 10 minutes; "
@@ -291,7 +397,7 @@ private func renderImagingTTY(_ summary: ImagingSummary) -> String {
     return lines.joined(separator: "\n") + "\n"
 }
 
-private func renderImagingJSON(_ summary: ImagingSummary) -> String {
+func renderImagingJSON(_ summary: ImagingSummary) -> String {
     var object: [String: Any] = [
         "status": summary.status,
         "exit_code": Int(summary.exitCode),
@@ -306,9 +412,14 @@ private func renderImagingJSON(_ summary: ImagingSummary) -> String {
             + "a volume-level damage report is the next step",
     ]
     if let rescued = summary.rescuedBytes { object["rescued_bytes"] = rescued }
+    if let failed = summary.failedBytes { object["failed_bytes"] = failed }
+    if let extents = summary.failedExtents { object["failed_extents"] = extents }
     if let bad = summary.badBytes { object["bad_bytes"] = bad }
+    if let extents = summary.badExtents { object["bad_extents"] = extents }
     if let remaining = summary.remainingBytes { object["remaining_bytes"] = remaining }
     if let extents = summary.remainingExtents { object["remaining_extents"] = extents }
+    if let code = summary.stopExitCode { object["stop_exit_code"] = Int(code) }
+    if let detail = summary.stopDetail { object["stop_detail"] = detail }
     if let limit = summary.partialLimitBytes { object["limit_bytes"] = limit }
     if let device = summary.deviceBytes { object["device_bytes"] = device }
     if let resume = summary.resumeCommand { object["resume_command"] = resume }
@@ -358,6 +469,10 @@ private func resumeCommand(_ plan: ImagingPlan) -> String {
 
 private func optionalBytes(_ value: Int64?) -> String {
     value.map(bytes) ?? "unknown"
+}
+
+private func optionalCount(_ value: Int?) -> String {
+    value.map(String.init) ?? "unknown"
 }
 
 private func bytes(_ value: Int64) -> String {

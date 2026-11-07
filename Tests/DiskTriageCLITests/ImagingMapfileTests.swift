@@ -73,6 +73,95 @@ struct ImagingMapfileTests {
         #expect(!snapshot.finished)
     }
 
+    // MARK: - Failed (`*`, `/`) versus bad (`-`)
+
+    /// One row's meaning, from GNU ddrescue 1.30's manual: `?` non-tried,
+    /// `*` failed during copying and not yet trimmed, `/` trimmed but not
+    /// scrapped (both contain read errors), `-` confirmed bad, `+` finished.
+    /// The expectations are derived from that meaning, not from the parser.
+    struct StatusMeaning: Sendable, CustomStringConvertible {
+        let status: Character
+        let rescued: Int64
+        let untried: Int64
+        let failed: Int64
+        let bad: Int64
+        var description: String { "\(status)" }
+    }
+
+    static let statusMeanings: [StatusMeaning] = [
+        StatusMeaning(status: "+", rescued: 4096, untried: 0, failed: 0, bad: 0),
+        StatusMeaning(status: "?", rescued: 0, untried: 4096, failed: 0, bad: 0),
+        StatusMeaning(status: "*", rescued: 0, untried: 0, failed: 4096, bad: 0),
+        StatusMeaning(status: "/", rescued: 0, untried: 0, failed: 4096, bad: 0),
+        StatusMeaning(status: "-", rescued: 0, untried: 0, failed: 0, bad: 4096),
+    ]
+
+    // REQ-0171: a block that failed during copying is failed, not confirmed
+    // bad and not rescued; a trimmed-but-not-scraped block is failed too.
+    @Test("REQ0171 each ddrescue status falls into exactly one quantity",
+          arguments: statusMeanings)
+    func REQ0171_statusMeaningsAreSeparate(_ meaning: StatusMeaning) throws {
+        let text = """
+        # Mapfile. Created by GNU ddrescue version 1.30
+        # current_pos  current_status  current_pass
+        0x00001000     \(meaning.status)               1
+        #      pos        size  status
+        0x00000000  0x00001000  \(meaning.status)
+
+        """
+        let snapshot = try #require(DdrescueMapfile.parse(text))
+
+        #expect(snapshot.rescuedBytes == meaning.rescued)
+        #expect(snapshot.nonTriedBytes == meaning.untried)
+        #expect(snapshot.failedBytes == meaning.failed,
+                "`*` and `/` are failed-so-far, not confirmed bad")
+        #expect(snapshot.badBytes == meaning.bad)
+        #expect(snapshot.failedExtents.reduce(0) { $0 + $1.size } == meaning.failed)
+        #expect(snapshot.badExtents.reduce(0) { $0 + $1.size } == meaning.bad)
+    }
+
+    // The real first `disktriage image --limit 10` run on the failing MiNaH
+    // drive. It ended after pass 1 with 12 `*` (failed, 64 KiB) extents and an
+    // unbounded `?` tail; the summary must not print `BAD 0` and stop there.
+    @Test("REQ0171 the MiNaH mapfile reports 12 failed extents and no confirmed bad ones")
+    func REQ0171_minahMapfileKeepsFailedAndBadApart() throws {
+        let text = Self.fixture("minah-partial-me.mapfile.txt")
+        let snapshot = try #require(DdrescueMapfile.parse(text))
+
+        #expect(snapshot.rescuedBytes == 3_393_650_688)
+        #expect(snapshot.failedExtents.count == 12)
+        #expect(snapshot.failedBytes == 786_432, "12 × 64 KiB failed blocks")
+        #expect(snapshot.badExtents.isEmpty)
+        #expect(snapshot.badBytes == 0)
+        #expect(snapshot.nonTrimmedBytes == 786_432)
+        #expect(snapshot.nonScrapedBytes == 0)
+    }
+
+    @Test("REQ0171 a fully trimmed mapfile turns the failed blocks into confirmed bad ones")
+    func REQ0171_trimmedMapfileIsBadNotFailed() throws {
+        let text = Self.fixture("mapfile-trimmed-bad.mapfile.txt")
+        let snapshot = try #require(DdrescueMapfile.parse(text, limitBytes: 10_737_418_240))
+
+        #expect(snapshot.failedBytes == 0, "trimming isolated every read error")
+        #expect(snapshot.failedExtents.isEmpty)
+        #expect(snapshot.badExtents.count == 12)
+        #expect(snapshot.badBytes == 786_432)
+        #expect(snapshot.rescuedBytes == 10_736_631_808)
+        #expect(snapshot.isComplete, "rescued plus confirmed bad is the whole limit")
+    }
+
+    @Test("REQ0171 a non-scraped extent is failed, never rescued")
+    func REQ0171_nonScrapedExtentIsFailed() throws {
+        let text = Self.fixture("mapfile-nonscraped.mapfile.txt")
+        let snapshot = try #require(DdrescueMapfile.parse(text))
+
+        #expect(snapshot.failedBytes == 8_192, "one `*` plus one `/` block")
+        #expect(snapshot.failedExtents.count == 2)
+        #expect(snapshot.badBytes == 4_096)
+        #expect(snapshot.badExtents.count == 1)
+        #expect(snapshot.rescuedBytes == 4_096)
+    }
+
     @Test("an empty or not-yet-written mapfile is not a measurement")
     func emptyMapfileIsNil() {
         #expect(DdrescueMapfile.parse("") == nil)

@@ -1,0 +1,17 @@
+# REQ-0174 — diskdoctor.md §7 the self-test while diskarbitrationd is stopped
+# Authored from the measured check hang with guard --suspend active.
+schema: req.claim/2
+claim_id: REQ-0174
+statement: "The check command shall not call diskutil or create a DiskArbitration session while diskarbitrationd is stopped."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L433
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCollectorsTests.LiveCheckProbesStoppedTests::REQ0174_REQ0176_mountGuardRowIsUnverifiableWhenStopped()"
+  - "DiskTriageCollectorsTests.LiveCheckProbesStoppedTests::REQ0174_REQ0176_wholeCheckCompletesWithoutDiskutilWhileStopped()"

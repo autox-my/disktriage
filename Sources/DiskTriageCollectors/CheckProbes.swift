@@ -166,20 +166,25 @@ public struct CheckRunner: Sendable {
                 detail: versions.joined(separator: " · ")
             )
         }
+        // The row repeats each tool's own detail, which names the prefix and
+        // directories searched: "missing ntfsls" is only honest when that path
+        // list is not the one inspect found the binary under.
+        let searched = missing
+            .map { "\($0.0.rawValue) (\($0.1.detail))" }
+            .joined(separator: "; ")
         if found.isEmpty {
             return CheckRow(
                 id: "ntfs-3g",
                 label: "ntfs-3g tools",
                 status: .unverifiable,
-                detail: "not installed (set DISKTRIAGE_NTFS_PREFIX or add to PATH); NTFS inspection unavailable"
+                detail: "not installed: \(searched); NTFS inspection unavailable"
             )
         }
-        let names = missing.map(\.0.rawValue).joined(separator: ", ")
         return CheckRow(
             id: "ntfs-3g",
             label: "ntfs-3g tools",
             status: .fail,
-            detail: "missing \(names)"
+            detail: "missing \(searched)"
         )
     }
 

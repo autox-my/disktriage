@@ -313,8 +313,63 @@ struct ImagingExecutionTests {
         #expect(launcher.launches.count == 1, "pass 2 never starts without a device")
     }
 
-    @Test("a non-zero ddrescue exit is reported, the mapfile is kept, and pass 2 does not start")
-    func ddrescueErrorKeepsTheMapfile() throws {
+    // REQ-0173: a ddrescue exit that is not ours is named with its code, and
+    // the `-T` stop rule is spelled out instead of the generic "ddrescue
+    // error" the real MiNaH run printed.
+    @Test("REQ0173 a non-zero ddrescue exit shows its code, the -T rule, and keeps the mapfile")
+    func REQ0173_stoppedOnItsOwnKeepsTheMapfile() throws {
+        let directory = try temporaryDirectory()
+        let image = directory + "/disk8.img"
+        let mapfile = image + ".mapfile"
+        let launcher = FakeDdrescueLauncher()
+        let pass1 = FakeDdrescueProcess()
+        pass1.ticks = [
+            {
+                // A `*` block: a read error was seen at 1024 and has not been
+                // trimmed yet. The progress line must not hide it behind bad 0.
+                try? """
+                # Mapfile. Created by GNU ddrescue version 1.30
+                # current_pos  current_status  current_pass
+                0x00010400     ?               1
+                #      pos        size  status
+                0x00000000  0x00000400  +
+                0x00000400  0x00010000  *
+                0x00010400  0x3FFFFEFC00  ?
+
+                """.write(toFile: mapfile, atomically: true, encoding: .utf8)
+                return nil
+            },
+            { return 1 },
+        ]
+        launcher.handles = [pass1]
+
+        let result = execute(
+            image: image,
+            mapfile: mapfile,
+            environment: FakeImagingEnvironment(),
+            launcher: launcher,
+            probe: FakeImageProbe(facts: emptyDestination())
+        )
+
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains("ddrescue stopped on its own, exit 1"), "\(result.stdout)")
+        #expect(result.stderr.contains("64.0 KiB (65536 bytes) failed (1 extents)"),
+                "\(result.stderr)")
+        #expect(!result.stdout.contains("ddrescue error"), "the stop reason is not a generic error")
+        #expect(result.stderr.contains("pass 1 ddrescue stopped on its own, exit 1"), "\(result.stderr)")
+        #expect(result.stdout.contains(
+            "with -T 90 ddrescue stops after 90 s without a successful read"
+        ), "\(result.stdout)")
+        #expect(result.stdout.contains("the drive may be stalling on a bad region"))
+        #expect(result.stdout.contains("the image is resumable"))
+        #expect(FileManager.default.fileExists(atPath: mapfile), "the mapfile is evidence")
+        #expect(launcher.launches.count == 1)
+        #expect(result.stdout.contains("RESUME"))
+        #expect(!result.stdout.contains("stop rule"), "the supervisor did not stop this pass")
+    }
+
+    @Test("REQ0173 ddrescue dying by SIGINT without our request is an interrupt, not an error")
+    func REQ0173_ddrescueSIGINTIsInterrupted() throws {
         let directory = try temporaryDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
@@ -323,7 +378,7 @@ struct ImagingExecutionTests {
         pass1.ticks = [
             {
                 writeMapfile(mapfile, rescued: 1024, total: Self.size, pass: 1)
-                return 1
+                return 130
             },
         ]
         launcher.handles = [pass1]
@@ -337,10 +392,65 @@ struct ImagingExecutionTests {
         )
 
         #expect(result.exitCode == 1)
-        #expect(result.stdout.contains("ddrescue error"))
-        #expect(FileManager.default.fileExists(atPath: mapfile), "the mapfile is evidence")
-        #expect(launcher.launches.count == 1)
-        #expect(result.stdout.contains("RESUME"))
+        #expect(result.stdout.contains("STOPPED   interrupted"))
+        #expect(!result.stdout.contains("stopped on its own"))
+    }
+
+    // MARK: - Failed versus bad in the summary
+
+    @Test("REQ0171 the image summary shows failed extents separately and never says only BAD 0")
+    func REQ0171_summaryShowsFailedExtentsNotBadZero() throws {
+        let text = try String(
+            contentsOfFile: fixturePath("minah-partial-me.mapfile.txt"),
+            encoding: .utf8
+        )
+        let snapshot = try #require(DdrescueMapfile.parse(text, limitBytes: 10_737_418_240))
+        let summary = ImagingSummary(
+            status: "incomplete",
+            exitCode: 1,
+            image: "/tmp/minah-test.img",
+            mapfile: "/tmp/minah-test.img.mapfile",
+            sidecar: "/tmp/minah-test.img.disktriage.json",
+            rescuedBytes: snapshot.rescuedBytes,
+            failedBytes: snapshot.failedBytes,
+            failedExtents: snapshot.failedExtents.count,
+            badBytes: snapshot.badBytes,
+            badExtents: snapshot.badExtents.count,
+            remainingBytes: snapshot.remainingBytes,
+            remainingExtents: snapshot.remainingExtents.count,
+            elapsedSeconds: 996.2,
+            passReached: 1,
+            stopped: .stoppedOnItsOwn,
+            stopExitCode: 1,
+            stopTimeout: "90",
+            resumeCommand: "sudo disktriage image disk8 --no-dry-run",
+            stop: nil,
+            partialLimitBytes: 10_737_418_240,
+            deviceBytes: 320_072_933_376
+        )
+
+        let rendered = renderImagingTTY(summary)
+        #expect(rendered.contains(
+            "RESCUED   3.2 GiB (3393650688 bytes)"
+        ), "\(rendered)")
+        #expect(rendered.contains(
+            "FAILED    768.0 KiB (786432 bytes) in 12 extents "
+                + "(read errors seen; not yet trimmed or scraped)"
+        ), "\(rendered)")
+        #expect(rendered.contains("BAD       0 bytes in 0 extents (confirmed)"), "\(rendered)")
+        #expect(rendered.contains("STOPPED   ddrescue stopped on its own, exit 1"), "\(rendered)")
+        #expect(!rendered.contains("\nBAD       0 bytes\n"), "a bare BAD 0 hides the failed extents")
+
+        let object = try #require(
+            try JSONSerialization.jsonObject(with: Data(renderImagingJSON(summary).utf8))
+                as? [String: Any]
+        )
+        #expect(object["failed_bytes"] as? Int == 786_432)
+        #expect(object["failed_extents"] as? Int == 12)
+        #expect(object["bad_bytes"] as? Int == 0)
+        #expect(object["bad_extents"] as? Int == 0)
+        #expect(object["stopped"] as? String == "ddrescue stopped on its own, exit 1")
+        #expect(object["stop_exit_code"] as? Int == 1)
     }
 
     // MARK: - Refusals before the first read

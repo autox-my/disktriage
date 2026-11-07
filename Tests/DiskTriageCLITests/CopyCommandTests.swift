@@ -119,6 +119,42 @@ struct CopyCommandTests {
         #expect(copy["files_copied"] as? Int == 5)
     }
 
+    // REQ-0172: the same failed-versus-bad accounting reaches copy's damage
+    // section; an incomplete mapfile still means no per-file claim.
+    @Test("REQ0172 copy reports failed extents as unreadable and claims no per-file integrity")
+    func REQ0172_REQ0177_copyCountsFailedExtentsAsUnreadable() throws {
+        let image = try makeBareNTFSImage()
+        let destination = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(atPath: image)
+            try? FileManager.default.removeItem(atPath: destination)
+        }
+        try Data(try Self.fixture("minah-partial-me.mapfile.txt").utf8)
+            .write(to: URL(fileURLWithPath: image + ".mapfile"))
+
+        let result = runCopy(
+            arguments: [image, "--to", destination],
+            dependencies: copyDependencies(tools: try Self.workingTools())
+        )
+        #expect(result.exitCode == 1, "\(result.stdout) \(result.stderr)")
+        #expect(result.stdout.contains("12 unreadable extents"), "\(result.stdout)")
+        #expect(result.stdout.contains("may shrink after trimming"), "\(result.stdout)")
+
+        let manifest = try json(destination + "/MANIFEST.json")
+        let damage = try #require(manifest["damage"] as? [String: Any])
+        #expect(damage["unreadable_extents"] as? Int == 12)
+        #expect(damage["unreadable_bytes"] as? Int == 786_432)
+        #expect(damage["failed_extents"] as? Int == 12)
+        #expect(damage["failed_bytes"] as? Int == 786_432)
+        #expect(damage["bad_extents"] as? Int == 0)
+        #expect(damage["bad_bytes"] as? Int == 0)
+
+        let attribution = try #require(manifest["attribution"] as? [String: Any])
+        #expect(attribution["kind"] as? String == "none",
+                "an incomplete mapfile makes the damage extent unknown")
+        #expect((attribution["reason"] as? String)?.contains("not rescued") == true)
+    }
+
     // REQ-0125: copy takes an image file, never a device node.
     @Test("REQ0125 copy refuses a device node and a symlink to one")
     func REQ0125_refusesADeviceNode() throws {

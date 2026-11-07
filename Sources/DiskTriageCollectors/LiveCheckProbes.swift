@@ -10,17 +10,21 @@ import DiskTriageCore
 /// disk, and it is harmless (one 4096-byte read, no sudo).
 public struct LiveCheckProbes: CheckProbing {
     private let executor: any CommandExecuting
-    private let checkRunner: ProcessRunner
+    /// The tool-version probe runs under the check policy, which is wider than
+    /// triage's. Injected with the executor in tests so no binary is executed.
+    private let checkRunner: any CommandExecuting
     private let environment: [String: String]
 
     public init(
         executor: any CommandExecuting = ProcessRunner(),
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        versionRunner: (any CommandExecuting)? = nil
     ) {
         self.executor = executor
         self.environment = environment
         // The self-test's own read-only shapes; 30 s covers the tiny log probe.
-        self.checkRunner = ProcessRunner(policy: .check, timeout: 30, outputLimit: 1_048_576)
+        self.checkRunner = versionRunner
+            ?? ProcessRunner(policy: .check, timeout: 30, outputLimit: 1_048_576)
     }
 
     public func runningAsRoot() -> Bool {
@@ -29,7 +33,7 @@ public struct LiveCheckProbes: CheckProbing {
 
     public func probeRawDevice() -> FDAProbeEvidence {
         guard let node = InternalDiskLocator(executor: executor).internalRawNode() else {
-            return .notRun(reason: "no internal disk found by diskutil list")
+            return .notRun(reason: "no internal disk found by diskutil or ioreg")
         }
         return RawDeviceProbe().probe(node: node)
     }
@@ -44,24 +48,23 @@ public struct LiveCheckProbes: CheckProbing {
     }
 
     public func tool(_ tool: CheckTool) -> CheckProbe {
-        guard let path = resolve(tool.rawValue, ntfs: CheckTool.ntfsTools.contains(tool)) else {
+        let ntfs = CheckTool.ntfsTools.contains(tool)
+        guard let path = resolve(tool.rawValue, ntfs: ntfs) else {
+            // The searched directories are part of the message: the real run
+            // said "missing ntfsls" while inspect found it under the same
+            // prefix, which is a different claim from "not on any search path".
             switch tool {
             case .smartctl, .ddrescue:
-                return .fail("not found on PATH")
+                return .fail("not found on PATH (searched \(searchDescription(ntfs: ntfs)))")
             default:
-                return .unverifiable("not found (set DISKTRIAGE_NTFS_PREFIX or add to PATH)")
+                return .unverifiable("not found (searched \(searchDescription(ntfs: ntfs)))")
             }
         }
 
         let result = checkRunner.run(.toolVersion(path: path))
         switch result.outcome {
         case .ok:
-            let version = result.stdout
-                .split(whereSeparator: \.isNewline)
-                .first
-                .map(String.init)?
-                .trimmingCharacters(in: .whitespaces)
-            guard let version, !version.isEmpty else {
+            guard let version = firstLine(result.stdout) else {
                 return .unverifiable("\(path) --version printed nothing")
             }
             return .pass(version)
@@ -74,7 +77,18 @@ public struct LiveCheckProbes: CheckProbing {
         case .policyRejected:
             return .fail("\(path) --version is not allow-listed")
         case .error:
-            return .fail("\(path) --version exited \(result.exitCode.map(String.init) ?? "on a signal")")
+            let code = result.exitCode.map(String.init) ?? "on a signal"
+            // ntfs-3g's `ntfsls --version` prints its banner and exits 1. A
+            // found, runnable binary is present even when the version flag's
+            // exit status is not 0; it is never reported as "missing".
+            if ntfs, let line = firstLine(result.stdout),
+               line.lowercased().contains(tool.rawValue) {
+                return .pass("\(line) (found at \(path); --version exited \(code))")
+            }
+            if ntfs {
+                return .unverifiable("found at \(path), but --version exited \(code)")
+            }
+            return .fail("\(path) --version exited \(code)")
         }
     }
 
@@ -134,6 +148,13 @@ public struct LiveCheckProbes: CheckProbing {
     }
 
     public func mountGuardAvailable() -> CheckProbe {
+        // DASessionCreate is a synchronous DiskArbitration call. With the
+        // daemon SIGSTOPped it waits with no timeout — the measured `check`
+        // hang — so the row is UNVERIFIABLE and never makes the call.
+        let daemon = DiskArbitrationProbe(executor: executor, environment: environment)
+        if daemon.isStopped() {
+            return .unverifiable("diskarbitrationd stopped; DASessionCreate skipped")
+        }
         // Create the session only: no callback and no dissent, so this probe
         // cannot affect a plugged-in disk.
         guard DASessionCreate(kCFAllocatorDefault) != nil else {
@@ -151,17 +172,36 @@ public struct LiveCheckProbes: CheckProbing {
     }
 
     public func diskArbitrationDaemon() -> CheckProbe {
-        guard let output = processList() else {
-            return .unverifiable("ps could not be run")
+        // The guard's own argv shapes, through the injected runner: `pgrep`
+        // and `ps` are bounded by the runner's hard timeout, unlike the bare
+        // `Process` this row used to run with no deadline.
+        let pidResult = executor.run(.pgrepDiskArbitrationDaemon)
+        guard pidResult.outcome == .ok,
+              let pid = pidResult.stdout
+                  .split(whereSeparator: \.isWhitespace)
+                  .first
+                  .flatMap({ Int32($0) })
+        else {
+            if pidResult.outcome == .error, pidResult.exitCode == 1 {
+                return .fail("diskarbitrationd is not running")
+            }
+            if pidResult.outcome == .timeout {
+                return .unverifiable("pgrep did not answer within its hard timeout")
+            }
+            return .unverifiable("pgrep could not be run (\(pidResult.outcome.rawValue))")
         }
-        let line = output
-            .split(whereSeparator: \.isNewline)
-            .first { $0.contains("diskarbitrationd") }
-        guard let line else {
-            return .fail("diskarbitrationd is not running")
+
+        let stateResult = executor.run(.processState(pid: pid))
+        guard stateResult.outcome == .ok else {
+            if stateResult.outcome == .timeout {
+                return .unverifiable("ps did not answer within its hard timeout")
+            }
+            return .unverifiable("ps could not read the state of diskarbitrationd")
         }
-        let fields = line.split(whereSeparator: \.isWhitespace)
-        let stat = fields.count > 1 ? String(fields[1]) : "?"
+        let stat = stateResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !stat.isEmpty else {
+            return .unverifiable("ps printed no state for diskarbitrationd")
+        }
         if stat.contains("T") {
             return .fail("diskarbitrationd is stopped (stat \(stat))")
         }
@@ -198,20 +238,25 @@ public struct LiveCheckProbes: CheckProbing {
         return nil
     }
 
-    private func processList() -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-Ao", "pid=,stat=,comm="]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            return nil
+    /// The directories the tool lookup actually visits, in order. A failure
+    /// that does not name them turns "the prefix was not exported" into
+    /// "the tool is missing".
+    private func searchDescription(ntfs: Bool) -> String {
+        var parts: [String] = []
+        if ntfs, let prefix = environment[NTFSToolLocator.prefixVariable], !prefix.isEmpty {
+            parts.append("\(NTFSToolLocator.prefixVariable)=\(prefix) (bin/, sbin/)")
         }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return String(decoding: data, as: UTF8.self)
+        parts.append("PATH")
+        parts.append("/opt/homebrew/bin, /usr/local/bin, /usr/bin, /bin, /sbin")
+        return parts.joined(separator: ", ")
+    }
+
+    private func firstLine(_ text: String) -> String? {
+        let line = text
+            .split(whereSeparator: \.isNewline)
+            .first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespaces)
+        return line?.isEmpty == false ? line : nil
     }
 }

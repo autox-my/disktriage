@@ -1,0 +1,17 @@
+# REQ-0175 — diskdoctor.md §7 the ntfs-3g tool row
+# Authored from `missing ntfsls, ntfscat` while inspect found ntfsls.
+schema: req.claim/2
+claim_id: REQ-0175
+statement: "The check command's ntfs-3g row shall name the prefix and the directories it searched when a tool is missing."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L433
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.LiveCheckProbesStoppedTests::REQ0175_ntfsRowNamesThePrefixSearched()"
+  - "DiskTriageCollectorsTests.LiveCheckProbesStoppedTests::REQ0175_versionExitIsNotMissing()"

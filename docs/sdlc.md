@@ -601,3 +601,100 @@ still falls back once.
   destination walk still use `diskutil` first; the suite drives the whole
   `image --no-dry-run` flow with a fake ddrescue and asserts both the
   zero-diskutil stopped run and the diskutil-first running run.
+
+## Mapfile accounting: failed is not bad (P3b follow-up)
+
+The first real `disktriage image --limit 10` run on the failing MiNaH drive
+(WD3200BJKT, 131 pending sectors) printed `BAD 0 bytes` and `0 unreadable
+extents` while its mapfile held 12 `*` extents of 64 KiB. The statuses are not
+interchangeable: in GNU ddrescue 1.30's mapfile, `?` is non-tried, `*` failed
+during copying and is not yet trimmed, `/` is trimmed but not scraped (both
+contain read errors), `-` is a confirmed bad sector, and `+` is finished.
+
+- **Four quantities, never merged.** `MapfileSnapshot` keeps rescued (`+`),
+  untried (`?`), failed (`*` + `/`) and bad (`-`) apart, each with its byte
+  total and extent count (`failedBytes`, `failedExtents`, `badBytes`,
+  `badExtents`; the older `nonTrimmedBytes`/`nonScrapedBytes` remain).
+- **The summary never hides damage behind `BAD 0`.** The human summary always
+  prints `FAILED  X bytes in N extents (read errors seen; not yet trimmed or
+  scraped)` and `BAD  X bytes in N extents (confirmed)`. The live progress line
+  carries the failed bytes and extent count too. JSON keeps `bad_bytes` and
+  `remaining_bytes`/`remaining_extents` and adds `failed_bytes`,
+  `failed_extents` and `bad_extents`; the old keys stay.
+- **`inspect` and `copy` count failed and bad together as unreadable.** An
+  extent with a read error is unreadable so far whether or not ddrescue has
+  isolated it, so `unreadable_extents`/`unreadable_bytes` are failed + bad.
+  The damage line also shows the split (`(12 failed, 0 confirmed bad)`), and an
+  incomplete mapfile adds: failed extents may shrink after trimming and
+  scraping. The JSON damage section adds `failed_extents`, `failed_bytes`,
+  `bad_extents` and `bad_bytes`. `copy` writes the same four fields into the
+  manifest's damage section.
+- **The partial-image clamp is unchanged (REQ-0108).** Every accounting runs
+  inside `[0, limit)` exactly as before; failure simply has its own bucket now.
+  The real MiNaH mapfile measured 12 failed extents (786,432 bytes), not 13.
+- **Fixture and reason.** `Tests/Fixtures/minah-partial-me.mapfile.txt` is the
+  real run with its local paths redacted; `mapfile-trimmed-bad.mapfile.txt` is
+  the same drive after trimming (12 `-` extents) and
+  `mapfile-nonscraped.mapfile.txt` is the `*`/`/` table. The expectations come
+  from the status meanings above, not from the parser.
+
+## The stop reason is ddrescue's own exit (P3b follow-up)
+
+The same run ended with `STOPPED  ddrescue error` after 996 s although the node
+was present, no SIGINT was sent, and ddrescue had been invoked with `-T 90`.
+ddrescue stopped itself: `-T` is "maximum time since last successful read", so
+a bad region that stalls reads is enough. A generic "error" hid both the code
+and the explanation.
+
+- **Classification.** A pass the supervisor stops itself is `stop rule`,
+  `interrupted` or `device disappeared` as before. A pass that exits on its own
+  is `complete` at 0, `interrupted` at 130/143 (the user's Ctrl-C or a SIGTERM
+  reached ddrescue directly), and `ddrescue stopped on its own, exit N`
+  otherwise. The per-pass stderr line carries the same text and code.
+- **Exit codes come from the manual, not a guess.** GNU ddrescue 1.30 documents
+  0 normal, 1 environmental problem (file not found, invalid options, I/O
+  error), 2 corrupt or invalid input file, 3 internal consistency error. The
+  summary's NOTE shows the documented meaning next to the code.
+- **`-T` is stated when it is in the command.** `with -T 90 ddrescue stops
+  after 90 s without a successful read; the drive may be stalling on a bad
+  region; the image is resumable`. JSON adds `stop_exit_code` and
+  `stop_detail`; `stopped` is the same sentence the tty prints.
+- **Unchanged.** Every non-complete outcome except a launch failure still exits
+  **1** and keeps the mapfile; resumability and the printed resume command are
+  untouched. `stop rule` is now spelled `pass-2 stop rule`.
+
+## `check` does not wait on a stopped diskarbitrationd (P3 follow-up)
+
+`disktriage check` did not return within 120 s with `guard --suspend` active,
+even though the `diskutil listFilesystems` row already skipped. The audit found
+the remaining blocker: `mountGuardAvailable` called `DASessionCreate`, a
+synchronous DiskArbitration call that talks to the stopped daemon with no
+timeout.
+
+- **The rows that touch DiskArbitration ask first.** `mount-guard` returns
+  `UNVERIFIABLE diskarbitrationd stopped; DASessionCreate skipped`; the
+  filesystem row keeps `diskarbitrationd stopped; diskutil skipped`. Both use
+  the same `DiskArbitrationProbe` (a positive `T` state from `pgrep`/`ps`) as
+  the collector and the image path; a failed probe falls through, so an
+  unreadable state is never treated as a guard.
+- **Everything else runs or is bounded.** The raw-device row reaches
+  `DeviceCollector`, which uses ioreg while stopped and never `diskutil`. The
+  tool rows run `--version` under the check policy's hard timeout. The unified
+  log probe has its hard timeout. The `diskarbitrationd state` row now runs its
+  `pgrep`/`ps` through the injected runner with the runner's hard timeout,
+  instead of a bare `Process` with no deadline.
+- **The seam test.** No test stops a system daemon. One test injects a runner
+  where every diskutil shape returns a timeout and `pgrep`/`ps` report `T`,
+  then runs the whole `CheckRunner`: both DiskArbitration rows are
+  UNVERIFIABLE with the reason, no diskutil command is attempted, and the
+  run completes in well under 5 s. There is still no in-process timeout for
+  `DASessionCreate` when the daemon is running but wedged; the skip covers the
+  measured failure, and a wedged-but-running daemon is a finding, not a pass.
+- **The ntfs-3g row names what it searched.** The real run printed
+  `missing ntfsls, ntfscat` while `inspect` found `ntfsls` under the same
+  prefix. Resolution was already shared; the row collapsed every non-PASS
+  into "missing" and printed no path. `ntfsls --version` prints its banner and
+  **exits 1**, so a present binary looked absent. A found ntfs tool whose
+  `--version` exits non-zero is now `PASS` when it printed its banner (or
+  `UNVERIFIABLE` when it printed nothing), and a genuinely missing tool's
+  message names `DISKTRIAGE_NTFS_PREFIX`, PATH and the fallback directories.

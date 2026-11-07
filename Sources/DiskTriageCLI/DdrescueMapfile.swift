@@ -57,6 +57,24 @@ public struct MapfileSnapshot: Equatable, Sendable {
         self.rangeBytes = rangeBytes
     }
 
+    /// Extents that failed during copying (`*`, non-trimmed) or were trimmed
+    /// but not scraped (`/`, non-scraped). Both have read errors on record but
+    /// are not yet isolated, so a later trim/scrape pass may shrink them. They
+    /// are deliberately not `bad`: `-` means ddrescue confirmed the block is
+    /// unreadable (GNU ddrescue 1.30 manual, mapfile statuses).
+    public var failedExtents: [MapfileExtent] {
+        extents.filter { $0.status == "*" || $0.status == "/" }
+    }
+
+    /// `*` plus `/` bytes: read errors seen, not yet confirmed bad.
+    public var failedBytes: Int64 { nonTrimmedBytes + nonScrapedBytes }
+
+    /// `-` extents: ddrescue gave up on these and the image has them
+    /// zero-filled. A resume does not retry them.
+    public var badExtents: [MapfileExtent] {
+        extents.filter { $0.status == "-" }
+    }
+
     /// Extents ddrescue has not finished: non-tried, non-trimmed, non-scraped
     /// and bad sectors. These are what a resume would still attempt.
     ///
