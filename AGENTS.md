@@ -2,7 +2,7 @@
 
 disktriage triages a failing disk from hardware signals, images it, and hands
 off. The plan is [`diskdoctor.md`](diskdoctor.md) (v3) and is the only source of
-scope; the SDLC is [`docs/sdlc.md`](docs/sdlc.md); vocabulary is
+scope; the SDLC is [`docs/sdlc.md`](docs/sdlc.md) and decisions are ADRs in [`docs/adr/`](docs/adr/README.md); vocabulary is
 [`CONTEXT.md`](CONTEXT.md). Where this file and `scripts/check.sh` disagree, the
 gate wins and the disagreement is a finding.
 

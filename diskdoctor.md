@@ -775,7 +775,7 @@ product, and awkward on Apple Silicon.
 - §8 imaging: mapfile statuses (failed `*`/`/` vs bad `-`); unreadable `$Bitmap` bytes are unknown
   allocation, counted as used.
 - §4 history: store contract (hashed key, 50-snapshot cap, `ok`-only, live-only, failure-tolerant).
-- Implementation-level decisions stay in `docs/sdlc.md`; claims may anchor there.
+- Implementation-level decisions are recorded as ADRs in `docs/adr/`; claims may anchor there.
 
 **v3.8 (2026-11-07), after the first real MiNaH image run and performance research:**
 
