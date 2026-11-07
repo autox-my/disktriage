@@ -6,7 +6,7 @@ statement: "The copy command shall refuse a non-NTFS filesystem as not implement
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#L245
+  source: docs/sdlc.md#cli-decisions-p3c-inspect
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

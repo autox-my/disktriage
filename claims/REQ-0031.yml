@@ -6,7 +6,7 @@ statement: "The tool shall exit with code 10 when a MEDIA root cause reaches at 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L300
+  source: diskdoctor.md#fault-classes-and-prescriptions
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

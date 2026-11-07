@@ -6,7 +6,7 @@ statement: "The tool shall treat a collector timeout as an unresponsive-device s
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L79
+  source: diskdoctor.md#2-design-principles
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

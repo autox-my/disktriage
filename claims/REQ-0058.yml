@@ -6,7 +6,7 @@ statement: "The tool shall write progress to stderr and the verdict to stdout."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L345
+  source: diskdoctor.md#6-cli
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

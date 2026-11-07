@@ -6,7 +6,7 @@ statement: "The tool shall assume a USB bridge imaging rate of 30 to 37 MB/s, ba
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L462
+  source: diskdoctor.md#mount-guard
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

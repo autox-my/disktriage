@@ -6,7 +6,7 @@ statement: "The tool shall exit with code 21 when collection fails for lack of p
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L305
+  source: diskdoctor.md#fault-classes-and-prescriptions
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

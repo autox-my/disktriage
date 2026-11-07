@@ -6,7 +6,7 @@ statement: "The tool shall record smart history as null on the first sight of a 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L159
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

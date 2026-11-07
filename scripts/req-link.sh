@@ -22,8 +22,9 @@
 #       2 usage. A missing report is never a pass. A tag naming a claim that
 #       does not exist fails loudly and writes nothing.
 #
-# This is deliberately NOT part of scripts/check.sh yet: it edits the corpus,
-# and the gate must stay read-only.
+# `--check` is read-only, so scripts/check.sh calls it as a gate step. The
+# default (write) mode edits the corpus and is deliberately not in the gate:
+# the gate never rewrites a claim.
 set -u
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || {

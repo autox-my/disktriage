@@ -6,7 +6,7 @@ statement: "The image command shall print the model, serial, and size of the sou
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L336
+  source: diskdoctor.md#exit-codes
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

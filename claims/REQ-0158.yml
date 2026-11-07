@@ -6,7 +6,7 @@ statement: "The snapshot store shall skip a corrupt, unknown-schema or foreign-d
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L164
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

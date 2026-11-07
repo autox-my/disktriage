@@ -6,7 +6,7 @@ statement: "The image command shall derive the default minimum read rate from th
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L494
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

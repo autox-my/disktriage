@@ -112,8 +112,8 @@ It reads every `*.xml` under `.build/test-results/`, extracts each `REQ-NNNN` ta
 stale id (the test was renamed or removed) is dropped in write mode and reported as drift by
 `--check`; a tag naming a claim that does not exist is a definite finding (exit 1) and nothing is
 written. The report is the evidence: a missing, empty or unparsable report is exit 3, never a
-pass. The script is **not** part of `scripts/check.sh`: linking edits the corpus, and the gate
-stays read-only and non-blocking on `req`.
+pass. `--check` is **read-only and is a `scripts/check.sh` step**; the default write mode edits
+the corpus and is deliberately not in the gate, which never rewrites a claim.
 
 **Parameterised tests collapse.** `@Test(arguments: [1, 2]) func probeParam(_ value: Int)` yields
 **one** `<testcase classname="…ProbeParameterisedTests" name="probeParam(_:)">`, not
@@ -175,7 +175,7 @@ req check --test-report .build/test-results/junit-swift-testing.xml
                                                        # 0: every variant and projection confirmed
 ```
 
-`req-link.sh --check` is advisory in this loop, not a gate: `scripts/check.sh` does not call it.
+`req-link.sh --check` is a gate step (it is read-only); write mode, which edits the corpus, is not.
 
 Exit codes are tri-state: **0** settled affirmatively, **1** a definite finding, **3**
 UNVERIFIABLE (cannot be told; blocks and is never a pass), **2** usage. `req check` folds one
@@ -206,17 +206,28 @@ only if that is impossible).
 
 ## Current state
 
-- 242 claims, all structured, 196 pins held, 0 lints (`req canon --fail-on-flag` → 0).
-- The suite runs under Swift Testing and writes a JUnit report that `req` reads (measured above).
-  Two hundred and two claims are linked to tests by a `REQ` tag in the test function name; P3c added
-  `REQ-0111`–`REQ-0122` for `inspect`, `REQ-0123`–`REQ-0124` for the relative-path and
-  damage-unknown fixes, and `REQ-0125`–`REQ-0142` for `copy` (0138 and 0141 are unused numbers,
-  kept free by the split of the copy obligations), `REQ-0143`–`REQ-0149` for streaming `copy`
-  `REQ-0150`–`REQ-0160` for the history store, `REQ-0161`–`REQ-0164` for identity while DiskArbitration is stopped and `REQ-0165`–`REQ-0170` for the diskutil-free `image` path and `REQ-0171`–`REQ-0177` for failed-block accounting, the stop reason and `check` under a stopped DiskArbitration, `REQ-0178`–`REQ-0184` for `--min-read-rate`, `REQ-0185`–`REQ-0199` for the pure NTFS allocation domain and `REQ-0200`–`REQ-0217` for the staged allocation-aware `image`, `REQ-0221`–`REQ-0227` for `--scope-report` (0218–0220 unused), `REQ-0228`–`REQ-0232` for the test temp cleanup and its gate leak guard `REQ-0233`–`REQ-0237` for the scope report's destination rule and `REQ-0238`–`REQ-0247` for unreadable bitmap bytes as unknown allocation. The other 40 have no linked test — linking is a
-  judgement about evidence, and only a test that demonstrably proves the obligation is linked.
-  `req gate --test-report .build/test-results/junit-swift-testing.xml` is therefore still exit 3
-  (*no linked test* on the 40), which is not a pass. `scripts/req-link.sh --check` reports 0 drift
-  for the one hundred; `req-link.sh` keeps them in step with the report.
+<!-- req-counts:begin -->
+- 242 claims total.
+- 196 pins held (`req gate --format json`, `pins_hold.checked`).
+- 202 claims have a non-empty `tests:` list.
+- 0 claims are process-evidenced (`evidence: process`).
+- 40 claims are unlinked: no linked test and no process evidence.
+<!-- req-counts:end -->
+
+These counts are generated from the corpus by `scripts/req-counts.sh`; do not edit the block by
+hand. After a merge that changes `claims/`, run `scripts/req-counts.sh --write` and then the gate.
+
+The suite runs under Swift Testing and writes a JUnit report that `req` reads (measured above).
+A linked claim names the test that demonstrates it; linking is a judgement about evidence, so the
+unlinked claims are a finding, not a chore. `req gate --test-report
+.build/test-results/junit-swift-testing.xml` therefore reports exit 3 (*no linked test* on the
+unlinked claims), which is not a pass. `scripts/req-link.sh --check` reports drift; `req-link.sh`
+keeps the lists in step with the report.
+
+For which requirement numbers belong to which feature, use `git log -- claims/` and
+[`docs/sdlc.md`](./sdlc.md): the history and the SDLC pages now carry that narrative, and this page
+does not keep a hand-maintained range list.
+
 - No `.req/variants` and no `.req/projections` are committed yet; `req check` therefore runs the
   default variant and checks no projection. Add a variant line in the commit that first uses
   `applicability`, and pin `docs/spec.md` only when a projection is a deliverable. Those two

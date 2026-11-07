@@ -6,7 +6,7 @@ statement: "The device collector shall retain the diskutil timeout as evidence w
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L244
+  source: diskdoctor.md#4-platform-strategy
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

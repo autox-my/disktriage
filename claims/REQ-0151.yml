@@ -6,7 +6,7 @@ statement: "The triage command shall report smart.history as null when the devic
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L166
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "A --used-only run with ddrescue shall copy every cluster the $Bitmap
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

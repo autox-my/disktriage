@@ -6,7 +6,7 @@ statement: "The copy command shall record the image hash only when hashing the i
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#L245
+  source: docs/sdlc.md#cli-decisions-p3c-inspect
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

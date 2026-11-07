@@ -6,7 +6,7 @@ statement: "The tool shall treat denied, timeout, and unsupported statuses as di
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L227
+  source: diskdoctor.md#4-platform-strategy
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The tool shall display I/O statistics without counting them as an in
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L257
+  source: diskdoctor.md#5-triage-decision-tree
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The inspect command shall extract an NTFS partition from a whole-dis
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L514
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The snapshot store shall keep at most 50 snapshots per device."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L164
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

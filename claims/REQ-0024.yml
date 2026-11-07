@@ -6,7 +6,7 @@ statement: "The tool shall record each collector outcome and elapsed time in col
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L147
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

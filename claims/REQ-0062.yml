@@ -6,7 +6,7 @@ statement: "The tool shall not cache a Full Disk Access result across launches."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L380
+  source: diskdoctor.md#7-fda-onboarding
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

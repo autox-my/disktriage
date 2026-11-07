@@ -6,7 +6,7 @@ statement: "The image command shall refuse with exit 30 to resume an image whose
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L478
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

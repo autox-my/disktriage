@@ -40,6 +40,11 @@ if [ -z "$XMLLINT_BIN" ] || [ ! -x "$XMLLINT_BIN" ]; then
     exit 3
 fi
 
+# The requirement steps use `req` and three read-only scripts. A missing `req`
+# is UNVERIFIABLE (3), never a pass and never a silent skip to 0; each step
+# says so itself, so one missing tool does not hide the other steps' outcomes.
+REQ_BIN="${REQ_BIN:-$(command -v req 2>/dev/null || true)}"
+
 LOG_DIR="$(mktemp -d)" || {
     echo "UNVERIFIABLE  cannot create a temporary directory"
     exit 3
@@ -153,6 +158,97 @@ run_tests() {
     return "$verdict_rc"
 }
 
+# The requirement steps run after the suite because the suite's JUnit report is
+# their evidence. They are read-only: req canon/link/gate and the anchor and
+# count checks never write the corpus. The JUnit report the test step wrote is
+# the input, so a missing or zero-testcase report stays UNVERIFIABLE.
+run_req_canon() {
+    echo "== req canon =="
+    if [ -z "$REQ_BIN" ] || [ ! -x "$REQ_BIN" ]; then
+        echo "UNVERIFIABLE  req canon (req not found; set REQ_BIN)"
+        return 3
+    fi
+    local log="$LOG_DIR/req-canon.log" rc
+    "$REQ_BIN" --root "$ROOT" canon --fail-on-flag >"$log" 2>&1
+    rc=$?
+    case "$rc" in
+        0) echo "PASS          req canon --fail-on-flag (0 flagged pins)" ;;
+        *)
+            cat "$log"
+            echo "FAIL          req canon --fail-on-flag exited $rc (a flagged pin is a finding)"
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+run_req_link() {
+    echo "== req link =="
+    local log="$LOG_DIR/req-link.log" rc
+    "$ROOT/scripts/req-link.sh" --check >"$log" 2>&1
+    rc=$?
+    cat "$log"
+    case "$rc" in
+        0) echo "PASS          req-link --check" ;;
+        1) echo "FAIL          req-link --check reports drift"; return 1 ;;
+        3) echo "UNVERIFIABLE  req-link --check (no usable JUnit report)"; return 3 ;;
+        *) echo "FAIL          req-link --check exited $rc"; return 1 ;;
+    esac
+    return 0
+}
+
+run_req_gate() {
+    echo "== req gate =="
+    if [ -z "$REQ_BIN" ] || [ ! -x "$REQ_BIN" ]; then
+        echo "UNVERIFIABLE  req gate (req not found; set REQ_BIN)"
+        return 3
+    fi
+    local log="$LOG_DIR/req-gate.log" rc
+    "$REQ_BIN" --root "$ROOT" gate --test-report "$SWIFT_TESTING_REPORT" >"$log" 2>&1
+    rc=$?
+    cat "$log"
+    case "$rc" in
+        0) echo "PASS          req gate" ;;
+        1) echo "FAIL          req gate (a flagged pin, a linked test failed, or an undecided claim)"; return 1 ;;
+        3)
+            echo "UNVERIFIABLE  req gate (exit 3; unlinked claims or stale links are named above)"
+            return 3
+            ;;
+        *) echo "FAIL          req gate exited $rc"; return 1 ;;
+    esac
+    return 0
+}
+
+run_req_anchors() {
+    echo "== req anchors =="
+    local log="$LOG_DIR/req-anchors.log" rc
+    "$ROOT/scripts/req-anchors.sh" --check >"$log" 2>&1
+    rc=$?
+    cat "$log"
+    case "$rc" in
+        0) echo "PASS          req-anchors --check" ;;
+        1) echo "FAIL          req-anchors --check (an unresolved or line anchor outside the pending list)"; return 1 ;;
+        3) echo "UNVERIFIABLE  req-anchors --check (no corpus)"; return 3 ;;
+        *) echo "FAIL          req-anchors --check exited $rc"; return 1 ;;
+    esac
+    return 0
+}
+
+run_req_counts() {
+    echo "== req counts =="
+    local log="$LOG_DIR/req-counts.log" rc
+    "$ROOT/scripts/req-counts.sh" --check >"$log" 2>&1
+    rc=$?
+    cat "$log"
+    case "$rc" in
+        0) echo "PASS          req-counts --check" ;;
+        1) echo "FAIL          req-counts --check (the docs block is stale; run scripts/req-counts.sh --write)"; return 1 ;;
+        3) echo "UNVERIFIABLE  req-counts --check (req or claims missing)"; return 3 ;;
+        *) echo "FAIL          req-counts --check exited $rc"; return 1 ;;
+    esac
+    return 0
+}
+
 run_build
 build_rc=$?
 if [ "$build_rc" -ne 0 ]; then
@@ -162,8 +258,41 @@ fi
 
 run_tests
 test_rc=$?
-case "$test_rc" in
-    0) echo "PASS"; exit 0 ;;
-    3) echo "UNVERIFIABLE"; exit 3 ;;
-    *) echo "FAIL"; exit 1 ;;
-esac
+run_req_canon
+canon_rc=$?
+run_req_link
+link_rc=$?
+run_req_gate
+gate_rc=$?
+run_req_anchors
+anchors_rc=$?
+run_req_counts
+counts_rc=$?
+
+# Precedence: a definite failure outranks UNVERIFIABLE, and UNVERIFIABLE
+# outranks PASS. The final word names every step that did not pass.
+failed=""
+unverifiable=""
+for step in test:"$test_rc" canon:"$canon_rc" link:"$link_rc" \
+            gate:"$gate_rc" anchors:"$anchors_rc" counts:"$counts_rc"; do
+    name="${step%%:*}"
+    rc="${step##*:}"
+    case "$rc" in
+        0) ;;
+        1) failed="$failed $name" ;;
+        *) unverifiable="$unverifiable $name" ;;
+    esac
+done
+
+if [ -n "$failed" ]; then
+    echo "FAIL          step(s):$failed"
+    echo "FAIL"
+    exit 1
+fi
+if [ -n "$unverifiable" ]; then
+    echo "UNVERIFIABLE  step(s):$unverifiable"
+    echo "UNVERIFIABLE"
+    exit 3
+fi
+echo "PASS"
+exit 0

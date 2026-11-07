@@ -6,7 +6,7 @@ statement: "The check command shall report a row skipped because diskarbitration
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L433
+  source: diskdoctor.md#self-test-disktriage-check
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The image command shall complete with the same outcome when diskarbi
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L462
+  source: diskdoctor.md#mount-guard
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

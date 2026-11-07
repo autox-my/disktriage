@@ -6,7 +6,7 @@ statement: "The destination rule shall refuse a destination whose backing whole 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L475
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

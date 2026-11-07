@@ -6,7 +6,7 @@ statement: "The triage command shall store a snapshot only when the SMART sectio
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L167
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The image command shall accept --confirm-serial for scripted confirm
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L337
+  source: diskdoctor.md#exit-codes
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

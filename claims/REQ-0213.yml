@@ -6,7 +6,7 @@ statement: "Default staging with ddrescue shall reproduce the whole source devic
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

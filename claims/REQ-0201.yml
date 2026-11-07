@@ -6,7 +6,7 @@ statement: "Stage 0 shall read the partition table, the primary and backup boot 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

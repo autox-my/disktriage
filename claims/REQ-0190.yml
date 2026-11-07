@@ -6,7 +6,7 @@ statement: "The MFT record parser shall decode a resident or non-resident $DATA 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

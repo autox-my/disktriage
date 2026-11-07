@@ -6,7 +6,7 @@ statement: "The copy command shall refuse a device node as its input."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L537
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

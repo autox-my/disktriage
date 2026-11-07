@@ -6,7 +6,7 @@ statement: "When diskarbitrationd is stopped, the check command's filesystem-dri
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L442
+  source: diskdoctor.md#self-test-disktriage-check
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

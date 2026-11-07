@@ -6,7 +6,7 @@ statement: "The image command shall not report a partial image as a complete ima
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L478
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

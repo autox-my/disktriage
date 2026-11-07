@@ -6,7 +6,7 @@ statement: "The tool shall represent an unknown counter as null rather than zero
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L113
+  source: diskdoctor.md#3-architecture
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

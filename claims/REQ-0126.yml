@@ -6,7 +6,7 @@ statement: "The copy command shall not overwrite an existing destination file."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L537
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

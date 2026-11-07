@@ -6,7 +6,7 @@ statement: "The inspect command shall report damage as unknown when no mapfile i
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L534
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

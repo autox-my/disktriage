@@ -6,7 +6,7 @@ statement: "The copy command shall subtract the partition offset and round a bad
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L551
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

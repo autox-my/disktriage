@@ -6,7 +6,7 @@ statement: "The tool shall exit with code 12 on a bridge, link, or power suspici
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L302
+  source: diskdoctor.md#fault-classes-and-prescriptions
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

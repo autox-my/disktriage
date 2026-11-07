@@ -9,7 +9,7 @@ relations:
   - type: "refines"
     to: "REQ-0179"
 rationale:
-  source: diskdoctor.md#L494
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

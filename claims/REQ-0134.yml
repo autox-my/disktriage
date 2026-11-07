@@ -6,7 +6,7 @@ statement: "The copy command shall not report a successful copy unless every wri
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#L245
+  source: docs/sdlc.md#cli-decisions-p3c-inspect
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

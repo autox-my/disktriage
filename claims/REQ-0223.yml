@@ -6,7 +6,7 @@ statement: "The scope report shall print an ETA range for stage 1 derived from t
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L513
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

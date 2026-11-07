@@ -6,7 +6,7 @@ statement: "The MFT record parser shall apply the update sequence array fixups b
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []
