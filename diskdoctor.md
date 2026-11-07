@@ -491,6 +491,30 @@ Deep link:
   temperature only between passes, or not at all.
 - **Two passes:** `-n` first (fast sweep), then `-r3` (scrape). Measured here: pass 2 hit ~200 B/s
   and would have needed 14 more hours for 9.9 MB.
+- **Defer slow zones (`--min-read-rate`, default 10 MB/s on rotational media, 0 disables):** pass 1
+  passes `ddrescue -a <bytes/s>` so a zone that reads slower than the threshold is skipped and left
+  for the later passes, instead of crawling through it first. Measured on the MiNaH drive (first
+  real run, USB 2 bridge, 37 MB/s on clean zones): one stretch ran at 6 MB/s for about 225 s. The
+  value is printed in the command and recorded in the mapfile header; it is not part of the
+  resume-identity check (changing it on resume is allowed).
+- **Allocation-aware order for NTFS (default), so the data that matters comes first:** three stages
+  in one mapfile, each a `ddrescue -m <domain-mapfile>` run (`-m` restricts the run to blocks marked
+  finished in the domain file). *Stage 0, metadata:* the partition table, the boot sector (the
+  **backup** sector at `partition_offset + partition_length_bytes - 512` when the primary is
+  unreadable, which is the MiNaH case), the first `$MFT` records and `$Bitmap` (MFT record 6). *Stage
+  1, used clusters:* the clusters the `$Bitmap` marks allocated, plus all `$MFT` extents. *Stage 2,
+  the rest of the volume:* run last, skipped with `--used-only`, and stopped by the same pass-2 stop
+  rule. The bitmap is parsed by the tool itself from the already-imaged metadata (MFT record update
+  sequence arrays are applied; data runs are decoded; a bitmap that cannot be read or parsed is a
+  stage-0 failure). If stage 0 cannot determine the allocation (both boot sectors unreadable, not
+  NTFS, the bitmap unreadable), the tool says so and falls back to the plain whole-device passes. It
+  never marks free space as unneeded without having read the bitmap. Skipping free space also skips
+  bad sectors in free space, which cost about 48 s each on macOS for nothing.
+- **Do not read the failing drive in parallel.** Concurrent reads on one HDD add seeks and stress the
+  drive. Parallel work belongs only after the data is in the image.
+- **Hardware note:** a generic USB 2 bridge caps reads at about 37 MB/s (measured, `Device Speed 2`).
+  A USB 3 / UASP dock or a direct SATA connection is the cheapest speed-up and may expose SMART; this
+  is advice in the report, not something the tool can change.
 - **Pass-2 stop rule (a rule, not a sentiment):** stop and report when the marginal yield over the
   trailing 10 minutes is < 0.01% of device size **and** the projected remaining time is > 2× the
   time elapsed. Thresholds are tunable; the measured ~200 B/s case is the reference trigger. On
@@ -720,6 +744,14 @@ product, and awkward on Apple Silicon.
 ---
 
 ## 14. Revision history
+
+**v3.8 (2026-11-07), after the first real MiNaH image run and performance research:**
+
+- Imaging performance (§8): `--min-read-rate` defers slow zones (default 10 MB/s on HDDs); NTFS imaging
+  is allocation-aware by default (metadata, then used clusters, then the rest) with `--used-only` to
+  stop before free space; no parallel reads on the failing drive; hardware note (USB 2 bridge cap).
+- Findings from the first MiNaH run: failed blocks (`*`, `/`) are damage, not zero; ddrescue `-T 90` can
+  stop a run on its own; `check` and `image` must not call `diskutil` while diskarbitrationd is stopped.
 
 **v3.7 (2026-11-07), after the first real-hardware smoke:**
 
