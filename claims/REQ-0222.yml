@@ -1,0 +1,19 @@
+# REQ-0222 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0222
+statement: "The scope report shall print the geometry source, cluster size, total, used and free clusters and bytes, the used extent count and the $MFT byte count."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeReportLiveTests::REQ0221_REQ0222_realDdrescueStageZeroReportsTheRecordedAllocation()"
+  - "DiskTriageCLITests.ScopeReportTests::REQ0221_REQ0222_scopeReportRunsStageZeroOnlyAndPrintsTheAllocation()"
+  - "DiskTriageCLITests.ScopeReportTests::REQ0222_REQ0223_scopeReportJSONHasStableKeys()"
+  - "DiskTriageCLITests.ScopeReportTests::REQ0222_limitReportsUsedBytesInsideTheLimit()"

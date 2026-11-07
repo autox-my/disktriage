@@ -34,6 +34,9 @@ struct ImagingPlan {
     let minReadRateBytesPerSecond: Int64?
     /// Stop after stage 1; free space is not imaged (REQ-0204).
     let usedOnly: Bool
+    /// Stop after stage 0 and report the allocation (REQ-0221). Never
+    /// combined with `usedOnly`; the CLI refuses that as a usage error.
+    let scopeReport: Bool
     /// The previous run's stage state, for a resume. `--used-only` itself is
     /// not identity; the stage state is informational (REQ-0207).
     let previousAllocation: ImageSidecarAllocation?
@@ -263,8 +266,20 @@ func runImaging(
         stage1: "not-started",
         stage2: "not-started"
     )
+    /// Set by a successful `--scope-report` (or a failed one, left nil so no
+    /// numbers are recorded). A later full run reads it and re-runs stage 0.
+    var scopeReportRecord: ImageSidecarScopeReport?
 
     func persistSidecar() throws {
+        let command: [String]
+        if plan.scopeReport {
+            // Only the reads this attempt made, not the stages it never ran.
+            command = plan.plannedStages.filter { $0.stage == 0 }.flatMap(\.lines)
+        } else {
+            command = dependencies.allocationAware
+                ? plan.plannedStages.flatMap(\.lines)
+                : plan.passes.map(\.line)
+        }
         let sidecar = ImageSidecar(
             schema: "disktriage.image/1",
             device: ImageSidecarDevice(
@@ -273,12 +288,11 @@ func runImaging(
                 sizeBytes: plan.source.sizeBytes ?? 0
             ),
             createdAt: iso8601String(startedAt),
-            command: dependencies.allocationAware
-                ? plan.plannedStages.flatMap(\.lines)
-                : plan.passes.map(\.line),
+            command: command,
             limitBytes: partialLimitBytes,
             minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond,
-            allocation: allocation
+            allocation: allocation,
+            scopeReport: scopeReportRecord
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -351,6 +365,119 @@ func runImaging(
         )
     }
 
+    var stageReports: [ImagingStageReport] = []
+    var lastPass: DdrescuePass?
+    var passReached = 0
+
+    /// The one stage-0 read path, shared by a full imaging run and a scope
+    /// report: the same domain mapfile, the same main mapfile and the same
+    /// safety gates (REQ-0221, REQ-0226).
+    func performStage0() -> Stage0Outcome {
+        runStage0(Stage0Context(
+            deviceSize: plan.source.sizeBytes ?? 0,
+            imageBytes: imageLimit,
+            rawDevice: plan.rawDevice,
+            image: plan.image,
+            mapfile: plan.mapfile,
+            blockSize: plan.source.blockSize ?? 512,
+            timeoutSeconds: timeoutSeconds,
+            limitBytes: partialLimitBytes,
+            writeFile: writeFile,
+            readImage: dependencies.readImage,
+            run: { pass, extentScope in
+                lastPass = pass
+                passReached = max(passReached, 1)
+                progress.append(
+                    "disktriage: stage 0 (\(pass.line)) started"
+                )
+                let value = makeSupervisor(pass, scope: extentScope)
+                    .run(pass, applyStopRule: false)
+                progress.append(contentsOf: progressLog.drain())
+                progress.append("disktriage: stage 0 \(passOutcome(value))")
+                return value
+            },
+            progress: { progress.append($0) }
+        ))
+    }
+
+    // `--scope-report`: stage 0 only, then the allocation, and exit 0. No
+    // stage 1 or 2 argv is built or launched (REQ-0221).
+    if plan.scopeReport {
+        guard dependencies.allocationAware else {
+            return CLIResult(
+                stdout: "",
+                stderr: "disktriage: --scope-report needs the allocation-aware stage 0, "
+                    + "which this dependency set did not enable\n",
+                exitCode: 30
+            )
+        }
+
+        switch performStage0() {
+        case .known(let stage0):
+            updateAllocation(
+                mode: "allocation-aware",
+                stage0: "done",
+                geometrySource: stage0.geometrySource.rawValue
+            )
+            let report = makeScopeReport(
+                stage0: stage0,
+                source: plan.source,
+                limitBytes: partialLimitBytes
+            )
+            scopeReportRecord = report.sidecarValue
+            // `updateAllocation` already re-persisted the sidecar; persist once
+            // more so `scope_report` lands beside the state it describes.
+            do {
+                try persistSidecar()
+            } catch {
+                progress.append(
+                    "disktriage: warning: cannot record scope_report in the sidecar: "
+                        + "\(error.localizedDescription)"
+                )
+            }
+            let stdout = plan.asJSON
+                ? renderScopeReportJSON(
+                    report,
+                    image: plan.image,
+                    mapfile: plan.mapfile,
+                    sidecar: sidecarPath
+                )
+                : renderScopeReportTTY(report)
+            return CLIResult(
+                stdout: stdout,
+                stderr: progress.joined(separator: "\n") + "\n",
+                exitCode: 0
+            )
+        case .failed(let reason):
+            updateAllocation(
+                mode: "whole-device",
+                stage0: "failed",
+                reason: reason
+            )
+            progress.append(
+                "disktriage: scope report: stage 0 failed: \(reason); nothing learned "
+                    + "(no allocation, no stage 1 or 2 read)"
+            )
+            return CLIResult(
+                stdout: "",
+                stderr: progress.joined(separator: "\n") + "\n",
+                exitCode: 1
+            )
+        case .stopped(let stopped):
+            updateAllocation(stage0: "interrupted", reason: stopped.reason.rawValue)
+            progress.append(
+                "disktriage: scope report: stage 0 \(stopped.reason.rawValue)"
+                    + (stopped.launchError.map { ": \($0)" } ?? "")
+                    + "; nothing learned"
+            )
+            return CLIResult(
+                stdout: "",
+                stderr: progress.joined(separator: "\n") + "\n",
+                exitCode: stopped.reason == .launchFailed ? 30 : 1
+            )
+        }
+    }
+
     /// A pass that never ran (everything was already done) is complete for the
     /// requested scope; the snapshot is evidence, not a fabricated rescue.
     func currentPassResult() -> PassResult {
@@ -359,10 +486,6 @@ func runImaging(
         }
         return PassResult(pass: 2, reason: .complete, snapshot: snapshot)
     }
-
-    var stageReports: [ImagingStageReport] = []
-    var lastPass: DdrescuePass?
-    var passReached = 0
 
     func runPlainPasses() -> PassResult {
         guard plan.passes.count == 2 else {
@@ -420,33 +543,7 @@ func runImaging(
     var result: PassResult
 
     if dependencies.allocationAware {
-        let stage0 = runStage0(Stage0Context(
-            deviceSize: plan.source.sizeBytes ?? 0,
-            imageBytes: imageLimit,
-            rawDevice: plan.rawDevice,
-            image: plan.image,
-            mapfile: plan.mapfile,
-            blockSize: plan.source.blockSize ?? 512,
-            timeoutSeconds: timeoutSeconds,
-            limitBytes: partialLimitBytes,
-            writeFile: writeFile,
-            readImage: dependencies.readImage,
-            run: { pass, extentScope in
-                lastPass = pass
-                passReached = max(passReached, 1)
-                progress.append(
-                    "disktriage: stage 0 (\(pass.line)) started"
-                )
-                let value = makeSupervisor(pass, scope: extentScope)
-                    .run(pass, applyStopRule: false)
-                progress.append(contentsOf: progressLog.drain())
-                progress.append("disktriage: stage 0 \(passOutcome(value))")
-                return value
-            },
-            progress: { progress.append($0) }
-        ))
-
-        switch stage0 {
+        switch performStage0() {
         case .stopped(let stopped):
             result = stopped
             updateAllocation(stage0: "interrupted", reason: stopped.reason.rawValue)

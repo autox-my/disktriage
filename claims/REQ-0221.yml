@@ -1,0 +1,20 @@
+# REQ-0221 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0221
+statement: "The image command with --scope-report shall not start a stage-1 or stage-2 ddrescue pass after printing the scope report."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.ScopeReportLiveTests::REQ0221_REQ0222_realDdrescueStageZeroReportsTheRecordedAllocation()"
+  - "DiskTriageCLITests.ScopeReportTests::REQ0221_REQ0222_scopeReportRunsStageZeroOnlyAndPrintsTheAllocation()"
+  - "DiskTriageCLITests.ScopeReportTests::REQ0221_REQ0224_bitmapFailurePrintsTheReasonAndNoNumbers()"
+  - "DiskTriageCLITests.ScopeReportTests::REQ0221_backupBootSectorSuppliesTheSameAllocation()"
+  - "DiskTriageCLITests.ScopeReportTests::REQ0221_dryRunPrintsTheStageZeroCommand()"

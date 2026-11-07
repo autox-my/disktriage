@@ -1,0 +1,16 @@
+# REQ-0223 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0223
+statement: "The scope report shall print an ETA range for stage 1 derived from the used bytes and the assumed bus speed."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeReportTests::REQ0222_REQ0223_scopeReportJSONHasStableKeys()"

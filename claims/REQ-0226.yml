@@ -1,0 +1,16 @@
+# REQ-0226 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0226
+statement: "A scope report shall require the same consent, root, Full Disk Access, mount guard, source confirmation and destination checks as an imaging run."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeReportTests::REQ0226_scopeReportNeedsTheSameGates()"
