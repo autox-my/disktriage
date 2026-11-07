@@ -38,6 +38,26 @@ struct InspectCommandTests {
         #expect(result.stderr.contains("image"))
     }
 
+    // REQ-0111 / REQ-0123: the textual path may look ordinary; the symlink
+    // target is what the /dev refusal must see.
+    @Test("REQ0111_REQ0123 a symlink to a device node is refused")
+    func REQ0111_REQ0123_symlinkToADeviceIsRefused() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("disktriage-inspect-link-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let link = directory.appendingPathComponent("ordinary.img").path
+        try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: "/dev/null")
+
+        let result = runInspect(
+            arguments: [link],
+            dependencies: inspectDependencies(tools: ScriptedNTFSTools())
+        )
+
+        #expect(result.exitCode == 2, "a device node behind a symlink is still a device node")
+        #expect(result.stderr.contains("/dev/null"), "the message names the resolved target")
+    }
+
     // REQ-0112: a directory, socket or device is not an image file.
     @Test("REQ0112 inspect refuses a non-regular file")
     func REQ0112_refusesANonRegularFile() throws {
@@ -106,6 +126,108 @@ struct InspectCommandTests {
         #expect(result.stderr.contains("NTFS signature is missing"))
     }
 
+    @Test("a policy rejection names the argument it rejected")
+    func policyRejectionNamesTheArgument() throws {
+        let image = try makeBareNTFSImage()
+        defer { try? FileManager.default.removeItem(atPath: image) }
+
+        let tools = ScriptedNTFSTools(
+            volume: CollectorResult(outcome: .policyRejected, policyViolation: .notAllowListed)
+        )
+        let result = runInspect(arguments: [image], dependencies: inspectDependencies(tools: tools))
+
+        #expect(result.exitCode == 30)
+        #expect(result.stderr.contains(image), "the message names the rejected argument: \(result.stderr)")
+        #expect(result.stderr.contains("not-allow-listed"))
+    }
+
+    // REQ-0123: the command policy is absolute-only, so the CLI resolves a
+    // relative path before the runner (and therefore the policy) sees it.
+    @Test("REQ0123 a relative image path is resolved before the command policy")
+    func REQ0123_relativeImagePathIsResolvedBeforeThePolicy() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("disktriage-inspect-relative-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let absolute = directory.appendingPathComponent("volume.img").path
+        var bytes = [UInt8](repeating: 0, count: 65_536)
+        bytes.replaceSubrange(0..<512, with: makeBootSector(totalSectors: 127))
+        try Data(bytes).write(to: URL(fileURLWithPath: absolute))
+
+        // The policy stays strict: the relative spelling is still rejected.
+        #expect(CommandPolicy.inspect.evaluate(
+            ["/opt/ntfs/bin/ntfsinfo", "-m", "volume.img"]
+        ) != .allowed, "the policy is absolute-only")
+
+        let executor = PolicyEnforcingNTFSExecutor()
+        let runner = NTFSToolRunner(
+            toolchain: NTFSToolchain(
+                ntfsinfo: "/opt/ntfs/bin/ntfsinfo",
+                ntfsls: "/opt/ntfs/bin/ntfsls"
+            ),
+            executor: executor
+        )
+        let result = runInspect(
+            arguments: ["volume.img", "--json"],
+            dependencies: InspectDependencies(
+                fileSystem: LiveInspectFileSystem(),
+                environment: [:],
+                tools: runner,
+                resolveTools: false,
+                currentDirectory: directory.path
+            )
+        )
+
+        #expect(result.exitCode == 0, "\(result.stdout) \(result.stderr)")
+        #expect(!executor.images.isEmpty, "the tools ran")
+        #expect(executor.images.allSatisfy { $0 == absolute },
+                "the policy saw the resolved absolute path: \(executor.images)")
+    }
+
+    // REQ-0123: --mapfile and --to are resolved at the same boundary as the
+    // image, so a relative path reaches neither the policy nor the filesystem
+    // as a bare relative name.
+    @Test("REQ0123 a relative --mapfile and --to are resolved too")
+    func REQ0123_relativeMapfileAndWorkingCopyAreResolved() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("disktriage-inspect-relpaths-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        var bytes = [UInt8](repeating: 0, count: 8192)
+        bytes.replaceSubrange(7680..<8192, with: makeBootSector(totalSectors: 15))
+        try Data(bytes).write(to: directory.appendingPathComponent("image.img"))
+        try Data(try Self.fixture("ntfs-damaged.mapfile.txt").utf8)
+            .write(to: directory.appendingPathComponent("damage.map"))
+
+        let result = runInspect(
+            arguments: [
+                "image.img", "--restore-boot-sector", "--to", "working.img",
+                "--mapfile", "damage.map", "--json",
+            ],
+            dependencies: InspectDependencies(
+                fileSystem: LiveInspectFileSystem(),
+                environment: [:],
+                tools: BootAwareTools(),
+                resolveTools: false,
+                currentDirectory: directory.path
+            )
+        )
+        #expect(result.exitCode == 1, "the mapfile still reports damage: \(result.stdout) \(result.stderr)")
+
+        let object = try jsonObject(result)
+        let boot = try #require(object["boot_sector"] as? [String: Any])
+        #expect(boot["working_copy"] as? String
+            == directory.appendingPathComponent("working.img").path)
+        let damage = try #require(object["damage"] as? [String: Any])
+        #expect(damage["mapfile"] as? String
+            == directory.appendingPathComponent("damage.map").path)
+        #expect(FileManager.default.fileExists(
+            atPath: directory.appendingPathComponent("working.img").path
+        ), "the working copy was written where the relative path pointed")
+    }
+
     // REQ-0117: an absent mapfile is unknown damage, never zero.
     @Test("REQ0117 no mapfile reports damage as unknown, not zero")
     func REQ0117_absentMapfileIsUnknownNotZero() throws {
@@ -132,6 +254,24 @@ struct InspectCommandTests {
         #expect(human.stdout.contains("damage unknown"))
         #expect(human.stdout.contains("absent is never a zero"))
         #expect(!human.stdout.contains("0 unreadable"))
+    }
+
+    // REQ-0124: "no damage note" reads like "no damage". With no mapfile the
+    // human RESULT line must say the damage is unknown, matching the JSON.
+    @Test("REQ0124 no mapfile: the result line says damage is unknown, not 'no damage'")
+    func REQ0124_resultLineSaysDamageUnknownWithoutAMapfile() throws {
+        let image = try makeBareNTFSImage()
+        defer { try? FileManager.default.removeItem(atPath: image) }
+
+        let result = runInspect(
+            arguments: [image],
+            dependencies: inspectDependencies(tools: try Self.workingTools())
+        )
+
+        #expect(result.exitCode == 0)
+        #expect(result.stdout.contains("damage UNKNOWN"), "\(result.stdout)")
+        #expect(result.stdout.contains("no mapfile"), "\(result.stdout)")
+        #expect(!result.stdout.contains("inspected; no damage note"), "\(result.stdout)")
     }
 
     // REQ-0116: the mapfile's `-` extents are the volume-level damage note.
@@ -607,6 +747,43 @@ private struct ScriptedNTFSTools: NTFSToolRunning {
     func listing(image: String, recursive: Bool) -> CollectorResult {
         onListing?(image)
         return recursive ? self.recursive : root
+    }
+}
+
+/// The real inspect policy is applied to the argv the runner builds, so a
+/// relative image path is rejected exactly as the shipped `ProcessRunner`
+/// would reject it. Allowed shapes return the recorded fixtures.
+private final class PolicyEnforcingNTFSExecutor: CommandExecuting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String] = []
+
+    var images: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    func run(_ command: TriageCommand) -> CollectorResult {
+        run(command, timeout: 0)
+    }
+
+    func run(_ command: TriageCommand, timeout: TimeInterval) -> CollectorResult {
+        switch CommandPolicy.inspect.evaluate(command.argv) {
+        case .rejected(let violation):
+            return CollectorResult(outcome: .policyRejected, policyViolation: violation)
+        case .allowed:
+            let argv = command.argv
+            let tool = (argv[0] as NSString).lastPathComponent
+            lock.lock()
+            storage.append(argv[2])
+            lock.unlock()
+            if tool == "ntfsinfo" {
+                return .ok(try! InspectCommandTests.volumeFixtureText())
+            }
+            return .ok(argv[1] == "-R"
+                ? (try! InspectCommandTests.recursiveFixtureText())
+                : (try! InspectCommandTests.rootFixtureText()))
+        }
     }
 }
 

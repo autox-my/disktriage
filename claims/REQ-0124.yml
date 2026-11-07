@@ -1,0 +1,16 @@
+# REQ-0124 — docs/sdlc.md §CLI decisions (P3c) mapfile
+# Authored from the inspect contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0124
+statement: "The inspect command's human result line shall report damage as unknown when no mapfile was supplied."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L210
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0124_resultLineSaysDamageUnknownWithoutAMapfile()"
