@@ -237,8 +237,18 @@ expect_rc "req gate reports an unlinked claim" 3 "$got" "$output" "no linked tes
 # pending list tolerates it; --fix converts it to the enclosing heading.
 anchor_root="$TMP/anchor-corpus"
 mkdir -p "$anchor_root/claims" "$anchor_root/docs"
-cp "$ROOT/docs/sdlc.md" "$anchor_root/docs/sdlc.md"
-awk 'BEGIN{done=0} /^  source:/ && !done {print "  source: docs/sdlc.md#L7"; done=1; next} {print}' \
+cat >"$anchor_root/docs/sdlc.md" <<'DOC'
+# The SDLC
+
+## The gate
+
+A claim may point at this section.
+
+### Commands
+
+The more specific heading wins when it encloses the line.
+DOC
+awk 'BEGIN{done=0} /^  source:/ && !done {print "  source: docs/sdlc.md#L5"; done=1; next} {print}' \
     "$ROOT/claims/REQ-0004.yml" >"$anchor_root/claims/REQ-0004.yml"
 output="$("$ROOT/scripts/req-anchors.sh" --root "$anchor_root" --pending "$TMP/no-pending" --check 2>&1)"
 got=$?
@@ -254,6 +264,17 @@ if grep -q 'source: docs/sdlc.md#the-gate' "$anchor_root/claims/REQ-0004.yml"; t
     echo "ok   probe req-anchors --fix wrote the section anchor"
 else
     fail "req-anchors --fix" "the source is not docs/sdlc.md#the-gate: $(grep 'source:' "$anchor_root/claims/REQ-0004.yml")"
+fi
+# The nearest (###) heading wins over the enclosing (##) one.
+awk 'BEGIN{done=0} /^  source:/ && !done {print "  source: docs/sdlc.md#L9"; done=1; next} {print}' \
+    "$ROOT/claims/REQ-0004.yml" >"$anchor_root/claims/REQ-0004.yml"
+output="$("$ROOT/scripts/req-anchors.sh" --root "$anchor_root" --pending "$TMP/no-pending" --fix --only REQ-0004 2>&1)"
+got=$?
+expect_rc "req-anchors --fix prefers the most specific heading" 0 "$got" "$output" "FIXED"
+if grep -q 'source: docs/sdlc.md#commands' "$anchor_root/claims/REQ-0004.yml"; then
+    echo "ok   probe req-anchors --fix chose the ### heading"
+else
+    fail "req-anchors --fix specificity" "the source is not docs/sdlc.md#commands: $(grep 'source:' "$anchor_root/claims/REQ-0004.yml")"
 fi
 output="$("$ROOT/scripts/req-anchors.sh" --root "$anchor_root" --pending "$TMP/no-pending" --check 2>&1)"
 got=$?
