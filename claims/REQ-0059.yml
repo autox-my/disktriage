@@ -6,7 +6,7 @@ statement: "The tool shall render timestamps in UTC unless --local is given."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#copy-and-damage-reporting
+  source: diskdoctor.md#11-test-strategy
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

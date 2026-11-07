@@ -6,7 +6,7 @@ statement: "The tool shall print the unread extent and the exact resume command 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#mount-guard
+  source: diskdoctor.md#imaging
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

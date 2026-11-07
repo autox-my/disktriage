@@ -6,7 +6,7 @@ statement: "The tool shall exit with code 20 when the evidence is insufficient."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#fault-classes-and-prescriptions
+  source: diskdoctor.md#exit-codes
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

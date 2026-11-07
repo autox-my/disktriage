@@ -6,7 +6,7 @@ statement: "The tool shall apply the pass-2 stop rule at a marginal yield of les
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#mount-guard
+  source: diskdoctor.md#imaging
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

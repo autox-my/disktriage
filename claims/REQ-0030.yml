@@ -6,7 +6,7 @@ statement: "The tool shall exit with code 0 when no actionable fault is found."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#fault-classes-and-prescriptions
+  source: diskdoctor.md#exit-codes
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The tool shall probe Full Disk Access with a real read on every run.
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#process-identity--decide-in-p0p2-not-p4
+  source: diskdoctor.md#rules
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The destination probe shall walk the ioreg media tree from a mounted
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#imaging
+  source: docs/sdlc.md#the-stopped-da-rule-reaches-the-rest-of-the-image-path-p3b-follow-up
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

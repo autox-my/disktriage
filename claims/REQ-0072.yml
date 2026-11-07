@@ -6,7 +6,7 @@ statement: "The guard command shall be started before the target device is conne
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#rules
+  source: diskdoctor.md#mount-guard
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

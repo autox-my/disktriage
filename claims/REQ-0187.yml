@@ -6,7 +6,7 @@ statement: "The NTFS boot geometry selector shall validate the backup boot secto
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#imaging
+  source: docs/sdlc.md#allocation-aware-ntfs-stage-0-is-a-pure-library-v38
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The inspect command shall run the ntfs-3g tools read-only without mo
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#imaging
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

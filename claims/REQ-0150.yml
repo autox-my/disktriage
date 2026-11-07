@@ -6,7 +6,7 @@ statement: "The triage command shall derive smart.history from the most recent p
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#signalset--the-contract
+  source: docs/sdlc.md#local-snapshot-history-p1f-smarthistory
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

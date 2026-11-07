@@ -6,7 +6,7 @@ statement: "A resumed image run shall continue at the stage after the last compl
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#imaging
+  source: docs/sdlc.md#allocation-aware-ntfs-staging-is-wired-into-image-v38
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

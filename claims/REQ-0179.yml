@@ -6,7 +6,7 @@ statement: "The image command shall convert the minimum read rate to 1000000 byt
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#imaging
+  source: docs/sdlc.md#deferring-slow-zones---min-read-rate-p3b-follow-up
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

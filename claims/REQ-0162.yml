@@ -6,7 +6,7 @@ statement: "The device collector shall use the ioreg device tree as the whole-di
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#mount-guard
+  source: docs/sdlc.md#identity-while-diskarbitration-is-stopped-p3b-follow-up
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

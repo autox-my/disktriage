@@ -6,7 +6,7 @@ statement: "The triage command shall redact serial numbers when it records a Sig
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#copy-and-damage-reporting
+  source: diskdoctor.md#11-test-strategy
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

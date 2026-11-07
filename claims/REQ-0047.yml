@@ -6,7 +6,7 @@ statement: "The image command shall accept --dry-run and print the exact ddrescu
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#exit-codes
+  source: diskdoctor.md#6-cli
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

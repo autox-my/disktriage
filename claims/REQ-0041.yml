@@ -6,7 +6,7 @@ statement: "The tool shall report a permission or tooling failure as a signal st
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#fault-classes-and-prescriptions
+  source: diskdoctor.md#exit-codes
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
