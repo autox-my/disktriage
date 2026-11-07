@@ -6,19 +6,30 @@ import DiskTriageCore
 // The numbers come from the parsed `$Bitmap`, never from the read extents: a
 // report that could not parse the bitmap must not invent an allocation.
 
-/// One stage-0 scope report. The twelve reported values are the bitmap's view
-/// of the volume; `limitBytes` is the `--limit` composition, reported beside
-/// them rather than folded in.
+/// One stage-0 scope report. The reported values are the bitmap's view of the
+/// volume plus the bytes it could not vouch for; `limitBytes` is the `--limit`
+/// composition, reported beside them rather than folded in.
 struct ScopeReport: Equatable, Sendable {
     let geometrySource: String
     let clusterBytes: Int64
     let totalClusters: Int64
+    /// The bitmap's own used clusters. Unknown clusters are not folded in here.
     let usedClusters: Int64
+    /// Clusters whose allocation an unreadable `$Bitmap` byte hides.
+    let unknownClusters: Int64
+    /// Clusters that are bitmap-free and were actually read.
     let freeClusters: Int64
     let usedBytes: Int64
+    let unknownBytes: Int64
     let freeBytes: Int64
     let usedExtents: Int
+    let unknownExtents: Int
+    let bitmapUnreadableBytes: Int64
+    /// Stage 1's basis: used plus unknown clusters, coalesced.
+    let stage1Clusters: Int64
+    let stage1Bytes: Int64
     let mftBytes: Int64
+    let unreadableMetadataRecords: Int
     let etaLowSeconds: Double?
     let etaHighSeconds: Double?
     let etaBasis: String
@@ -39,6 +50,13 @@ struct ScopeReport: Equatable, Sendable {
             freeBytes: freeBytes,
             usedExtents: usedExtents,
             mftBytes: mftBytes,
+            unknownClusters: unknownClusters,
+            unknownBytes: unknownBytes,
+            unknownExtents: unknownExtents,
+            bitmapUnreadableBytes: bitmapUnreadableBytes,
+            stage1Clusters: stage1Clusters,
+            stage1Bytes: stage1Bytes,
+            unreadableMetadataRecords: unreadableMetadataRecords,
             etaLowSeconds: etaLowSeconds,
             etaHighSeconds: etaHighSeconds,
             etaBasis: etaBasis
@@ -46,9 +64,9 @@ struct ScopeReport: Equatable, Sendable {
     }
 }
 
-/// Builds the report from the stage-0 domain. The ETA applies the existing bus
-/// assumption to the **used** bytes, which is what stage 1 reads; the
-/// failed-block caveat stays text.
+/// Builds the report from the stage-0 domain. Used and free stay the bitmap's
+/// trustworthy counts; unknown clusters are reported beside them and are stage
+/// 1's extra work. The ETA is computed from **stage-1 bytes** (used + unknown).
 func makeScopeReport(
     stage0: Stage0Domain,
     source: ImageSource,
@@ -57,13 +75,17 @@ func makeScopeReport(
     let clusterBytes = Int64(stage0.geometry.clusterSize)
     let totalClusters = stage0.geometry.totalClusters
     let usedClusters = stage0.domain.usedClusters.reduce(0) { $0 + $1.count }
-    let freeClusters = max(0, totalClusters - usedClusters)
+    let unknownClusters = stage0.domain.unknownClusters.reduce(0) { $0 + $1.count }
+    let stage1Clusters = stage0.domain.stage1Clusters.reduce(0) { $0 + $1.count }
+    let freeClusters = max(0, totalClusters - stage1Clusters)
     let usedBytes = usedClusters * clusterBytes
+    let unknownBytes = unknownClusters * clusterBytes
     let freeBytes = freeClusters * clusterBytes
+    let stage1Bytes = stage1Clusters * clusterBytes
 
     let bus = assumedBusSpeed(bus: source.bus)
     let eta = etaRange(
-        deviceBytes: usedBytes,
+        deviceBytes: stage1Bytes,
         lowBytesPerSecond: bus.lowBytesPerSecond,
         highBytesPerSecond: bus.highBytesPerSecond,
         basis: bus.basis
@@ -78,11 +100,18 @@ func makeScopeReport(
         clusterBytes: clusterBytes,
         totalClusters: totalClusters,
         usedClusters: usedClusters,
+        unknownClusters: unknownClusters,
         freeClusters: freeClusters,
         usedBytes: usedBytes,
+        unknownBytes: unknownBytes,
         freeBytes: freeBytes,
         usedExtents: stage0.domain.usedClusters.count,
+        unknownExtents: stage0.domain.bitmapUnreadable.extentCount,
+        bitmapUnreadableBytes: stage0.domain.bitmapUnreadable.bitmapBytes,
+        stage1Clusters: stage1Clusters,
+        stage1Bytes: stage1Bytes,
         mftBytes: stage0.mftBytes,
+        unreadableMetadataRecords: stage0.unreadableMetadataRecords,
         etaLowSeconds: eta?.lowSeconds,
         etaHighSeconds: eta?.highSeconds,
         etaBasis: bus.basis,
@@ -101,28 +130,50 @@ func renderScopeReportTTY(_ report: ScopeReport) -> String {
     lines.append(scopeField("CLUSTER", "\(report.clusterBytes) bytes"))
     lines.append(scopeField(
         "CLUSTERS",
-        "total \(report.totalClusters) · used \(report.usedClusters) · free \(report.freeClusters)"
+        "total \(report.totalClusters) · used \(report.usedClusters) · "
+            + "free \(report.freeClusters) · unknown \(report.unknownClusters)"
     ))
     lines.append(scopeField(
         "BYTES",
         "used \(scopeBytes(report.usedBytes)) · free \(scopeBytes(report.freeBytes))"
     ))
+    if report.bitmapUnreadableBytes > 0 {
+        lines.append(scopeField(
+            "UNKNOWN",
+            "\(report.unknownClusters) clusters (\(scopeBytes(report.unknownBytes))) "
+                + "allocation unreadable (\(report.bitmapUnreadableBytes) bitmap bytes); "
+                + "counted as used"
+        ))
+    } else {
+        lines.append(scopeField("UNKNOWN", "0 clusters; the whole $Bitmap was read"))
+    }
+    lines.append(scopeField(
+        "STAGE 1",
+        "\(report.stage1Clusters) clusters (\(scopeBytes(report.stage1Bytes))) = used + unknown"
+    ))
+    if report.unreadableMetadataRecords > 0 {
+        lines.append(scopeField(
+            "METADATA",
+            "unreadable metadata records: \(report.unreadableMetadataRecords)"
+        ))
+    }
     lines.append(scopeField("EXTENTS", "\(report.usedExtents) used extents"))
     lines.append(scopeField("$MFT", "\(scopeBytes(report.mftBytes)); inside the used bytes"))
 
     if let low = report.etaLowSeconds, let high = report.etaHighSeconds {
         lines.append(scopeField(
             "ETA",
-            "stage 1 (used clusters + metadata) \(scopeDurationRange(low: low, high: high)) "
+            "stage 1 (used + unknown clusters) \(scopeDurationRange(low: low, high: high)) "
                 + "at \(report.etaBasis)"
         ))
     } else {
-        lines.append(scopeField("ETA", "not computable: the used byte count is zero or unknown"))
+        lines.append(scopeField("ETA", "not computable: the stage-1 byte count is zero or unknown"))
     }
     lines.append(scopeField(
         "NOTE",
-        "a failed block costs about 48 s each on macOS when it is retried; that is not "
-            + "in the ETA, and the ETA is a range, not a promise"
+        "the ETA is computed from the stage-1 bytes (used + unknown); a failed block costs "
+            + "about 48 s each on macOS when it is retried; that is not in the ETA, and "
+            + "the ETA is a range, not a promise"
     ))
     if let limit = report.limitBytes {
         lines.append(scopeField(
@@ -151,6 +202,13 @@ func renderScopeReportJSON(_ report: ScopeReport, image: String, mapfile: String
         "free_bytes": report.freeBytes,
         "used_extents": report.usedExtents,
         "mft_bytes": report.mftBytes,
+        "unknown_clusters": report.unknownClusters,
+        "unknown_bytes": report.unknownBytes,
+        "unknown_extents": report.unknownExtents,
+        "bitmap_unreadable_bytes": report.bitmapUnreadableBytes,
+        "stage1_clusters": report.stage1Clusters,
+        "stage1_bytes": report.stage1Bytes,
+        "unreadable_metadata_records": report.unreadableMetadataRecords,
         "eta_basis": report.etaBasis,
     ]
     scope["eta_low_seconds"] = report.etaLowSeconds.map { $0 as Any } ?? NSNull()

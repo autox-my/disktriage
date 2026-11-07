@@ -1,0 +1,17 @@
+# REQ-0238 — diskdoctor.md §8 bitmap trust
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0238
+statement: "The tool shall compute the untrustworthy $Bitmap byte ranges as the intersection of the bitmap data runs with the mapfile ranges not marked finished, in bitmap stream order."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0238_realMiNaHMapfileYieldsTheRecordedUnknowns()"
+  - "DiskTriageCoreTests.NTFSBitmapTrustTests::REQ0238_untrustworthyBytesAreTheUnfinishedBitmapIntersection()"

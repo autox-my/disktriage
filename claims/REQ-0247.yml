@@ -1,0 +1,16 @@
+# REQ-0247 — diskdoctor.md §8 bitmap trust
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0247
+statement: "The scope report JSON and the image sidecar shall carry the unknown-cluster, unknown-byte, unknown-extent and unreadable-bitmap-byte keys."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0247_jsonAndSidecarCarryTheUnknownBitmapKeys()"

@@ -146,6 +146,9 @@ struct Stage0Domain {
     /// Every extent stage 0 read, so the used-only scope can include the
     /// partition table and boot sectors that sit outside the used clusters.
     let readExtents: [ByteRange]
+    /// `$MFT` records the main mapfile did not finish. They are reported and
+    /// never used (records 0 and 6 are a stage-0 failure instead).
+    let unreadableMetadataRecords: Int
 }
 
 enum Stage0Outcome {
@@ -169,6 +172,9 @@ struct Stage0Context {
     let limitBytes: Int64?
     let writeFile: (String, Data) throws -> Void
     let readImage: (String, Int64, Int) -> Data?
+    /// Reads the main mapfile. Stage 0 consults it for the exact ranges its
+    /// metadata reads did not finish (diskdoctor.md §8).
+    let readMapfile: (String) -> String?
     /// Runs one ddrescue command; the scope is the extents it may read.
     let run: (DdrescuePass, [ByteRange]?) -> PassResult
     let progress: (String) -> Void
@@ -230,6 +236,30 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
         if case .stopped = outcome { return outcome }
         if case .failed = outcome { return outcome }
         return nil
+    }
+
+    /// The main mapfile rows that are not `+`. An absent or unparsable mapfile
+    /// is not "everything finished": the caller then trusts nothing, which is
+    /// the conservative answer (it falls back to whole-device passes).
+    func unfinishedRanges() -> [ByteRange]? {
+        guard let text = context.readMapfile(context.mapfile),
+              let snapshot = DdrescueMapfile.parse(text, limitBytes: context.limitBytes)
+        else { return nil }
+        return snapshot.extents
+            .filter { $0.status != "+" && $0.size > 0 }
+            .map { ByteRange(position: $0.position, size: $0.size) }
+    }
+
+    func isFinished(_ range: ByteRange, _ unfinished: [ByteRange]?) -> Bool {
+        guard let unfinished else { return false }
+        // Compare by distance, not by `end`: ddrescue's untried tail can have
+        // `position + size` past Int64.max on a full-device mapfile.
+        return !unfinished.contains { hole in
+            if hole.position <= range.position {
+                return range.position - hole.position < hole.size
+            }
+            return hole.position - range.position < range.size
+        }
     }
 
     // 1. The partition table. LBA 0 is the MBR; LBA 1 is the GPT header when
@@ -300,11 +330,42 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
         partitionLengthBytes: partitionLength
     )
     let backup = backupOffset.flatMap { context.readImage(context.image, $0, 512) }
+
+    // A boot sector whose 512 bytes the mapfile did not finish is not a boot
+    // sector: the image has zeroes there. Exclude it from the choice instead of
+    // parsing a zero-filled sector (diskdoctor.md §8).
+    let bootUnfinished = unfinishedRanges()
+    let primaryRange = ByteRange(position: partitionOffset, size: 512)
+    let primaryFinished = isFinished(primaryRange, bootUnfinished)
+    let backupRange = backupOffset.map { ByteRange(position: $0, size: 512) }
+    let backupFinished = backupRange.map { isFinished($0, bootUnfinished) } ?? false
+    if !primaryFinished {
+        context.progress("disktriage: stage 0: the primary boot sector was not finished "
+            + "in the mapfile; it is not used")
+    }
+    if backupRange != nil, !backupFinished {
+        context.progress("disktriage: stage 0: the backup boot sector was not finished "
+            + "in the mapfile; it is not used")
+    }
+
     let selection: NTFSBootGeometrySelection
-    switch NTFSBootGeometry.select(primary: primary, backup: backup) {
+    switch NTFSBootGeometry.select(
+        primary: primaryFinished ? primary : Data(),
+        backup: backupFinished ? backup : nil
+    ) {
     case .success(let value):
+        let chosen = value.source == .primary ? primaryRange : backupRange
+        guard let chosen, isFinished(chosen, bootUnfinished) else {
+            return .failed("the chosen boot sector (\(value.source.rawValue)) was not "
+                + "finished in the mapfile; the geometry cannot be trusted")
+        }
         selection = value
     case .failure(let failure):
+        if !primaryFinished || (backupRange != nil && !backupFinished) {
+            return .failed("the boot sector could not be trusted: neither the primary at "
+                + "\(partitionOffset) nor the backup at \(backupOffset ?? -1) was finished "
+                + "in the mapfile")
+        }
         return .failed(describeBootFailure(failure))
     }
     let geometry = selection.geometry
@@ -324,6 +385,14 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
     if let outcome = stop(read("$MFT records", mftExtents)) { return outcome }
 
     let mftRecordOffset = partitionOffset + geometry.mftOffset
+    let recordZeroRange = ByteRange(
+        position: mftRecordOffset,
+        size: Int64(geometry.mftRecordSize)
+    )
+    guard isFinished(recordZeroRange, unfinishedRanges()) else {
+        return .failed("$MFT record 0 at \(mftRecordOffset) was not finished in the "
+            + "mapfile; the metadata cannot be trusted")
+    }
     guard let mftRecord = context.readImage(
         context.image, mftRecordOffset, geometry.mftRecordSize
     ), mftRecord.count >= geometry.mftRecordSize else {
@@ -340,6 +409,29 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
         return .failed("$MFT record 0 did not parse: \(describeMFTFailure(failure))")
     }
 
+    // Records 1-15 (except record 6, checked below) are not needed for the
+    // allocation, but an unfinished one is evidence the report must carry.
+    let recordsUnfinished = unfinishedRanges()
+    var unreadableMetadataRecords = 0
+    for record in 1...15 where record != 6 {
+        guard let offset = mftRecordDeviceOffset(
+            record: record,
+            runs: mftData.runs,
+            geometry: geometry,
+            partitionOffset: partitionOffset
+        ) else { continue }
+        if !isFinished(
+            ByteRange(position: offset, size: Int64(geometry.mftRecordSize)),
+            recordsUnfinished
+        ) {
+            unreadableMetadataRecords += 1
+        }
+    }
+    if unreadableMetadataRecords > 0 {
+        context.progress("disktriage: stage 0: unreadable metadata records: "
+            + "\(unreadableMetadataRecords)")
+    }
+
     // Record 6 ($Bitmap). It is normally inside the first 16-record region;
     // a fragmented $MFT may put it elsewhere, so read exactly where the run
     // map says it is.
@@ -354,6 +446,14 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
     if let outcome = stop(read("$Bitmap record", [
         ByteRange(position: bitmapRecordOffset, size: Int64(geometry.mftRecordSize)),
     ])) { return outcome }
+    let recordSixRange = ByteRange(
+        position: bitmapRecordOffset,
+        size: Int64(geometry.mftRecordSize)
+    )
+    guard isFinished(recordSixRange, unfinishedRanges()) else {
+        return .failed("$Bitmap record 6 at \(bitmapRecordOffset) was not finished in the "
+            + "mapfile; the allocation cannot be trusted")
+    }
     guard let bitmapRecord = context.readImage(
         context.image, bitmapRecordOffset, geometry.mftRecordSize
     ), bitmapRecord.count >= geometry.mftRecordSize else {
@@ -372,6 +472,7 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
 
     // 4. The bitmap data itself, which can be several MB.
     var bitmapData: Data?
+    var bitmapTrust = NTFSBitmapTrust.Unreadable.none
     if let resident = bitmapAttribute.residentData {
         bitmapData = resident
     } else {
@@ -397,6 +498,32 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
                 + "\(bitmapAttribute.dataSize) bytes are in the image")
         }
         bitmapData = bytes.prefix(Int(bitmapAttribute.dataSize))
+
+        // A zero-filled bitmap bit reads as "free". The mapfile says which
+        // bytes were not finished; those bytes hide allocation we do not know,
+        // so their clusters are unknown and are read with stage 1, never
+        // skipped as free (diskdoctor.md §8).
+        let holes = unfinishedRanges() ?? [
+            ByteRange(position: 0, size: max(context.deviceSize, 1)),
+        ]
+        bitmapTrust = NTFSBitmapTrust.unreadable(
+            bitmapRuns: extents,
+            unfinished: holes,
+            clusterBytes: clusterSize,
+            totalClusters: geometry.totalClusters
+        )
+        if bitmapTrust.bitmapBytes > 0 {
+            context.progress("disktriage: stage 0: \(bitmapTrust.bitmapBytes) $Bitmap bytes "
+                + "were not finished in the mapfile; \(bitmapTrust.clusterCount) clusters "
+                + "have unknown allocation and are counted as used")
+        }
+        let bitmapSize = max(1, bitmapAttribute.dataSize)
+        if bitmapTrust.bitmapBytes > bitmapSize / 10 {
+            return .failed("\(bitmapTrust.bitmapBytes) of \(bitmapSize) $Bitmap bytes "
+                + "(more than 10 percent) were not finished in the mapfile; the "
+                + "allocation-aware order would buy nothing, so plain whole-device "
+                + "passes are used")
+        }
     }
 
     let outcome = NTFSAllocation.evaluate(
@@ -405,7 +532,9 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
         bitmapRecord: bitmapRecord,
         bitmapData: bitmapData,
         partitionOffset: partitionOffset,
-        partitionLength: partitionLength
+        partitionLength: partitionLength,
+        unknownClusters: bitmapTrust.clusters,
+        bitmapUnreadable: bitmapTrust
     )
     switch outcome {
     case .known(let domain):
@@ -421,7 +550,8 @@ func runStage0(_ context: Stage0Context) -> Stage0Outcome {
             mftBytes: mftBytes,
             partitionOffset: partitionOffset,
             partitionLength: partitionLength,
-            readExtents: mergeExtents(readExtents)
+            readExtents: mergeExtents(readExtents),
+            unreadableMetadataRecords: unreadableMetadataRecords
         ))
     case .unknown(let failure):
         return .failed(describeAllocationFailure(failure))

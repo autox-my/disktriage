@@ -120,11 +120,11 @@ struct ScopeReportTests {
         #expect(report["free_bytes"] as? Int == 16_691_200)
         #expect(report["used_extents"] as? Int == 10)
         #expect(report["mft_bytes"] as? Int == 126_976)
-        // 50413568 / 30 MB/s and / 25 MB/s: the bus is the recorded synthetic USB.
+        // 50413568 / 37 MB/s and / 30 MB/s: the bus is the recorded synthetic USB.
         let low = try #require(report["eta_low_seconds"] as? Double)
         let high = try #require(report["eta_high_seconds"] as? Double)
-        #expect(abs(low - 50_413_568.0 / 30_000_000.0) < 0.001)
-        #expect(abs(high - 50_413_568.0 / 25_000_000.0) < 0.001)
+        #expect(abs(low - 50_413_568.0 / 37_000_000.0) < 0.001)
+        #expect(abs(high - 50_413_568.0 / 30_000_000.0) < 0.001)
         #expect((report["eta_basis"] as? String)?.contains("assumed USB") == true)
     }
 

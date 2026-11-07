@@ -1,0 +1,22 @@
+# Mapfile. Created by GNU ddrescue version 1.30
+# Command line: ddrescue -b 512 -O -K 65536 -T 90 -m <image>.domain-stage0.mapfile <raw device> <image> <image>.mapfile
+# Start time:   2026-11-07 19:43:51
+# Current time: 2026-11-07 19:48:02
+# Scraping failed blocks... (forwards)
+# current_pos  current_status  current_pass
+0x2543301600     /               1
+#      pos        size  status
+0x00000000  0x00000400  +
+0x00000400  0x000FFC00  ?
+0x00100000  0x00000200  +
+0x00100200  0xBFFFFE00  ?
+0xC0100000  0x00004000  +
+0xC0104000  0x2482D86000  ?
+0x2542E8A000  0x00477000  +
+0x2543301000  0x00000600  -
+0x2543301600  0x00000800  /
+0x2543301E00  0x00000200  -
+0x2543302000  0x004D9000  +
+0x25437DB000  0x2542424E00  ?
+0x4A85BFFE00  0x00000200  +
+0x4A85C00000  0x7FFFFFB57A3FFFFF  ?

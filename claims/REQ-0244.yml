@@ -1,0 +1,17 @@
+# REQ-0244 — diskdoctor.md §8 bitmap trust
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0244
+statement: "The tool shall fall back to plain whole-device passes when $MFT record 0 or $Bitmap record 6 is unfinished in the mapfile, naming the structure."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0244_unfinishedBitmapRecordFails()"
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0244_unfinishedMFTRecordZeroFallsBack()"

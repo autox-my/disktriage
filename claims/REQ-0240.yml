@@ -1,0 +1,16 @@
+# REQ-0240 — diskdoctor.md §8 bitmap trust
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0240
+statement: "The tool shall place every unknown-allocation cluster in the stage-1 domain and not in the stage-2 complement."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0239_REQ0240_unknownBitmapClustersAreStageOneNotStageTwo()"

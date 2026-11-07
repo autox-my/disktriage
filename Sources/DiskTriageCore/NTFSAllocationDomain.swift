@@ -61,21 +61,44 @@ public enum NTFSAllocationFailure: Error, Equatable, Sendable {
 /// clipped to the partition and merged. `usedClusters` stays volume-relative so
 /// it can be compared with the ntfs-3g tools' cluster numbers.
 public struct NTFSAllocationDomain: Equatable, Sendable {
+    /// Stage 1's domain: the bitmap's used clusters, the `$MFT` runs, the
+    /// metadata region **and** the unknown-allocation clusters. An unknown
+    /// cluster is read with stage 1, conservatively.
     public let used: [ByteRange]
+    /// The stage-2 complement: no used and no unknown cluster is inside it.
     public let free: [ByteRange]
+    /// The bitmap's own used clusters. Unknown clusters are kept separately so
+    /// the report never presents an unreadable bit as allocated evidence.
     public let usedClusters: [ClusterRange]
+    /// Clusters the unreadable `$Bitmap` bytes describe. They are UNKNOWN, not
+    /// free and not measured as used; stage 1 reads them anyway.
+    public let unknownClusters: [ClusterRange]
     public let metadataRecords: ByteRange?
+    /// The unreadable bitmap bytes that produced `unknownClusters`, so the
+    /// report can name both the clusters and the bytes.
+    public let bitmapUnreadable: NTFSBitmapTrust.Unreadable
 
     public init(
         used: [ByteRange],
         free: [ByteRange],
         usedClusters: [ClusterRange],
-        metadataRecords: ByteRange?
+        metadataRecords: ByteRange?,
+        unknownClusters: [ClusterRange] = [],
+        bitmapUnreadable: NTFSBitmapTrust.Unreadable = .none
     ) {
         self.used = used
         self.free = free
         self.usedClusters = usedClusters
         self.metadataRecords = metadataRecords
+        self.unknownClusters = unknownClusters
+        self.bitmapUnreadable = bitmapUnreadable
+    }
+
+    /// Stage 1's cluster count basis: the bitmap's used clusters plus the
+    /// unknown ones, coalesced so an overlap is counted once. The report's ETA
+    /// uses these bytes.
+    public var stage1Clusters: [ClusterRange] {
+        NTFSBitmapTrust.coalesce(usedClusters + unknownClusters)
     }
 }
 
@@ -106,7 +129,9 @@ public enum NTFSAllocation {
         bitmapRecord: Data,
         bitmapData: Data?,
         partitionOffset: Int64,
-        partitionLength: Int64
+        partitionLength: Int64,
+        unknownClusters: [ClusterRange] = [],
+        bitmapUnreadable: NTFSBitmapTrust.Unreadable = .none
     ) -> NTFSAllocationOutcome {
         let mft: NTFSDataAttribute
         switch NTFSMFTRecord.dataAttribute(
@@ -148,7 +173,9 @@ public enum NTFSAllocation {
             mftRuns: mft.runs,
             usedClusters: used,
             partitionOffset: partitionOffset,
-            partitionLength: partitionLength
+            partitionLength: partitionLength,
+            unknownClusters: unknownClusters,
+            bitmapUnreadable: bitmapUnreadable
         ) {
         case .success(let domain): return .known(domain)
         case .failure(let failure): return .unknown(failure)
@@ -164,7 +191,9 @@ public enum NTFSAllocation {
         mftRuns: [NTFSDataRun],
         usedClusters: [ClusterRange],
         partitionOffset: Int64,
-        partitionLength: Int64
+        partitionLength: Int64,
+        unknownClusters: [ClusterRange] = [],
+        bitmapUnreadable: NTFSBitmapTrust.Unreadable = .none
     ) -> Result<NTFSAllocationDomain, NTFSAllocationFailure> {
         guard partitionOffset >= 0, partitionLength >= 0 else {
             return .failure(.mftOutsidePartition(
@@ -235,6 +264,16 @@ public enum NTFSAllocation {
             ))
         }
 
+        // The clusters an unreadable bitmap bit describes. Their allocation is
+        // unknown, so stage 1 reads them with the used clusters and the stage-2
+        // complement leaves them out: unknown is not free (diskdoctor.md §8).
+        for range in unknownClusters {
+            relative.append(ByteRange(
+                position: range.first * clusterSize,
+                size: range.count * clusterSize
+            ))
+        }
+
         let device = relative.compactMap { extent -> ByteRange? in
             let start = max(extent.position + partitionOffset, partitionOffset)
             let end = min(extent.end + partitionOffset, partitionEnd)
@@ -250,7 +289,9 @@ public enum NTFSAllocation {
             usedClusters: usedClusters,
             metadataRecords: metadata.map {
                 ByteRange(position: $0.position + partitionOffset, size: $0.size)
-            }
+            },
+            unknownClusters: unknownClusters,
+            bitmapUnreadable: bitmapUnreadable
         ))
     }
 

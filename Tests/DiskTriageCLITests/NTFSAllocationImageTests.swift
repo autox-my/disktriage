@@ -552,6 +552,10 @@ final class StageFakeDdrescueLauncher: DdrescueLaunching, @unchecked Sendable {
     /// The main mapfile's text as it stood when each launch started.
     private(set) var mapfilesSeen: [String?] = []
     var shouldInterrupt: (Launch) -> Bool = { _ in false }
+    /// Device ranges the run leaves unreadable. The fake writes them as `-`
+    /// rows (ddrescue's confirmed-bad status) instead of `+`, so a test can
+    /// prove stage 0 consults the mapfile, not only the bytes in the image.
+    var badRanges: (Launch) -> [ByteRange] = { _ in [] }
 
     func reset() {
         launches.removeAll()
@@ -586,7 +590,7 @@ final class StageFakeDdrescueLauncher: DdrescueLaunching, @unchecked Sendable {
             return InterruptingProcess()
         }
         try copy(domain: domain, to: image)
-        try updateMapfile(mapfile, adding: domain)
+        try updateMapfile(mapfile, adding: domain, bad: badRanges(launch))
         return ImmediateProcess()
     }
 
@@ -633,7 +637,11 @@ final class StageFakeDdrescueLauncher: DdrescueLaunching, @unchecked Sendable {
         }
     }
 
-    private func updateMapfile(_ path: String, adding extents: [ByteRange]) throws {
+    private func updateMapfile(
+        _ path: String,
+        adding extents: [ByteRange],
+        bad: [ByteRange]
+    ) throws {
         var rescued = extents
         if let text = try? String(contentsOfFile: path, encoding: .utf8),
            let existing = DdrescueMapfile.parse(text) {
@@ -641,20 +649,30 @@ final class StageFakeDdrescueLauncher: DdrescueLaunching, @unchecked Sendable {
                 ByteRange(position: $0.position, size: $0.size)
             }
         }
-        let merged = merge(rescued)
+        let good = merge(rescued)
+        let damaged = merge(bad)
+        var points: Set<Int64> = [0, deviceSize]
+        for extent in good + damaged {
+            points.insert(max(0, min(extent.position, deviceSize)))
+            points.insert(max(0, min(extent.end, deviceSize)))
+        }
+        let edges = points.sorted()
         var text = "# Mapfile. Created by GNU ddrescue version 1.30\n"
             + "# current_pos  current_status  current_pass\n0x00000000  ?  1\n"
             + "#      pos        size  status\n"
-        var cursor: Int64 = 0
-        for extent in merged {
-            if extent.position > cursor {
-                text += row(cursor, extent.position - cursor, "?")
+        for index in 0..<max(0, edges.count - 1) {
+            let start = edges[index]
+            let end = edges[index + 1]
+            guard end > start else { continue }
+            let status: String
+            if damaged.contains(where: { $0.position <= start && end <= $0.end }) {
+                status = "-"
+            } else if good.contains(where: { $0.position <= start && end <= $0.end }) {
+                status = "+"
+            } else {
+                status = "?"
             }
-            text += row(extent.position, extent.size, "+")
-            cursor = extent.end
-        }
-        if deviceSize > cursor {
-            text += row(cursor, deviceSize - cursor, "?")
+            text += row(start, end - start, status)
         }
         try text.write(toFile: path, atomically: true, encoding: .utf8)
     }

@@ -83,6 +83,15 @@ public struct ImageSidecarScopeReport: Codable, Equatable, Sendable {
     public let freeBytes: Int64
     public let usedExtents: Int
     public let mftBytes: Int64
+    /// Clusters whose allocation the unreadable `$Bitmap` bytes hide.
+    public let unknownClusters: Int64
+    public let unknownBytes: Int64
+    public let unknownExtents: Int
+    public let bitmapUnreadableBytes: Int64
+    /// Stage 1's basis: used plus unknown clusters.
+    public let stage1Clusters: Int64
+    public let stage1Bytes: Int64
+    public let unreadableMetadataRecords: Int
     public let etaLowSeconds: Double?
     public let etaHighSeconds: Double?
     public let etaBasis: String
@@ -97,6 +106,13 @@ public struct ImageSidecarScopeReport: Codable, Equatable, Sendable {
         freeBytes: Int64,
         usedExtents: Int,
         mftBytes: Int64,
+        unknownClusters: Int64,
+        unknownBytes: Int64,
+        unknownExtents: Int,
+        bitmapUnreadableBytes: Int64,
+        stage1Clusters: Int64,
+        stage1Bytes: Int64,
+        unreadableMetadataRecords: Int,
         etaLowSeconds: Double?,
         etaHighSeconds: Double?,
         etaBasis: String
@@ -110,6 +126,13 @@ public struct ImageSidecarScopeReport: Codable, Equatable, Sendable {
         self.freeBytes = freeBytes
         self.usedExtents = usedExtents
         self.mftBytes = mftBytes
+        self.unknownClusters = unknownClusters
+        self.unknownBytes = unknownBytes
+        self.unknownExtents = unknownExtents
+        self.bitmapUnreadableBytes = bitmapUnreadableBytes
+        self.stage1Clusters = stage1Clusters
+        self.stage1Bytes = stage1Bytes
+        self.unreadableMetadataRecords = unreadableMetadataRecords
         self.etaLowSeconds = etaLowSeconds
         self.etaHighSeconds = etaHighSeconds
         self.etaBasis = etaBasis
@@ -125,6 +148,13 @@ public struct ImageSidecarScopeReport: Codable, Equatable, Sendable {
         case freeBytes = "free_bytes"
         case usedExtents = "used_extents"
         case mftBytes = "mft_bytes"
+        case unknownClusters = "unknown_clusters"
+        case unknownBytes = "unknown_bytes"
+        case unknownExtents = "unknown_extents"
+        case bitmapUnreadableBytes = "bitmap_unreadable_bytes"
+        case stage1Clusters = "stage1_clusters"
+        case stage1Bytes = "stage1_bytes"
+        case unreadableMetadataRecords = "unreadable_metadata_records"
         case etaLowSeconds = "eta_low_seconds"
         case etaHighSeconds = "eta_high_seconds"
         case etaBasis = "eta_basis"
@@ -141,6 +171,13 @@ public struct ImageSidecarScopeReport: Codable, Equatable, Sendable {
         try container.encode(freeBytes, forKey: .freeBytes)
         try container.encode(usedExtents, forKey: .usedExtents)
         try container.encode(mftBytes, forKey: .mftBytes)
+        try container.encode(unknownClusters, forKey: .unknownClusters)
+        try container.encode(unknownBytes, forKey: .unknownBytes)
+        try container.encode(unknownExtents, forKey: .unknownExtents)
+        try container.encode(bitmapUnreadableBytes, forKey: .bitmapUnreadableBytes)
+        try container.encode(stage1Clusters, forKey: .stage1Clusters)
+        try container.encode(stage1Bytes, forKey: .stage1Bytes)
+        try container.encode(unreadableMetadataRecords, forKey: .unreadableMetadataRecords)
         try container.encode(etaBasis, forKey: .etaBasis)
         if let etaLowSeconds {
             try container.encode(etaLowSeconds, forKey: .etaLowSeconds)
@@ -837,9 +874,9 @@ func assumedBusSpeed(bus: String?) -> BusSpeedRange {
     switch bus?.lowercased() {
     case "usb":
         return BusSpeedRange(
-            lowBytesPerSecond: 25 * mb,
-            highBytesPerSecond: 30 * mb,
-            basis: "assumed USB 25–30 MB/s (not measured)"
+            lowBytesPerSecond: 30 * mb,
+            highBytesPerSecond: 37 * mb,
+            basis: "assumed USB 2: 30–37 MB/s (37 MB/s measured on a clean zone of the MiNaH drive)"
         )
     case "sata", "sata-iii":
         return BusSpeedRange(
@@ -861,9 +898,9 @@ func assumedBusSpeed(bus: String?) -> BusSpeedRange {
         )
     default:
         return BusSpeedRange(
-            lowBytesPerSecond: 25 * mb,
-            highBytesPerSecond: 30 * mb,
-            basis: "assumed 25–30 MB/s (bus unknown, not measured)"
+            lowBytesPerSecond: 30 * mb,
+            highBytesPerSecond: 37 * mb,
+            basis: "assumed 30–37 MB/s (bus unknown; 37 MB/s measured on a clean zone of the MiNaH drive)"
         )
     }
 }
