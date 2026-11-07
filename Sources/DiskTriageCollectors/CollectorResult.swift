@@ -101,3 +101,45 @@ public struct CommandDataResult: Sendable, Equatable {
         CommandDataResult(outcome: .ok, exitCode: exitCode, stdout: stdout, stderr: stderr)
     }
 }
+
+/// The result of a streamed command: stdout is never held whole. `bytesRead`
+/// counts the bytes handed to the sink, including the last partial chunk.
+/// `consumerFailed` is the sink's own failure (a destination write, or a cap
+/// the copy enforces); the child was killed and no further bytes were read.
+public struct CommandStreamResult: Sendable, Equatable {
+    public let outcome: CollectOutcome
+    public let exitCode: Int32?
+    public let stderr: String
+    public let stderrTruncated: Bool
+    public let bytesRead: Int64
+    public let durationMs: Int
+    public let policyViolation: PolicyViolation?
+    public let consumerFailed: Bool
+    public let consumerError: String?
+
+    public init(
+        outcome: CollectOutcome,
+        exitCode: Int32? = nil,
+        stderr: String = "",
+        stderrTruncated: Bool = false,
+        bytesRead: Int64 = 0,
+        durationMs: Int = 0,
+        policyViolation: PolicyViolation? = nil,
+        consumerFailed: Bool = false,
+        consumerError: String? = nil
+    ) {
+        self.outcome = outcome
+        self.exitCode = exitCode
+        self.stderr = stderr
+        self.stderrTruncated = stderrTruncated
+        self.bytesRead = bytesRead
+        self.durationMs = durationMs
+        self.policyViolation = policyViolation
+        self.consumerFailed = consumerFailed
+        self.consumerError = consumerError
+    }
+
+    public static func ok(bytesRead: Int64 = 0, stderr: String = "", exitCode: Int32 = 0) -> CommandStreamResult {
+        CommandStreamResult(outcome: .ok, exitCode: exitCode, stderr: stderr, bytesRead: bytesRead)
+    }
+}

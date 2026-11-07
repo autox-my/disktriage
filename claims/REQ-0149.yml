@@ -1,0 +1,16 @@
+# REQ-0149 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0149
+statement: "The copy command shall copy a zero-length file as an empty file with the SHA-256 of empty input."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L346
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0149_copiesAZeroLengthFile()"

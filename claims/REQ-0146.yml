@@ -1,0 +1,17 @@
+# REQ-0146 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0146
+statement: "The copy command shall record a file that did not finish as incomplete, never as copied."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L346
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0144_REQ0146_failedWriterLeavesNothing()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0146_timeoutMidStreamIsIncomplete()"

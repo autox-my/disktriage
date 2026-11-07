@@ -29,6 +29,50 @@ struct ProcessRunnerTests {
         try expectNoProcess(matching: marker, within: 2.0)
     }
 
+    // REQ-0143: stdout is consumed in bounded chunks, never buffered whole.
+    @Test("REQ0143 streaming delivers stdout in bounded chunks")
+    func REQ0143_streamsStdoutInBoundedChunks() {
+        let runner = ProcessRunner(policy: .unrestrictedForTesting, timeout: 5, outputLimit: 4096)
+        var chunks: [Data] = []
+        let result = runner.streamRaw(
+            ["/bin/sh", "-c", "printf abcdef"],
+            timeout: 5,
+            chunkSize: 2
+        ) { chunks.append($0) }
+
+        #expect(result.outcome == .ok, "outcome")
+        #expect(result.bytesRead == 6)
+        #expect(Data(chunks.joined()) == Data("abcdef".utf8))
+        #expect(chunks.allSatisfy { $0.count <= 2 }, "no chunk exceeds the requested size")
+    }
+
+    // REQ-0147: a streaming timeout keeps the hard timeout and the whole-group
+    // kill, and the chunks already consumed stay delivered.
+    @Test("REQ0147 a streaming timeout kills the whole process group")
+    func REQ0147_streamingTimeoutKillsTheProcessGroup() throws {
+        let marker = "disktriage-stream-\(UUID().uuidString)"
+        let dir = try makeTempDirectory()
+        let sleepPath = dir.appendingPathComponent(marker).path
+        try FileManager.default.createSymbolicLink(atPath: sleepPath, withDestinationPath: "/bin/sleep")
+
+        let runner = ProcessRunner(policy: .unrestrictedForTesting, timeout: 1.0, outputLimit: 4096)
+        var received = Data()
+        let started = Date()
+        let result = runner.streamRaw(
+            ["/bin/sh", "-c", "\(sleepPath) 30 & printf chunk; wait"],
+            timeout: 1.0,
+            chunkSize: 1024
+        ) { received.append($0) }
+        let elapsed = Date().timeIntervalSince(started)
+
+        #expect(result.outcome == .timeout, "outcome")
+        #expect(result.bytesRead == 5, "the chunk written before the timeout was delivered")
+        #expect(received == Data("chunk".utf8))
+        #expect(elapsed < 2.0, "returned within timeout + 1s, took \(elapsed)s")
+
+        try expectNoProcess(matching: marker, within: 2.0)
+    }
+
     @Test("the child's exit code passes through")
     func exitCodePassesThrough() {
         let runner = ProcessRunner(policy: .unrestrictedForTesting, timeout: 5, outputLimit: 64 * 1024)

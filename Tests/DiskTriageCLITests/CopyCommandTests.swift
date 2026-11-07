@@ -155,9 +155,11 @@ struct CopyCommandTests {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
         }
+        // 3 TiB is above the 2 TiB per-file sanity bound. The cap is no longer
+        // a memory bound, so the fixture must exceed the new value.
         let listing = """
         /:
-         2147483648 Nov  7 09:31 2026 huge.bin
+         3298534883328 Nov  7 09:31 2026 huge.bin
 
         """
         var tools = try Self.workingTools()
@@ -176,6 +178,236 @@ struct CopyCommandTests {
         let files = try #require(manifest["files"] as? [[String: Any]])
         #expect(files.first?["status"] as? String == "skipped")
         #expect(!FileManager.default.fileExists(atPath: destination + "/huge.bin"))
+    }
+
+    // REQ-0145: the last partial chunk is hashed, not dropped.
+    @Test("REQ0145 the final partial chunk is part of the read hash")
+    func REQ0145_hashesTheLastPartialChunk() throws {
+        let image = try makeBareNTFSImage()
+        let destination = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(atPath: image)
+            try? FileManager.default.removeItem(atPath: destination)
+        }
+        let chunks = [
+            Data(repeating: 0x41, count: 64),
+            Data(repeating: 0x42, count: 64),
+            Data(repeating: 0x43, count: 7),
+        ]
+        let data = chunks.reduce(Data(), +)
+        let expected = sha256(data)
+        let tools = try streamedTools(
+            listing: singleFileListing("partial.bin", size: Int64(data.count)),
+            chunks: chunks
+        )
+
+        let result = runCopy(
+            arguments: [image, "--to", destination],
+            dependencies: copyDependencies(tools: tools, chunkSize: 64)
+        )
+
+        #expect(result.exitCode == 0, "\(result.stdout) \(result.stderr)")
+        let files = try #require(try json(destination + "/MANIFEST.json")["files"] as? [[String: Any]])
+        let entry = try #require(files.first)
+        #expect(entry["sha256_read"] as? String == expected,
+                "the 7-byte final chunk must be hashed: \(expected)")
+        #expect(entry["sha256_written"] as? String == expected)
+        #expect(try Data(contentsOf: URL(fileURLWithPath: destination + "/partial.bin")) == data)
+    }
+
+    // REQ-0143: the copy loop holds one chunk at a time, not the whole file.
+    @Test("REQ0143 a streamed file is handled one chunk at a time")
+    func REQ0143_holdsOnlyOneChunk() throws {
+        let image = try makeBareNTFSImage()
+        let destination = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(atPath: image)
+            try? FileManager.default.removeItem(atPath: destination)
+        }
+        let chunks = (0..<16).map { value in Data(repeating: UInt8(value), count: 64) }
+        let data = chunks.reduce(Data(), +)
+        let observer = ChunkPeakObserver()
+        let tools = try streamedTools(
+            listing: singleFileListing("streamed.bin", size: Int64(data.count)),
+            chunks: chunks
+        )
+
+        let result = runCopy(
+            arguments: [image, "--to", destination],
+            dependencies: copyDependencies(tools: tools, chunkSize: 64, observer: observer)
+        )
+
+        #expect(result.exitCode == 0, "\(result.stdout) \(result.stderr)")
+        #expect(observer.total == chunks.count, "every chunk went through the streaming sink")
+        #expect(observer.peak <= 1, "the implementation held \(observer.peak) chunks at once")
+        #expect(try Data(contentsOf: URL(fileURLWithPath: destination + "/streamed.bin")) == data)
+    }
+
+    // REQ-0144 / REQ-0146: a writer that fails mid-file leaves neither a
+    // final file nor its temporary file, and the entry is `incomplete`.
+    @Test("REQ0144_REQ0146 a failed writer leaves no final or temporary file")
+    func REQ0144_REQ0146_failedWriterLeavesNothing() throws {
+        let image = try makeBareNTFSImage()
+        let destination = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(atPath: image)
+            try? FileManager.default.removeItem(atPath: destination)
+        }
+        let chunks = (0..<8).map { _ in Data(repeating: 0x5A, count: 64) }
+        let tools = try streamedTools(
+            listing: singleFileListing("big.bin", size: 512),
+            chunks: chunks
+        )
+
+        let result = runCopy(
+            arguments: [image, "--to", destination],
+            dependencies: copyDependencies(
+                tools: tools,
+                fileSystem: FailingCopyFileSystem(failAfter: 256),
+                chunkSize: 64
+            )
+        )
+
+        #expect(result.exitCode == 1, "a partial copy is exit 1: \(result.stdout) \(result.stderr)")
+        let files = try #require(try json(destination + "/MANIFEST.json")["files"] as? [[String: Any]])
+        #expect(files.first?["status"] as? String == "incomplete")
+        #expect((files.first?["note"] as? String)?.contains("discarded") == true)
+
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: destination)
+        #expect(!leftovers.contains("big.bin"), "an unfinished file is never installed")
+        #expect(!leftovers.contains { $0.contains("disktriage-partial") }, "the temp file was deleted")
+    }
+
+    // REQ-0144: the read-back happens before the install, so a corrupting
+    // writer never leaves a plausible final file behind.
+    @Test("REQ0144 a read-back mismatch is caught before the file is installed")
+    func REQ0144_readBackIsCheckedBeforeInstall() throws {
+        let image = try makeBareNTFSImage()
+        let destination = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(atPath: image)
+            try? FileManager.default.removeItem(atPath: destination)
+        }
+        let data = Data(repeating: 0x7E, count: 128)
+        let tools = try streamedTools(
+            listing: singleFileListing("corrupt.bin", size: Int64(data.count)),
+            chunks: [data]
+        )
+
+        let result = runCopy(
+            arguments: [image, "--to", destination],
+            dependencies: copyDependencies(
+                tools: tools,
+                fileSystem: CorruptingCopyFileSystem(),
+                chunkSize: 64
+            )
+        )
+
+        #expect(result.exitCode == 1, "a hash mismatch is not success: \(result.stdout) \(result.stderr)")
+        let files = try #require(try json(destination + "/MANIFEST.json")["files"] as? [[String: Any]])
+        #expect(files.first?["status"] as? String == "hash-mismatch")
+        #expect(!FileManager.default.fileExists(atPath: destination + "/corrupt.bin"),
+                "the install must follow the read-back check")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: destination)
+        #expect(!leftovers.contains { $0.contains("disktriage-partial") })
+    }
+
+    // REQ-0146: a timeout mid-stream discards the partial file and records the
+    // entry as incomplete, never as copied.
+    @Test("REQ0146 a timeout mid-stream marks the file incomplete")
+    func REQ0146_timeoutMidStreamIsIncomplete() throws {
+        let image = try makeBareNTFSImage()
+        let destination = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(atPath: image)
+            try? FileManager.default.removeItem(atPath: destination)
+        }
+        let chunks = (0..<4).map { _ in Data(repeating: 0x33, count: 64) }
+        let tools = try streamedTools(
+            listing: singleFileListing("timed-out.bin", size: 4096),
+            chunks: chunks,
+            outcome: .timeout
+        )
+
+        let result = runCopy(
+            arguments: [image, "--to", destination],
+            dependencies: copyDependencies(tools: tools, chunkSize: 64)
+        )
+
+        #expect(result.exitCode == 1, "a timeout is a partial copy: \(result.stdout) \(result.stderr)")
+        let files = try #require(try json(destination + "/MANIFEST.json")["files"] as? [[String: Any]])
+        #expect(files.first?["status"] as? String == "incomplete")
+        #expect((files.first?["note"] as? String)?.contains("timeout") == true)
+        #expect(!FileManager.default.fileExists(atPath: destination + "/timed-out.bin"))
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: destination)
+        #expect(!leftovers.contains { $0.contains("disktriage-partial") })
+    }
+
+    // REQ-0148: --max-bytes is a run cap; hitting it mid-stream discards the
+    // partial file and marks the copy partial.
+    @Test("REQ0148 --max-bytes stops a stream and makes the copy partial")
+    func REQ0148_maxBytesStopsTheStream() throws {
+        let image = try makeBareNTFSImage()
+        let destination = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(atPath: image)
+            try? FileManager.default.removeItem(atPath: destination)
+        }
+        let chunks = (0..<8).map { _ in Data(repeating: 0x21, count: 64) }
+        let tools = try streamedTools(
+            listing: singleFileListing("capped.bin", size: 64),
+            chunks: chunks
+        )
+
+        let result = runCopy(
+            arguments: [image, "--to", destination, "--max-bytes", "1"],
+            dependencies: copyDependencies(tools: tools, chunkSize: 64, maxBytes: 256)
+        )
+
+        #expect(result.exitCode == 1, "a cap is a partial copy: \(result.stdout) \(result.stderr)")
+        let manifest = try json(destination + "/MANIFEST.json")
+        let copy = try #require(manifest["copy"] as? [String: Any])
+        #expect(copy["status"] as? String == "partial")
+        #expect(copy["max_bytes"] as? Int64 == 256)
+        let files = try #require(manifest["files"] as? [[String: Any]])
+        #expect(files.first?["status"] as? String == "incomplete")
+        #expect((files.first?["note"] as? String)?.contains("--max-bytes cap") == true)
+        #expect(!FileManager.default.fileExists(atPath: destination + "/capped.bin"))
+
+        let usage = runCopy(
+            arguments: [image, "--to", destination, "--max-bytes", "0"],
+            dependencies: copyDependencies(tools: tools)
+        )
+        #expect(usage.exitCode == 2, "a non-positive --max-bytes is a usage error")
+    }
+
+    // REQ-0149: a zero-length file is a real, empty file, not a skipped entry.
+    @Test("REQ0149 a zero-length file is copied with the empty-input hash")
+    func REQ0149_copiesAZeroLengthFile() throws {
+        let image = try makeBareNTFSImage()
+        let destination = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(atPath: image)
+            try? FileManager.default.removeItem(atPath: destination)
+        }
+        let emptyHash = sha256(Data())
+        let tools = try streamedTools(
+            listing: singleFileListing("empty.bin", size: 0),
+            chunks: []
+        )
+
+        let result = runCopy(
+            arguments: [image, "--to", destination],
+            dependencies: copyDependencies(tools: tools, chunkSize: 64)
+        )
+
+        #expect(result.exitCode == 0, "\(result.stdout) \(result.stderr)")
+        let files = try #require(try json(destination + "/MANIFEST.json")["files"] as? [[String: Any]])
+        let entry = try #require(files.first)
+        #expect(entry["status"] as? String == "ok")
+        #expect(entry["size_bytes"] as? Int64 == 0)
+        #expect(entry["sha256_read"] as? String == emptyHash)
+        #expect(try Data(contentsOf: URL(fileURLWithPath: destination + "/empty.bin")).isEmpty)
     }
 
     // REQ-0126: copy never overwrites a destination file.
@@ -557,13 +789,22 @@ struct CopyCommandTests {
 
     // MARK: - Support
 
-    private func copyDependencies(tools: (any NTFSCopyToolRunning)?) -> CopyDependencies {
+    private func copyDependencies(
+        tools: (any NTFSCopyToolRunning)?,
+        fileSystem: any CopyFileSystem = LiveCopyFileSystem(),
+        chunkSize: Int = CopyLimits.streamChunkBytes,
+        observer: (any CopyChunkObserving)? = nil,
+        maxBytes: Int64? = nil
+    ) -> CopyDependencies {
         CopyDependencies(
-            fileSystem: LiveCopyFileSystem(),
+            fileSystem: fileSystem,
             environment: [:],
             tools: tools,
             resolveTools: false,
-            now: { Date(timeIntervalSince1970: 1_791_360_000) }
+            now: { Date(timeIntervalSince1970: 1_791_360_000) },
+            chunkSize: chunkSize,
+            maxBytesOverride: maxBytes,
+            chunkObserver: observer
         )
     }
 
@@ -578,6 +819,32 @@ struct CopyCommandTests {
         try Data(try Self.fixture("ntfs-copy-damaged.mapfile.txt").utf8)
             .write(to: URL(fileURLWithPath: path))
         return path
+    }
+
+    private func singleFileListing(_ name: String, size: Int64) -> String {
+        """
+        /:
+         \(size) Nov  7 09:31 2026 \(name)
+
+        """
+    }
+
+    private func streamedTools(
+        listing: String,
+        chunks: [Data],
+        outcome: CollectOutcome = .ok
+    ) throws -> StreamedCopyTools {
+        StreamedCopyTools(
+            volume: .ok(try Self.fixture("ntfsinfo-copy.txt")),
+            listing: .ok(listing),
+            cluster: .ok(try Self.fixture("ntfscluster-copy.txt")),
+            chunks: chunks,
+            outcome: outcome
+        )
+    }
+
+    private func sha256(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     /// A 16 MiB sparse bare NTFS volume: only the boot sector is material.
@@ -728,6 +995,205 @@ private struct CorruptingCopyFileSystem: CopyFileSystem {
         if !isReserved, !corrupt.isEmpty { corrupt[0] ^= 0xFF }
         try base.writeFile(corrupt, to: path)
     }
+
+    func makeWriter(to path: String) throws -> any CopyFileWriter {
+        CorruptingCopyWriter(base: try base.makeWriter(to: path))
+    }
+
+    @discardableResult
+    func readChunks(
+        _ path: String,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) throws -> Int64 {
+        try base.readChunks(path, chunkSize: chunkSize, consume: consume)
+    }
+}
+
+/// Corrupts the first byte of every chunk it is asked to write, so the
+/// read-back hash must disagree.
+private final class CorruptingCopyWriter: CopyFileWriter {
+    private let base: any CopyFileWriter
+
+    init(base: any CopyFileWriter) {
+        self.base = base
+    }
+
+    var temporaryPath: String { base.temporaryPath }
+
+    func write(_ data: Data) throws {
+        var corrupt = data
+        if !corrupt.isEmpty { corrupt[0] ^= 0xFF }
+        try base.write(corrupt)
+    }
+
+    func sync() throws { try base.sync() }
+    func commit() throws { try base.commit() }
+    func abort() { base.abort() }
+}
+
+// MARK: - Streamed chunks
+
+/// Yields its chunks through the streaming seam. `outcome` is returned after
+/// the last chunk, so `.timeout` models a child that stopped mid-stream.
+private final class StreamedCopyTools: NTFSCopyToolRunning, @unchecked Sendable {
+    let volume: CollectorResult
+    let listing: CollectorResult
+    let cluster: CollectorResult
+    let chunks: [Data]
+    let outcome: CollectOutcome
+
+    init(
+        volume: CollectorResult,
+        listing: CollectorResult,
+        cluster: CollectorResult,
+        chunks: [Data],
+        outcome: CollectOutcome = .ok
+    ) {
+        self.volume = volume
+        self.listing = listing
+        self.cluster = cluster
+        self.chunks = chunks
+        self.outcome = outcome
+    }
+
+    func volumeInfo(image: String) -> CollectorResult { volume }
+    func listing(image: String) -> CollectorResult { listing }
+    func clusterRuns(image: String, lastCluster: Int64) -> CollectorResult { cluster }
+
+    func catFile(image: String, path: String) -> CommandDataResult {
+        .ok(chunks.reduce(Data(), +))
+    }
+
+    func catFileStreaming(
+        image: String,
+        path: String,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) -> CommandStreamResult {
+        var bytes: Int64 = 0
+        for chunk in chunks {
+            do {
+                try consume(chunk)
+                bytes += Int64(chunk.count)
+            } catch {
+                return CommandStreamResult(
+                    outcome: .error,
+                    exitCode: 0,
+                    bytesRead: bytes,
+                    consumerFailed: true,
+                    consumerError: String(describing: error)
+                )
+            }
+        }
+        return CommandStreamResult(
+            outcome: outcome,
+            exitCode: outcome == .ok ? 0 : 1,
+            bytesRead: bytes
+        )
+    }
+}
+
+/// Counts how many chunks the copy loop holds at once. The streaming loop
+/// acquires and releases one chunk at a time; a buffering implementation
+/// raises `peak` to the whole file.
+private final class ChunkPeakObserver: CopyChunkObserving, @unchecked Sendable {
+    private let lock = NSLock()
+    private var live = 0
+    private var peakValue = 0
+    private var totalValue = 0
+
+    var peak: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return peakValue
+    }
+
+    var total: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return totalValue
+    }
+
+    func chunkAcquired() {
+        lock.lock()
+        live += 1
+        totalValue += 1
+        peakValue = max(peakValue, live)
+        lock.unlock()
+    }
+
+    func chunkReleased() {
+        lock.lock()
+        live -= 1
+        lock.unlock()
+    }
+}
+
+/// Delegates every read to the live filesystem, but its writer throws once the
+/// file would pass `failAfter` bytes.
+private struct FailingCopyFileSystem: CopyFileSystem {
+    let failAfter: Int
+    private let base = LiveCopyFileSystem()
+
+    func exists(_ path: String) -> Bool { base.exists(path) }
+    func isRegularFile(_ path: String) -> Bool { base.isRegularFile(path) }
+    func isDirectory(_ path: String) -> Bool { base.isDirectory(path) }
+    func size(_ path: String) throws -> Int64 { try base.size(path) }
+    func read(_ path: String, offset: Int64, count: Int) throws -> Data {
+        try base.read(path, offset: offset, count: count)
+    }
+    func extract(from source: String, offset: Int64, length: Int64, to destination: String) throws -> Int64 {
+        try base.extract(from: source, offset: offset, length: length, to: destination)
+    }
+    func copy(from source: String, to destination: String) throws {
+        try base.copy(from: source, to: destination)
+    }
+    func write(_ data: Data, to path: String, offset: Int64) throws {
+        try base.write(data, to: path, offset: offset)
+    }
+    func remove(_ path: String) { base.remove(path) }
+    func temporaryFile() -> String { base.temporaryFile() }
+    func createDirectory(_ path: String) throws { try base.createDirectory(path) }
+    func writeFile(_ data: Data, to path: String) throws { try base.writeFile(data, to: path) }
+
+    func makeWriter(to path: String) throws -> any CopyFileWriter {
+        FailingCopyWriter(base: try base.makeWriter(to: path), failAfter: failAfter)
+    }
+
+    @discardableResult
+    func readChunks(
+        _ path: String,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) throws -> Int64 {
+        try base.readChunks(path, chunkSize: chunkSize, consume: consume)
+    }
+}
+
+private final class FailingCopyWriter: CopyFileWriter {
+    private let base: any CopyFileWriter
+    private let failAfter: Int
+    private var written = 0
+
+    init(base: any CopyFileWriter, failAfter: Int) {
+        self.base = base
+        self.failAfter = failAfter
+    }
+
+    var temporaryPath: String { base.temporaryPath }
+
+    func write(_ data: Data) throws {
+        guard written + data.count <= failAfter else {
+            throw InspectFileSystemError("the test writer failed after \(written) bytes")
+        }
+        try base.write(data)
+        written += data.count
+    }
+
+    func sync() throws { try base.sync() }
+    func commit() throws { try base.commit() }
+    func abort() { base.abort() }
 }
 
 // MARK: - Tool image recorder

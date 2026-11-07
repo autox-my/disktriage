@@ -69,6 +69,49 @@ struct CopyLiveTests {
         #expect(try sha256(path: fixture.image) == before, "the image was never written")
     }
 
+    // REQ-0143: an 8 MiB spike file is streamed in 64 KiB chunks, so the file
+    // crosses many chunk boundaries and still hashes and copies byte for byte.
+    @Test(
+        "live: a file larger than one stream chunk is copied by the streaming path",
+        .enabled(
+            if: liveCopyFixture() != nil,
+            "ntfs-3g tools or the spike's damaged-clip-part image not available"
+        )
+    )
+    func REQ0143_liveStreamsAFileLargerThanItsChunk() throws {
+        let fixture = try #require(liveCopyFixture())
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("disktriage-copy-live-stream-\(UUID().uuidString)")
+            .path
+        defer { try? FileManager.default.removeItem(atPath: destination) }
+
+        var environment = ProcessInfo.processInfo.environment
+        environment["DISKTRIAGE_NTFS_PREFIX"] = fixture.prefix
+        var dependencies = CopyDependencies.live(environment: environment)
+        dependencies.chunkSize = 64 * 1024
+
+        let result = run(
+            arguments: [
+                "copy", fixture.image,
+                "--to", destination,
+                "--mapfile", fixture.mapfile,
+            ],
+            copyDependencies: dependencies
+        )
+        #expect(result.exitCode == 1, "the mapfile reports damage: \(result.stdout) \(result.stderr)")
+
+        let manifest = try json(destination + "/MANIFEST.json")
+        let files = try #require(manifest["files"] as? [[String: Any]])
+        let big = try #require(files.first { $0["path"] as? String == "media/big.bin" })
+        #expect(big["status"] as? String == "ok", "big.bin is 8 MiB, well past one 64 KiB chunk")
+        #expect(big["size_bytes"] as? Int64 == 8_388_608)
+        #expect(big["sha256_read"] as? String == big["sha256_written"] as? String)
+
+        let copied = destination + "/media/big.bin"
+        #expect(FileManager.default.fileExists(atPath: copied))
+        #expect(try sha256(path: copied) == big["sha256_read"] as? String)
+    }
+
     // MARK: - Support
 
     private func json(_ path: String) throws -> [String: Any] {

@@ -35,10 +35,101 @@ public protocol NTFSCopyToolRunning: Sendable {
     func volumeInfo(image: String) -> CollectorResult
     /// `ntfsls -l -R`: names, sizes and directory headers in one call.
     func listing(image: String) -> CollectorResult
-    /// `ntfscat <image> <volume-path>`: binary file data.
+    /// `ntfscat <image> <volume-path>`: binary file data, buffered. Kept for
+    /// the recorded-output seam and the streaming fallback; `copy` itself uses
+    /// `catFileStreaming` so a file is never held whole in memory.
     func catFile(image: String, path: String) -> CommandDataResult
+    /// `ntfscat` with stdout handed to `consume` in bounded chunks.
+    func catFileStreaming(
+        image: String,
+        path: String,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) -> CommandStreamResult
     /// `ntfscluster -c 0-(lastCluster) -v`: every inode's LCN runs in one pass.
     func clusterRuns(image: String, lastCluster: Int64) -> CollectorResult
+}
+
+public extension NTFSCopyToolRunning {
+    /// Scripted tools only have whole `Data`; split it into bounded chunks so
+    /// the copy loop is still driven one chunk at a time. A real runner
+    /// overrides this with `ProcessRunner.stream` and never buffers stdout.
+    func catFileStreaming(
+        image: String,
+        path: String,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) -> CommandStreamResult {
+        streamBuffered(
+            catFile(image: image, path: path),
+            chunkSize: chunkSize,
+            consume: consume
+        )
+    }
+}
+
+/// The fallback for an executor that is not a `CommandStreaming`: split an
+/// already-recorded result into chunks. Never used by the live runner.
+public func streamBuffered(
+    _ result: CommandDataResult,
+    chunkSize: Int,
+    consume: (Data) throws -> Void
+) -> CommandStreamResult {
+    guard result.outcome == .ok else {
+        return CommandStreamResult(
+            outcome: result.outcome,
+            exitCode: result.exitCode,
+            stderr: result.stderr,
+            stderrTruncated: result.stderrTruncated,
+            bytesRead: 0,
+            durationMs: result.durationMs,
+            policyViolation: result.policyViolation
+        )
+    }
+    if result.stdoutTruncated {
+        return CommandStreamResult(
+            outcome: .error,
+            exitCode: result.exitCode,
+            stderr: result.stderr,
+            stderrTruncated: result.stderrTruncated,
+            bytesRead: 0,
+            durationMs: result.durationMs,
+            policyViolation: result.policyViolation
+        )
+    }
+    let capacity = max(1, chunkSize)
+    var offset = 0
+    var bytes: Int64 = 0
+    do {
+        while offset < result.stdout.count {
+            let end = min(offset + capacity, result.stdout.count)
+            let chunk = result.stdout.subdata(in: offset..<end)
+            try consume(chunk)
+            bytes += Int64(chunk.count)
+            offset = end
+        }
+    } catch {
+        return CommandStreamResult(
+            outcome: .error,
+            exitCode: result.exitCode,
+            stderr: result.stderr,
+            stderrTruncated: result.stderrTruncated,
+            bytesRead: bytes,
+            durationMs: result.durationMs,
+            policyViolation: result.policyViolation,
+            consumerFailed: true,
+            consumerError: String(describing: error)
+        )
+    }
+    return CommandStreamResult(
+        outcome: .ok,
+        exitCode: result.exitCode,
+        stderr: result.stderr,
+        stderrTruncated: result.stderrTruncated,
+        bytesRead: bytes,
+        durationMs: result.durationMs,
+        policyViolation: result.policyViolation
+    )
 }
 
 /// The live runner. Every call goes through `ProcessRunner` with the inspect
@@ -105,6 +196,28 @@ public struct NTFSCopyToolRunner: NTFSCopyToolRunning, Sendable {
         )
     }
 
+    public func catFileStreaming(
+        image: String,
+        path: String,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) -> CommandStreamResult {
+        let command = TriageCommand.ntfsTool(path: toolchain.ntfscat, arguments: [image, path])
+        if let streaming = catExecutor as? any CommandStreaming {
+            return streaming.stream(
+                command,
+                timeout: Self.catTimeout,
+                chunkSize: chunkSize,
+                consume: consume
+            )
+        }
+        return streamBuffered(
+            catExecutor.runData(command, timeout: Self.catTimeout),
+            chunkSize: chunkSize,
+            consume: consume
+        )
+    }
+
     public func clusterRuns(image: String, lastCluster: Int64) -> CollectorResult {
         let range = "0-\(max(0, lastCluster))"
         return clusterExecutor.run(
@@ -117,9 +230,10 @@ public struct NTFSCopyToolRunner: NTFSCopyToolRunning, Sendable {
     }
 
     /// The shipped runner's policy is `.inspect`, so no caller can reach a
-    /// writer or a `/dev/*` path through it. Each call gets its own output cap:
-    /// one file may be up to `CopyLimits.maxFileBytes`, while the run map is
-    /// bounded far lower.
+    /// writer or a `/dev/*` path through it. stdout for `ntfscat` is streamed
+    /// in chunks and is not bounded by `outputLimit`; that cap applies to
+    /// stderr (and to the buffered fallback), while the run map keeps its own
+    /// lower bound.
     public static func live(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> NTFSCopyToolRunner? {
@@ -137,7 +251,7 @@ public struct NTFSCopyToolRunner: NTFSCopyToolRunning, Sendable {
         let cat = ProcessRunner(
             policy: .inspect,
             timeout: catTimeout,
-            outputLimit: Int(CopyLimits.maxFileBytes)
+            outputLimit: ProcessRunner.defaultOutputLimit
         )
         let cluster = ProcessRunner(
             policy: .inspect,

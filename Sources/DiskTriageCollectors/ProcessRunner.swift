@@ -34,13 +34,26 @@ public extension CommandExecuting {
     }
 }
 
+/// A command whose stdout is consumed in bounded chunks instead of buffered
+/// (`copy` streams `ntfscat` this way). The hard timeout and process-group kill
+/// are the same as `CommandExecuting.runData`, not a weaker path: the sink is
+/// called on the reader's thread and a throwing sink stops the child.
+public protocol CommandStreaming: Sendable {
+    func stream(
+        _ command: TriageCommand,
+        timeout: TimeInterval,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) -> CommandStreamResult
+}
+
 /// Runs one allow-listed argv in its own process group with a hard timeout.
 ///
 /// The timeout is enforced by killing the whole group (`TERM`, then `KILL`), so
 /// a wedged child or grandchild cannot outlive the triage run (diskdoctor.md
 /// §2.7, REQ-0011). stdout and stderr are drained concurrently while the child
 /// runs, so a command that writes megabytes cannot deadlock on a full pipe.
-public struct ProcessRunner: CommandExecuting, Sendable {
+public struct ProcessRunner: CommandExecuting, CommandStreaming, Sendable {
     /// The explicit environment every collector runs with: no inherited
     /// secrets, a fixed `PATH`, and a stable locale.
     public static let environment = [
@@ -91,6 +104,194 @@ public struct ProcessRunner: CommandExecuting, Sendable {
             stderrTruncated: raw.stderrTruncated,
             durationMs: raw.durationMs,
             policyViolation: raw.policyViolation
+        )
+    }
+
+    public func stream(
+        _ command: TriageCommand,
+        timeout: TimeInterval,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) -> CommandStreamResult {
+        streamRaw(command.argv, timeout: timeout, chunkSize: chunkSize, consume: consume)
+    }
+
+    /// The raw-argv form, for the real-process tests. The policy still runs
+    /// before `exec`, exactly as it does for `run(argv:)`.
+    public func streamRaw(
+        _ argv: [String],
+        timeout: TimeInterval,
+        chunkSize: Int,
+        consume: (Data) throws -> Void
+    ) -> CommandStreamResult {
+        let started = DispatchTime.now().uptimeNanoseconds
+
+        switch policy.evaluate(argv) {
+        case .rejected(let violation):
+            return CommandStreamResult(
+                outcome: .policyRejected,
+                stderr: "rejected before exec: \(violation.rawValue)",
+                durationMs: elapsedMs(since: started),
+                policyViolation: violation
+            )
+        case .allowed:
+            break
+        }
+
+        guard !argv.isEmpty, let path = resolveExecutable(argv[0]) else {
+            return CommandStreamResult(
+                outcome: .notFound,
+                stderr: "not found: \(argv.first ?? "")",
+                durationMs: elapsedMs(since: started)
+            )
+        }
+
+        var stdoutPipe: [Int32] = [-1, -1]
+        var stderrPipe: [Int32] = [-1, -1]
+        guard pipe(&stdoutPipe) == 0, pipe(&stderrPipe) == 0 else {
+            return CommandStreamResult(
+                outcome: .error,
+                stderr: "cannot create pipes: \(String(cString: strerror(errno)))",
+                durationMs: elapsedMs(since: started)
+            )
+        }
+
+        var childPID: pid_t = 0
+        let spawnResult = spawn(
+            path: path,
+            argv: argv,
+            environment: ProcessRunner.environment,
+            stdout: stdoutPipe[1],
+            stderr: stderrPipe[1],
+            pid: &childPID
+        )
+        close(stdoutPipe[1])
+        close(stderrPipe[1])
+        guard spawnResult == 0 else {
+            close(stdoutPipe[0])
+            close(stderrPipe[0])
+            return CommandStreamResult(
+                outcome: spawnFailureOutcome(spawnResult),
+                stderr: "cannot spawn: \(String(cString: strerror(spawnResult)))",
+                durationMs: elapsedMs(since: started)
+            )
+        }
+
+        // stderr is small and is still drained concurrently, so the child can
+        // never block on a full stderr pipe while stdout is being consumed.
+        let stderrBox = Locked(Drained(data: Data(), truncated: false))
+        let stderrReadFD = stderrPipe[0]
+        let readers = DispatchGroup()
+        readers.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            stderrBox.value = drain(fd: stderrReadFD, limit: outputLimit)
+            readers.leave()
+        }
+
+        // Non-blocking stdout lets the read loop check the deadline between
+        // chunks instead of blocking in `read` past it.
+        _ = fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK)
+        let capacity = max(1, chunkSize)
+        var buffer = [UInt8](repeating: 0, count: capacity)
+        var bytesRead: Int64 = 0
+        var consumerFailed = false
+        var consumerError: String?
+        var readFailed = false
+        var timedOut = false
+        var eof = false
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while !eof {
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining <= 0 {
+                timedOut = true
+                break
+            }
+            var descriptor = pollfd(fd: stdoutPipe[0], events: Int16(POLLIN), revents: 0)
+            let slice = Int32(max(1, min(remaining, 0.25) * 1_000))
+            let ready = poll(&descriptor, 1, slice)
+            if ready == 0 { continue }
+            if ready < 0 {
+                if errno == EINTR { continue }
+                readFailed = true
+                break
+            }
+            if (descriptor.revents & Int16(POLLERR)) != 0 {
+                readFailed = true
+                break
+            }
+
+            let count = buffer.withUnsafeMutableBytes { bytes in
+                Darwin.read(stdoutPipe[0], bytes.baseAddress, capacity)
+            }
+            if count > 0 {
+                bytesRead += Int64(count)
+                do {
+                    try consume(Data(buffer[0..<count]))
+                } catch {
+                    consumerFailed = true
+                    consumerError = String(describing: error)
+                    break
+                }
+            } else if count == 0 {
+                eof = true
+            } else if errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK {
+                continue
+            } else {
+                readFailed = true
+                break
+            }
+        }
+
+        var status: Int32 = 0
+        var reaped = false
+        if consumerFailed || readFailed || timedOut {
+            kill(-childPID, SIGTERM)
+            reaped = waitForReap(pid: childPID, status: &status, limit: 0.5)
+            kill(-childPID, SIGKILL)
+            if !reaped {
+                _ = waitForReap(pid: childPID, status: &status, limit: 0.5)
+            }
+        } else if waitForExit(
+            pid: childPID,
+            status: &status,
+            limit: max(0, deadline.timeIntervalSinceNow)
+        ) {
+            // `waitForExit` answers true when the deadline passed first.
+            timedOut = true
+            kill(-childPID, SIGTERM)
+            reaped = waitForReap(pid: childPID, status: &status, limit: 0.5)
+            kill(-childPID, SIGKILL)
+            if !reaped {
+                _ = waitForReap(pid: childPID, status: &status, limit: 0.5)
+            }
+        }
+
+        close(stdoutPipe[0])
+        _ = readers.wait(timeout: .now() + 2)
+        close(stderrPipe[0])
+
+        let err = stderrBox.value
+        let duration = elapsedMs(since: started)
+        let outcome: CollectOutcome
+        if timedOut {
+            outcome = .timeout
+        } else if consumerFailed || readFailed {
+            outcome = .error
+        } else {
+            let code = exitCode(from: status)
+            outcome = (code == 0 && wasExited(status)) ? .ok : .error
+        }
+
+        return CommandStreamResult(
+            outcome: outcome,
+            exitCode: exitCode(from: status),
+            stderr: String(decoding: err.data, as: UTF8.self),
+            stderrTruncated: err.truncated,
+            bytesRead: bytesRead,
+            durationMs: duration,
+            consumerFailed: consumerFailed,
+            consumerError: consumerError
         )
     }
 

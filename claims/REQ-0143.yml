@@ -1,0 +1,18 @@
+# REQ-0143 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0143
+statement: "The copy command shall stream each file's bytes from the tool in bounded chunks instead of buffering the whole output in memory."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L346
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0143_holdsOnlyOneChunk()"
+  - "DiskTriageCLITests.CopyLiveTests::REQ0143_liveStreamsAFileLargerThanItsChunk()"
+  - "DiskTriageCollectorsTests.ProcessRunnerTests::REQ0143_streamsStdoutInBoundedChunks()"

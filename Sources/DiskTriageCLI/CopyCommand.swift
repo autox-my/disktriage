@@ -3,6 +3,15 @@ import CryptoKit
 import DiskTriageCore
 import DiskTriageCollectors
 
+/// Observes the copy loop's chunk ownership, so a test can prove the
+/// implementation holds no more than a bounded number of chunks at once
+/// (REQ-0143). `chunkAcquired` is called before a chunk is touched and
+/// `chunkReleased` after it has been written and hashed.
+public protocol CopyChunkObserving: Sendable {
+    func chunkAcquired()
+    func chunkReleased()
+}
+
 /// The injectable side of `copy`: the filesystem (real temporary images and
 /// destinations in tests) and the ntfs-3g runner (recorded output in tests).
 public struct CopyDependencies: Sendable {
@@ -14,6 +23,14 @@ public struct CopyDependencies: Sendable {
     /// The directory a relative path argument is resolved against.
     public var currentDirectory: String
     public var now: @Sendable () -> Date
+    /// The streaming chunk size. One MiB in production; the tests inject a
+    /// deliberately tiny value to exercise chunk boundaries.
+    public var chunkSize: Int
+    /// A byte-level `--max-bytes` value for tests, bypassing the CLI's GiB
+    /// unit. `nil` means use the parsed option (or no cap).
+    public var maxBytesOverride: Int64?
+    /// Test-only chunk observer; `nil` in production.
+    public var chunkObserver: (any CopyChunkObserving)?
 
     public init(
         fileSystem: any CopyFileSystem = LiveCopyFileSystem(),
@@ -21,7 +38,10 @@ public struct CopyDependencies: Sendable {
         tools: (any NTFSCopyToolRunning)? = nil,
         resolveTools: Bool = true,
         currentDirectory: String = FileManager.default.currentDirectoryPath,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        chunkSize: Int = CopyLimits.streamChunkBytes,
+        maxBytesOverride: Int64? = nil,
+        chunkObserver: (any CopyChunkObserving)? = nil
     ) {
         self.fileSystem = fileSystem
         self.environment = environment
@@ -29,6 +49,9 @@ public struct CopyDependencies: Sendable {
         self.resolveTools = resolveTools
         self.currentDirectory = currentDirectory
         self.now = now
+        self.chunkSize = chunkSize
+        self.maxBytesOverride = maxBytesOverride
+        self.chunkObserver = chunkObserver
     }
 
     public static func live(
@@ -67,6 +90,18 @@ public func runCopy(arguments: [String], dependencies: CopyDependencies? = nil) 
                 return usageError("--mapfile needs a path")
             }
             options.mapfile = arguments[index + 1]
+            index += 2
+        case "--max-bytes":
+            guard index + 1 < arguments.count else {
+                return usageError("--max-bytes needs a number of GiB")
+            }
+            guard let gib = Int64(arguments[index + 1]),
+                  gib > 0,
+                  gib <= Int64.max / CopyLimits.gibibyte
+            else {
+                return usageError("--max-bytes needs a positive whole number of GiB")
+            }
+            options.maxBytes = gib * CopyLimits.gibibyte
             index += 2
         case "--hash-image":
             options.hashImage = true
@@ -144,6 +179,8 @@ private struct CopyOptions {
     var image: String?
     var destination: String?
     var mapfile: String?
+    /// The optional run-wide byte cap from `--max-bytes <GiB>`.
+    var maxBytes: Int64?
     var hashImage = false
     var asJSON = false
 }
@@ -156,6 +193,20 @@ private enum CopyStatus: String {
     case partial
     case toolError = "tool-error"
     case unsupported
+}
+
+/// Why a streaming read stopped before the child reached EOF. The copy records
+/// the reason on the entry; the thrown `CopyStreamStopError` only unwinds the
+/// sink and never reaches the report as an error string.
+private enum CopyStreamStop {
+    case runCap(limit: Int64)
+    case fileCap(limit: Int64)
+    case writeFailed(String)
+}
+
+private enum CopyStreamStopError: Error {
+    case cap
+    case write(String)
 }
 
 private struct CopyReport {
@@ -174,6 +225,7 @@ private struct CopyReport {
     var entries: [CopyManifestEntry] = []
     var bytesRead: Int64 = 0
     var bytesWritten: Int64 = 0
+    var maxBytes: Int64?
     var hashesAgree = false
     var manifestSHA256 = ""
     var manifestPath: String?
@@ -516,6 +568,8 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
         var allHashesAgree = true
         var entries: [CopyManifestEntry] = []
         var budgetStopped = false
+        let runByteCap = dependencies.maxBytesOverride ?? options.maxBytes
+        let chunkSize = max(1, dependencies.chunkSize)
 
         for (index, file) in files.enumerated() {
             if Date().timeIntervalSince(started) > CopyLimits.totalTimeout {
@@ -526,9 +580,9 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
                 budgetStopped = true
                 break
             }
-            if totalRead >= CopyLimits.maxTotalBytes {
+            if let cap = runByteCap, totalRead >= cap {
                 report.notes.append(
-                    "stopped at the \(CopyLimits.maxTotalBytes)-byte total cap; the remaining "
+                    "stopped at the \(cap)-byte --max-bytes cap; the remaining "
                         + "\(files.count - index) file(s) were not attempted"
                 )
                 budgetStopped = true
@@ -553,128 +607,249 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
                 ))
                 continue
             }
-
-            let cat = tools.catFile(image: sourceForTools, path: file.path)
-            guard cat.outcome == .ok else {
-                let note: String
-                switch cat.outcome {
-                case .timeout:
-                    note = "ntfscat did not answer within its hard timeout"
-                case .denied:
-                    note = "ntfscat was denied: " + (firstLine(trimmed(cat.stderr)) ?? "no message")
-                case .notFound:
-                    note = "ntfscat disappeared before exec"
-                case .policyRejected:
-                    note = "the ntfscat command was rejected by the command policy"
-                default:
-                    note = firstLine(trimmed(cat.stderr))
-                        ?? "ntfscat exited \(cat.exitCode.map(String.init) ?? "on a signal")"
-                }
-                failed += 1
-                allHashesAgree = false
-                entries.append(CopyManifestEntry(
-                    path: CopyPathRules.relative(file.path),
-                    sizeBytes: file.listedSize,
-                    sha256Read: nil,
-                    sha256Written: nil,
-                    integrity: nil,
-                    attribution: nil,
-                    status: "read-error",
-                    note: note
-                ))
-                report.notes.append("\(file.path) was not copied: \(note)")
-                continue
-            }
-            if cat.stdoutTruncated {
-                failed += 1
-                allHashesAgree = false
-                entries.append(CopyManifestEntry(
-                    path: CopyPathRules.relative(file.path),
-                    sizeBytes: file.listedSize,
-                    sha256Read: nil,
-                    sha256Written: nil,
-                    integrity: nil,
-                    attribution: nil,
-                    status: "skipped",
-                    note: "ntfscat output was truncated at the process cap; a truncated file is never written"
-                ))
+            if let cap = runByteCap, let listedSize = file.listedSize, totalRead + listedSize > cap {
                 report.notes.append(
-                    "\(file.path) was not copied: its \(cat.stdout.count) bytes are a truncated read"
+                    "\(file.path) is \(listedSize) bytes and would exceed the \(cap)-byte "
+                        + "--max-bytes cap; it was not copied"
                 )
-                continue
-            }
-
-            let data = cat.stdout
-            if Int64(data.count) > CopyLimits.maxFileBytes
-                || totalRead + Int64(data.count) > CopyLimits.maxTotalBytes {
                 failed += 1
                 allHashesAgree = false
                 entries.append(CopyManifestEntry(
                     path: CopyPathRules.relative(file.path),
-                    sizeBytes: Int64(data.count),
+                    sizeBytes: listedSize,
                     sha256Read: nil,
                     sha256Written: nil,
                     integrity: nil,
                     attribution: nil,
                     status: "skipped",
-                    note: "above the per-file or total byte cap"
+                    note: "would exceed the --max-bytes cap"
                 ))
-                report.notes.append("\(file.path) was not copied: it would exceed a byte cap")
                 continue
             }
 
-            let readHash = sha256Hex(data)
             let target = destinationPath(destination, file.path)
+            let writer: any CopyFileWriter
             do {
-                try fs.writeFile(data, to: target)
-                // Read the destination back: this proves the write landed and
-                // catches a writer that corrupts bytes.
-                let written = try fs.read(target, offset: 0, count: data.count)
-                let writtenHash = sha256Hex(written)
-                let agree = written.count == data.count && writtenHash == readHash
-                allHashesAgree = allHashesAgree && agree
-                totalRead += Int64(data.count)
-                totalWritten += Int64(written.count)
-
-                let integrity: CopyFileIntegrity? = report.attribution.kind == "ntfscluster"
-                    ? (report.attribution.integrity[file.path] ?? .intact)
-                    : nil
-                entries.append(CopyManifestEntry(
-                    path: CopyPathRules.relative(file.path),
-                    sizeBytes: Int64(data.count),
-                    sha256Read: readHash,
-                    sha256Written: writtenHash,
-                    integrity: integrity,
-                    attribution: integrity == nil ? nil : "ntfscluster",
-                    status: agree ? "ok" : "hash-mismatch",
-                    note: agree ? nil : "the bytes read back differ from the bytes written"
-                ))
-                if !agree {
-                    failed += 1
-                    report.notes.append(
-                        "\(file.path): written hash \(writtenHash) does not match read hash \(readHash)"
-                    )
-                }
+                writer = try fs.makeWriter(to: target)
             } catch {
                 failed += 1
                 allHashesAgree = false
                 entries.append(CopyManifestEntry(
                     path: CopyPathRules.relative(file.path),
-                    sizeBytes: Int64(data.count),
-                    sha256Read: readHash,
+                    sizeBytes: file.listedSize,
+                    sha256Read: nil,
                     sha256Written: nil,
                     integrity: nil,
                     attribution: nil,
-                    status: "write-error",
-                    note: describe(error)
+                    status: "incomplete",
+                    note: "cannot create the destination file: \(describe(error))"
                 ))
-                report.notes.append("\(file.path) could not be written: \(describe(error))")
+                report.notes.append("\(file.path) was not copied: \(describe(error))")
+                continue
+            }
+
+            var readHasher = SHA256()
+            var streamedBytes: Int64 = 0
+            var stop: CopyStreamStop?
+
+            let cat = tools.catFileStreaming(
+                image: sourceForTools,
+                path: file.path,
+                chunkSize: chunkSize
+            ) { chunk in
+                dependencies.chunkObserver?.chunkAcquired()
+                defer { dependencies.chunkObserver?.chunkReleased() }
+
+                if let cap = runByteCap,
+                   totalRead + streamedBytes + Int64(chunk.count) > cap {
+                    stop = .runCap(limit: cap)
+                    throw CopyStreamStopError.cap
+                }
+                if streamedBytes + Int64(chunk.count) > CopyLimits.maxFileBytes {
+                    stop = .fileCap(limit: CopyLimits.maxFileBytes)
+                    throw CopyStreamStopError.cap
+                }
+                do {
+                    try writer.write(chunk)
+                } catch {
+                    let message = describe(error)
+                    stop = .writeFailed(message)
+                    throw CopyStreamStopError.write(message)
+                }
+                // Hash only bytes that were written, and every byte including
+                // the last partial chunk (REQ-0145).
+                readHasher.update(data: chunk)
+                streamedBytes += Int64(chunk.count)
+            }
+
+            if let stop {
+                writer.abort()
+                failed += 1
+                allHashesAgree = false
+                let note: String
+                switch stop {
+                case .runCap(let limit):
+                    note = "the \(limit)-byte --max-bytes cap stopped the copy after "
+                        + "\(streamedBytes) bytes; the partial file was discarded"
+                    budgetStopped = true
+                    let remaining = files.count - index - 1
+                    if remaining > 0 {
+                        report.notes.append(
+                            "stopped at the \(limit)-byte --max-bytes cap; the remaining "
+                                + "\(remaining) file(s) were not attempted"
+                        )
+                    }
+                case .fileCap(let limit):
+                    note = "the \(limit)-byte per-file cap stopped the copy after "
+                        + "\(streamedBytes) bytes; the partial file was discarded"
+                case .writeFailed(let message):
+                    note = "the destination write failed after \(streamedBytes) bytes "
+                        + "(\(message)); the partial file was discarded"
+                }
+                entries.append(CopyManifestEntry(
+                    path: CopyPathRules.relative(file.path),
+                    sizeBytes: streamedBytes > 0 ? streamedBytes : file.listedSize,
+                    sha256Read: nil,
+                    sha256Written: nil,
+                    integrity: nil,
+                    attribution: nil,
+                    status: "incomplete",
+                    note: note
+                ))
+                report.notes.append("\(file.path) is incomplete: \(note)")
+                // A run cap stops the run; a per-file cap or a write failure
+                // only stops this file.
+                if case .runCap = stop { break }
+                continue
+            }
+
+            guard cat.outcome == .ok else {
+                writer.abort()
+                failed += 1
+                allHashesAgree = false
+                if cat.outcome == .timeout {
+                    let note = "ntfscat did not finish within its hard timeout; "
+                        + "\(streamedBytes) bytes were discarded and the file is incomplete"
+                    entries.append(CopyManifestEntry(
+                        path: CopyPathRules.relative(file.path),
+                        sizeBytes: streamedBytes > 0 ? streamedBytes : file.listedSize,
+                        sha256Read: nil,
+                        sha256Written: nil,
+                        integrity: nil,
+                        attribution: nil,
+                        status: "incomplete",
+                        note: note
+                    ))
+                    report.notes.append("\(file.path) is incomplete: \(note)")
+                } else {
+                    let note: String
+                    switch cat.outcome {
+                    case .denied:
+                        note = "ntfscat was denied: " + (firstLine(trimmed(cat.stderr)) ?? "no message")
+                    case .notFound:
+                        note = "ntfscat disappeared before exec"
+                    case .policyRejected:
+                        note = "the ntfscat command was rejected by the command policy"
+                    default:
+                        note = cat.consumerError
+                            ?? firstLine(trimmed(cat.stderr))
+                            ?? "ntfscat exited \(cat.exitCode.map(String.init) ?? "on a signal")"
+                    }
+                    entries.append(CopyManifestEntry(
+                        path: CopyPathRules.relative(file.path),
+                        sizeBytes: file.listedSize,
+                        sha256Read: nil,
+                        sha256Written: nil,
+                        integrity: nil,
+                        attribution: nil,
+                        status: "read-error",
+                        note: note
+                    ))
+                    report.notes.append("\(file.path) was not copied: \(note)")
+                }
+                continue
+            }
+
+            // The temporary file is read back before it is installed: this is
+            // what proves the write landed and catches a corrupting writer.
+            // A mismatch aborts the temporary file, so no bad final file
+            // exists (REQ-0144).
+            do {
+                try writer.sync()
+                var readBackHasher = SHA256()
+                let readBackBytes = try fs.readChunks(
+                    writer.temporaryPath,
+                    chunkSize: chunkSize
+                ) { data in
+                    readBackHasher.update(data: data)
+                }
+                let readHash = readHasher.finalize().map { String(format: "%02x", $0) }.joined()
+                let writtenHash = readBackHasher.finalize()
+                    .map { String(format: "%02x", $0) }
+                    .joined()
+                let agree = readBackBytes == streamedBytes && writtenHash == readHash
+
+                let integrity: CopyFileIntegrity? = report.attribution.kind == "ntfscluster"
+                    ? (report.attribution.integrity[file.path] ?? .intact)
+                    : nil
+
+                if agree {
+                    try writer.commit()
+                    totalRead += streamedBytes
+                    totalWritten += readBackBytes
+                    entries.append(CopyManifestEntry(
+                        path: CopyPathRules.relative(file.path),
+                        sizeBytes: streamedBytes,
+                        sha256Read: readHash,
+                        sha256Written: writtenHash,
+                        integrity: integrity,
+                        attribution: integrity == nil ? nil : "ntfscluster",
+                        status: "ok",
+                        note: nil
+                    ))
+                } else {
+                    writer.abort()
+                    failed += 1
+                    allHashesAgree = false
+                    entries.append(CopyManifestEntry(
+                        path: CopyPathRules.relative(file.path),
+                        sizeBytes: streamedBytes,
+                        sha256Read: readHash,
+                        sha256Written: writtenHash,
+                        integrity: integrity,
+                        attribution: integrity == nil ? nil : "ntfscluster",
+                        status: "hash-mismatch",
+                        note: "the bytes read back differ from the bytes written"
+                    ))
+                    report.notes.append(
+                        "\(file.path): written hash \(writtenHash) does not match read hash \(readHash)"
+                    )
+                }
+            } catch {
+                writer.abort()
+                failed += 1
+                allHashesAgree = false
+                entries.append(CopyManifestEntry(
+                    path: CopyPathRules.relative(file.path),
+                    sizeBytes: streamedBytes > 0 ? streamedBytes : file.listedSize,
+                    sha256Read: nil,
+                    sha256Written: nil,
+                    integrity: nil,
+                    attribution: nil,
+                    status: "incomplete",
+                    note: "the destination write failed after \(streamedBytes) bytes "
+                        + "(\(describe(error))); the partial file was discarded"
+                ))
+                report.notes.append(
+                    "\(file.path) is incomplete: \(describe(error)); the partial file was discarded"
+                )
             }
         }
 
         report.entries = entries
         report.bytesRead = totalRead
         report.bytesWritten = totalWritten
+        report.maxBytes = runByteCap
         report.hashesAgree = allHashesAgree
         report.copyStatus = (failed == 0 && !budgetStopped && !listingPartial) ? "ok" : "partial"
         report.manifestSHA256 = sha256Hex(Data(CopyManifest.digestText(entries: entries).utf8))
@@ -744,7 +919,8 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
                 bytesRead: totalRead,
                 bytesWritten: totalWritten,
                 hashesAgree: report.hashesAgree,
-                manifestSHA256: report.manifestSHA256
+                manifestSHA256: report.manifestSHA256,
+                maxBytes: runByteCap
             ),
             entries: entries,
             notes: report.notes
@@ -1001,6 +1177,7 @@ private func renderTTY(_ report: CopyReport) -> String {
             || $0.status == "hash-mismatch"
             || $0.status == "read-error"
             || $0.status == "write-error"
+            || $0.status == "incomplete"
             || $0.status == "skipped"
     }
     for entry in damaged.prefix(40) {
@@ -1088,6 +1265,7 @@ private func renderJSON(_ report: CopyReport) -> String {
         "files_failed": report.entries.count - copied,
         "bytes_read": report.bytesRead,
         "bytes_written": report.bytesWritten,
+        "max_bytes": report.maxBytes.map { $0 } ?? NSNull(),
         "hashes_agree": report.hashesAgree,
         "manifest_sha256": report.manifestSHA256,
     ]
@@ -1148,6 +1326,9 @@ private let copyUsage = "usage: disktriage copy <image> --to <dir> [options]\n"
     + "                      existing files are never overwritten)\n"
     + "  --mapfile <path>    damage notes and per-file attribution from this\n"
     + "                      ddrescue mapfile (default: <image>.mapfile)\n"
+    + "  --max-bytes <GiB>   stop after this many GiB (a positive whole\n"
+    + "                      number; default: no byte cap, a 1,800 s time\n"
+    + "                      budget still applies)\n"
     + "  --hash-image        also hash the whole image (off by default: a\n"
     + "                      multi-GB image is expensive)\n"
     + "  --json              print the report as JSON\n"
