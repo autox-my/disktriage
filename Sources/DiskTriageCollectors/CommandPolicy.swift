@@ -11,6 +11,17 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
     /// `ioreg -r -c IOMedia -d 1 -w 0`: the association query that supplies the
     /// `BSD Name` the Statistics capture lacks.
     case ioregMedia
+    /// `ioreg -r -c IOBlockStorageDevice -w 0 -l`: the identity path that does
+    /// not depend on DiskArbitration. The device node carries product/vendor/
+    /// serial and its subtree carries the whole-disk IOMedia.
+    case ioregDeviceTree
+    /// `ioreg -r -c IOUSBHostDevice -w 0 -l`: the same tree rooted at the USB
+    /// host device, which carries the serial string a bridge hides.
+    case ioregUSBDeviceTree
+    /// `pgrep -x diskarbitrationd`, the same argv the guard uses.
+    case pgrepDiskArbitrationDaemon
+    /// `ps -o stat= -p <pid>`, the same argv the guard uses to verify state T.
+    case processState(pid: Int32)
     case logShow(last: String, predicate: String)
     case smartctl(query: SmartQuery, node: String, deviceType: String? = nil)
     /// `disktriage check`: the filesystem personality inventory.
@@ -43,6 +54,14 @@ public enum TriageCommand: Sendable, Equatable, Hashable {
             return ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDriver", "-w", "0"]
         case .ioregMedia:
             return ["/usr/sbin/ioreg", "-r", "-c", "IOMedia", "-d", "1", "-w", "0"]
+        case .ioregDeviceTree:
+            return ["/usr/sbin/ioreg", "-r", "-c", "IOBlockStorageDevice", "-w", "0", "-l"]
+        case .ioregUSBDeviceTree:
+            return ["/usr/sbin/ioreg", "-r", "-c", "IOUSBHostDevice", "-w", "0", "-l"]
+        case .pgrepDiskArbitrationDaemon:
+            return ["/usr/bin/pgrep", "-x", "diskarbitrationd"]
+        case .processState(let pid):
+            return ["/bin/ps", "-o", "stat=", "-p", String(pid)]
         case .logShow(let last, let predicate):
             return ["/usr/bin/log", "show", "--last", last, "--style", "ndjson", "--predicate", predicate]
         case .smartctl(let query, let node, let deviceType):
@@ -137,11 +156,29 @@ public struct CommandPolicy: Sendable {
             case ["-r", "-c", "IOBlockStorageDriver", "-k", "Statistics"],
                  ["-r", "-c", "IOBlockStorageDriver", "-k", "Statistics", "-d", "1", "-w", "0"],
                  ["-r", "-c", "IOBlockStorageDriver", "-w", "0"],
-                 ["-r", "-c", "IOMedia", "-d", "1", "-w", "0"]:
+                 ["-r", "-c", "IOMedia", "-d", "1", "-w", "0"],
+                 ["-r", "-c", "IOBlockStorageDevice", "-w", "0", "-l"],
+                 ["-r", "-c", "IOUSBHostDevice", "-w", "0", "-l"]:
                 return .allowed
             default:
                 return .rejected(.notAllowListed)
             }
+        case "/usr/bin/pgrep":
+            return Array(argv.dropFirst()) == ["-x", "diskarbitrationd"]
+                ? .allowed
+                : .rejected(.notAllowListed)
+        case "/bin/ps":
+            let args = Array(argv.dropFirst())
+            guard args.count == 4,
+                  args[0] == "-o",
+                  args[1] == "stat=",
+                  args[2] == "-p",
+                  let pid = Int32(args[3]),
+                  pid > 0
+            else {
+                return .rejected(.notAllowListed)
+            }
+            return .allowed
         case "/usr/bin/log":
             return evaluateLog(Array(argv.dropFirst()))
         case "/opt/homebrew/bin/smartctl", "/usr/local/bin/smartctl", "/usr/bin/smartctl":

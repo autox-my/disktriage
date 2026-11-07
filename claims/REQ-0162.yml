@@ -1,0 +1,19 @@
+# REQ-0162 — diskdoctor.md §4 the ioreg identity source
+# Authored from the P0 phase C finding: while diskarbitrationd is suspended, collection uses ioreg.
+schema: req.claim/2
+claim_id: REQ-0162
+statement: "The device collector shall use the ioreg device tree as the whole-disk identity source when diskutil is skipped or times out."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L463
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageIORegFallbackTests::REQ0162_REQ0164_imageDryRunFallsBackAfterTimeout()"
+  - "DiskTriageCLITests.ImageIORegFallbackTests::REQ0162_triageReadsIdentityFromIOReg()"
+  - "DiskTriageCollectorsTests.DeviceCollectorIORegTests::REQ0162_usbHostSerialIsUsed()"
+  - "DiskTriageCoreTests.IORegDeviceParserTests::REQ0162_recordedDeviceTreesParseToTheIdentityTable()"

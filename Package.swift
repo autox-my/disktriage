@@ -61,6 +61,7 @@ let package = Package(
         // the suite needs neither DiskArbitration nor a disk.
         .target(
             name: "DiskTriageGuard",
+            dependencies: ["DiskTriageCore"],
             path: "Sources/DiskTriageGuard",
             linkerSettings: [
                 .linkedFramework("DiskArbitration"),

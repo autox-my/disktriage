@@ -1,0 +1,29 @@
++-o IOBlockStorageDevice  <class IOBlockStorageDevice, id 0x100004d90, registered, matched, active, busy 0 (34 ms), retain 9>
+  | {
+  |   "IOClass" = "IOBlockStorageDevice"
+  |   "Device Characteristics" = {"Serial Number"="","Medium Type"="","Product Name"="Expansion","Vendor Name"="Seagate","Product Revision Level"="9300"}
+  |   "Protocol Characteristics" = {"Physical Interconnect"="USB","Physical Interconnect Location"="External"}
+  | }
+  |
+  +-o IOBlockStorageDriver  <class IOBlockStorageDriver, id 0x100004d8c, registered, matched, active, busy 0 (36 ms), retain 8>
+    | {
+    |   "IOClass" = "IOBlockStorageDriver"
+    |   "Statistics" = {"Operations (Write)"=0,"Bytes (Read)"=4608,"Errors (Write)"=0,"Errors (Read)"=0,"Bytes (Write)"=0,"Operations (Read)"=7,"Retries (Read)"=0,"Retries (Write)"=0}
+    | }
+    |
+    +-o Expansion Media  <class IOMedia, id 0x100004d8e, registered, matched, active, busy 0 (34 ms), retain 14>
+      | {
+      |   "Content" = "GUID_partition_scheme"
+      |   "Removable" = No
+      |   "Whole" = Yes
+      |   "Leaf" = No
+      |   "BSD Name" = "disk8"
+      |   "Ejectable" = Yes
+      |   "Preferred Block Size" = 512
+      |   "Size" = 5000981077504
+      | }
+      |
+      +-o IOMediaBSDClient  <class IOMediaBSDClient, id 0x100004d8f, registered, matched, active, busy 0 (0 ms), retain 6>
+        | {
+        |   "IOClass" = "IOMediaBSDClient"
+        | }

@@ -1,0 +1,34 @@
++-o NS_01@1  <class IOEmbeddedNVMeBlockDevice, id 0x1000006da, registered, matched, active, busy 0 (200 ms), retain 9>
+  | {
+  |   "Logical Block Size" = 4096
+  |   "Device Characteristics" = {"Serial Number"="REDACTED0000ABCD","Medium Type"="Solid State","Product Name"="APPLE SSD AP0256Q","Vendor Name"="","Product Revision Level"="591.40.3"}
+  |   "Protocol Characteristics" = {"Physical Interconnect"="Apple Fabric","Physical Interconnect Location"="Internal"}
+  | }
+  |
+  +-o IOBlockStorageDriver  <class IOBlockStorageDriver, id 0x1000006ee, registered, matched, active, busy 0 (197 ms), retain 10>
+    | {
+    |   "IOClass" = "IOBlockStorageDriver"
+    |   "IOPersonalityPublisher" = "com.apple.iokit.IOStorageFamily"
+    | }
+    |
+    +-o APPLE SSD AP0256Q Media  <class IOMedia, id 0x1000006f0, registered, matched, active, busy 0 (198 ms), retain 14>
+      | {
+      |   "Content" = "GUID_partition_scheme"
+      |   "Removable" = No
+      |   "Whole" = Yes
+      |   "Leaf" = No
+      |   "BSD Name" = "disk0"
+      |   "Ejectable" = No
+      |   "Preferred Block Size" = 4096
+      |   "Size" = 251000193024
+      | }
+      |
+      +-o IOMediaBSDClient  <class IOMediaBSDClient, id 0x1000006f6, registered, matched, active, busy 0 (0 ms), retain 6>
+        | {
+        |   "IOClass" = "IOMediaBSDClient"
+        | }
+        |
+        +-o IOGUIDPartitionScheme  <class IOGUIDPartitionScheme, id 0x100000709, !registered, !matched, active, busy 0 (154 ms), retain 8>
+          | {
+          |   "IOClass" = "IOGUIDPartitionScheme"
+          | }

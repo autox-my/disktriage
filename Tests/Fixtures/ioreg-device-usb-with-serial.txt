@@ -1,0 +1,42 @@
++-o SSD 850 EVO  <class IOUSBHostDevice, id 0x100004a00, registered, matched, active, busy 0 (20 ms), retain 12>
+  | {
+  |   "IOClass" = "IOUSBHostDevice"
+  |   "USB Product Name" = "VLI Product String"
+  |   "USB Vendor Name" = "VLI Manufacture String"
+  |   "USB Serial Number" = "44454d4f2d5553422d3030303041424344"
+  |   "idVendor" = 8457
+  |   "idProduct" = 1813
+  | }
+  |
+  +-o IOUSBMassStorageDriverNub  <class IOUSBMassStorageDriverNub, id 0x100004a01, registered, matched, active, busy 0 (0 ms), retain 8>
+    |
+    +-o IOUSBMassStorageDriver  <class IOUSBMassStorageDriver, id 0x100004a02, registered, matched, active, busy 0 (3 ms), retain 8>
+      |
+      +-o IOBlockStorageDevice  <class IOBlockStorageDevice, id 0x100004a03, registered, matched, active, busy 0 (4 ms), retain 9>
+        | {
+        |   "IOClass" = "IOBlockStorageDevice"
+        |   "Device Characteristics" = {"Serial Number"="","Medium Type"="Solid State","Product Name"="SSD 850 EVO","Vendor Name"="Samsung","Product Revision Level"="EMT02B6Q"}
+        |   "Protocol Characteristics" = {"Physical Interconnect"="USB","Physical Interconnect Location"="External"}
+        | }
+        |
+        +-o IOBlockStorageDriver  <class IOBlockStorageDriver, id 0x100004a04, registered, matched, active, busy 0 (5 ms), retain 8>
+          | {
+          |   "IOClass" = "IOBlockStorageDriver"
+          | }
+          |
+          +-o SSD 850 EVO Media  <class IOMedia, id 0x100004a05, registered, matched, active, busy 0 (5 ms), retain 14>
+            | {
+            |   "Content" = "GUID_partition_scheme"
+            |   "Removable" = No
+            |   "Whole" = Yes
+            |   "Leaf" = No
+            |   "BSD Name" = "disk8"
+            |   "Ejectable" = Yes
+            |   "Preferred Block Size" = 512
+            |   "Size" = 250059350016
+            | }
+            |
+            +-o IOMediaBSDClient  <class IOMediaBSDClient, id 0x100004a06, registered, matched, active, busy 0 (0 ms), retain 6>
+              | {
+              |   "IOClass" = "IOMediaBSDClient"
+              | }

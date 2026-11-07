@@ -1,0 +1,17 @@
+# REQ-0164 — diskdoctor.md §2.3 a timeout is evidence
+# Authored from the P0 phase C finding that diskutil can time out on a failing disk too.
+schema: req.claim/2
+claim_id: REQ-0164
+statement: "The device collector shall retain the diskutil timeout as evidence when it falls back to ioreg."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L244
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageIORegFallbackTests::REQ0162_REQ0164_imageDryRunFallsBackAfterTimeout()"
+  - "DiskTriageCollectorsTests.DeviceCollectorIORegTests::REQ0164_diskutilTimeoutFallsBackAndKeepsEvidence()"

@@ -1,4 +1,5 @@
 import Foundation
+import DiskTriageCore
 
 /// The two signals the guard ever sends, and only to diskarbitrationd.
 public enum GuardSignal: Equatable, Sendable {
@@ -52,8 +53,10 @@ public func resumeDiskArbitrationDaemon(
 }
 
 /// `ps -o stat=` prints a T prefix for a stopped process ("T", "T+", "T<").
+/// The rule lives in `DiskTriageCore` so the collector's "diskutil would hang"
+/// check cannot drift from the guard's.
 public func isStoppedState(_ state: String?) -> Bool {
-    state?.hasPrefix("T") == true
+    ProcessState.isStopped(state)
 }
 
 /// The exact command the bench tells the operator to run when the disk is
