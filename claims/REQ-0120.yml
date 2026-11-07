@@ -1,0 +1,17 @@
+# REQ-0120 — diskdoctor.md §8 non-NTFS inspection
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0120
+statement: "The inspect command shall report a non-NTFS filesystem instead of inspecting it."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L508
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0120_reportsBareAPFS()"
+  - "DiskTriageCoreTests.NTFSBootSectorTests::REQ0120_detectsTheVolumeMagics()"

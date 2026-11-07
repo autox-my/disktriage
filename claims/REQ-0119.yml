@@ -1,0 +1,17 @@
+# REQ-0119 — diskdoctor.md §8 backup offset
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0119
+statement: "The inspect command shall read the backup boot sector from the last sector of the partition."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L523
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0119_restoreUsesThePartitionEnd()"
+  - "DiskTriageCoreTests.NTFSBootSectorTests::REQ0119_backupOffsetIsTheLastSectorOfThePartition()"

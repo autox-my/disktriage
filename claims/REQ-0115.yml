@@ -1,0 +1,18 @@
+# REQ-0115 — diskdoctor.md §8 whole-disk images
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0115
+statement: "The inspect command shall extract an NTFS partition from a whole-disk image before running the ntfs-3g tools."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L514
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0115_extractsThePartition()"
+  - "DiskTriageCoreTests.PartitionTableTests::REQ0115_parsesAGPTAndFindsTheBasicDataPartition()"
+  - "DiskTriageCoreTests.PartitionTableTests::REQ0115_parsesAnMBRWithOneNTFSPartition()"

@@ -1,0 +1,16 @@
+# REQ-0117 — diskdoctor.md §2.3 absent is never zero
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0117
+statement: "The inspect command shall report damage as unknown when no mapfile is present."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L534
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0117_absentMapfileIsUnknownNotZero()"

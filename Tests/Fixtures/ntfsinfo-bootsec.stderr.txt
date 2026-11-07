@@ -1,0 +1,5 @@
+NTFS signature is missing.
+Failed to mount 'img/damaged-bootsec.img': Invalid argument
+The device 'img/damaged-bootsec.img' doesn't have a valid NTFS.
+Maybe you selected the wrong device? Or the whole disk instead of a
+partition (e.g. /dev/hda, not /dev/hda1)? Or the other way around?

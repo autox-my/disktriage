@@ -1,0 +1,18 @@
+# REQ-0118 — diskdoctor.md §8 boot-sector restore
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0118
+statement: "The inspect command shall restore the backup boot sector only on an explicit request and only to a working copy."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L519
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.InspectCommandTests::REQ0118_REQ0113_restoreWritesOnlyTheWorkingCopy()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0118_invalidBackupCannotRestore()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0118_refusesToOverwriteTheWorkingCopy()"
