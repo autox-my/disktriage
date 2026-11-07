@@ -6,7 +6,7 @@ statement: "The image command shall default to dry-run in the first release."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L333
+  source: diskdoctor.md#exit-codes
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The inspect command shall resolve the image, mapfile and working-cop
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#L179
+  source: docs/sdlc.md#cli-decisions-p3c-inspect
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

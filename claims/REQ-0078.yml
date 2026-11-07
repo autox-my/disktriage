@@ -6,7 +6,7 @@ statement: "The image command shall refuse an existing destination file with no 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L440
+  source: diskdoctor.md#self-test-disktriage-check
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

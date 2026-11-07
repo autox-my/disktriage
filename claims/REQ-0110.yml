@@ -6,7 +6,7 @@ statement: "The image command shall compute the pass-2 stop rule's projected rem
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L494
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

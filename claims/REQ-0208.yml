@@ -6,7 +6,7 @@ statement: "The image summary shall state the requested scope and each stage's o
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

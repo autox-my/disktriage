@@ -6,7 +6,7 @@ statement: "The tool shall name the terminal application that needs the Full Dis
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L396
+  source: diskdoctor.md#process-identity--decide-in-p0p2-not-p4
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

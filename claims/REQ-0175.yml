@@ -6,7 +6,7 @@ statement: "The check command's ntfs-3g row shall name the prefix and the direct
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L433
+  source: diskdoctor.md#self-test-disktriage-check
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

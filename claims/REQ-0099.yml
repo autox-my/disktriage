@@ -6,7 +6,7 @@ statement: "The tool shall not predict the extent of data loss."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L51
+  source: diskdoctor.md#non-goals
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

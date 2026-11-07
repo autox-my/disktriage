@@ -6,7 +6,7 @@ statement: "The SignalSet shall carry a schema version."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L112
+  source: diskdoctor.md#3-architecture
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

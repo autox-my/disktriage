@@ -6,7 +6,7 @@ statement: "The image command shall apply the pass-2 stop rule to the limited im
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L456
+  source: diskdoctor.md#mount-guard
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

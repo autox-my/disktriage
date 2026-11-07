@@ -6,7 +6,7 @@ statement: "A scope-report image on APFS shall allocate far fewer blocks than it
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L513
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

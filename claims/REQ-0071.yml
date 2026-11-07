@@ -6,7 +6,7 @@ statement: "The mount guard shall dissent from every DiskArbitration mount appro
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L425
+  source: diskdoctor.md#rules
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

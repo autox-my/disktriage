@@ -6,7 +6,7 @@ statement: "The tool shall show an image ETA as a range derived from device size
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L462
+  source: diskdoctor.md#mount-guard
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

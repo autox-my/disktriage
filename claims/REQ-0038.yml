@@ -6,7 +6,7 @@ statement: "The tool shall rank exit code 11 above exit code 10, then 10 above 1
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L308
+  source: diskdoctor.md#fault-classes-and-prescriptions
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

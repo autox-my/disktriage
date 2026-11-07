@@ -6,7 +6,7 @@ statement: "The image command shall image an NTFS volume in the allocation-aware
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

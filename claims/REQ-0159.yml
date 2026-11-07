@@ -6,7 +6,7 @@ statement: "The triage command shall use the snapshot store only for live device
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L355
+  source: diskdoctor.md#6-cli
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

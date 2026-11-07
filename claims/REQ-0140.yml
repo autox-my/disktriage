@@ -6,7 +6,7 @@ statement: "The copy command shall name the file whose run intersects an unreada
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L549
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

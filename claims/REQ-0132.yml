@@ -6,7 +6,7 @@ statement: "The copy command shall state that hash equality proves the copy matc
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L540
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

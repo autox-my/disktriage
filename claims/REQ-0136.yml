@@ -6,7 +6,7 @@ statement: "The copy command shall write a manifest containing the schema versio
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L539
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

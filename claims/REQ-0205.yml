@@ -6,7 +6,7 @@ statement: "Each allocation-aware stage shall run a -n pass first and an -r3 pas
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The copy command shall compare the hash of each written file with th
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L545
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

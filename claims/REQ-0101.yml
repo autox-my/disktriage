@@ -6,7 +6,7 @@ statement: "The image command shall parse --limit as a positive whole number of 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L477
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

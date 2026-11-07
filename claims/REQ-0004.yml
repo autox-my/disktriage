@@ -6,7 +6,7 @@ statement: "Insufficient evidence shall be a verdict carrying its own exit code,
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L67
+  source: diskdoctor.md#2-design-principles
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []

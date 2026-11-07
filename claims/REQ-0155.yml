@@ -6,7 +6,7 @@ statement: "The triage command shall not read or write the snapshot store when t
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L168
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

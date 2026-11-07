@@ -6,7 +6,7 @@ statement: "The triage command shall not change the verdict or exit code when th
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L355
+  source: diskdoctor.md#6-cli
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

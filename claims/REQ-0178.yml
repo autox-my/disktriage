@@ -6,7 +6,7 @@ statement: "The image command shall accept --min-read-rate only as a non-negativ
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L494
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

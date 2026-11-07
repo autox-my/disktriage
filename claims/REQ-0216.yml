@@ -6,7 +6,7 @@ statement: "The --used-only choice shall not be part of the image resume identit
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

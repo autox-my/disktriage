@@ -6,7 +6,7 @@ statement: "The image sidecar shall record the allocation-aware stage state so a
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

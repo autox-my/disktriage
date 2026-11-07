@@ -6,7 +6,7 @@ statement: "The triage command shall not derive smart.history from a prior snaps
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L167
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

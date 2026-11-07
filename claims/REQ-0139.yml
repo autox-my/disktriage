@@ -6,7 +6,7 @@ statement: "The copy command shall not merge unreadable extents into a min-max s
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L556
+  source: diskdoctor.md#inspection
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

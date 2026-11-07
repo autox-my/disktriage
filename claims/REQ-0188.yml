@@ -6,7 +6,7 @@ statement: "The stage-0 read plan shall order the partition-table sectors, the p
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

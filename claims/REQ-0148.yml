@@ -6,7 +6,7 @@ statement: "The copy command shall stop at an explicit --max-bytes cap and repor
 applicability: []
 relations: []
 rationale:
-  source: docs/sdlc.md#L346
+  source: docs/sdlc.md#cli-decisions-p3c-streaming-copy
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

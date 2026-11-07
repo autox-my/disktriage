@@ -6,7 +6,7 @@ statement: "A scope report shall require the same consent, root, Full Disk Acces
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L513
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The tool shall choose a boot sector only from a sector the mapfile f
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

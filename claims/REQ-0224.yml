@@ -6,7 +6,7 @@ statement: "A scope report whose stage 0 fails shall exit 1 with the typed reaso
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L516
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

@@ -6,7 +6,7 @@ statement: "The inspect command shall not write the source image."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L519
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

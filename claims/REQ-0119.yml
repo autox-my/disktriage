@@ -6,7 +6,7 @@ statement: "The inspect command shall read the backup boot sector from the last 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L523
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

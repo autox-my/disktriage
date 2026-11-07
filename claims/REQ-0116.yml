@@ -6,7 +6,7 @@ statement: "The inspect command shall report unreadable extents and bytes from t
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L533
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

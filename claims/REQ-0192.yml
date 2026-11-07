@@ -6,7 +6,7 @@ statement: "The $Bitmap decoder shall read bits least-significant first, coalesc
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L500
+  source: diskdoctor.md#imaging
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

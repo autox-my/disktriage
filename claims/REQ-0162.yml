@@ -6,7 +6,7 @@ statement: "The device collector shall use the ioreg device tree as the whole-di
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L463
+  source: diskdoctor.md#mount-guard
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

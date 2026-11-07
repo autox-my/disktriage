@@ -6,7 +6,7 @@ statement: "The device collector shall leave the serial absent when the ioreg tr
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L363
+  source: diskdoctor.md#6-cli
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

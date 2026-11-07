@@ -6,7 +6,7 @@ statement: "The snapshot store shall identify a device on disk only by the full 
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L168
+  source: diskdoctor.md#signalset--the-contract
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

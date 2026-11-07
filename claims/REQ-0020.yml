@@ -6,7 +6,7 @@ statement: "Every signal section shall carry a status of ok, denied, unsupported
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#L112
+  source: diskdoctor.md#3-architecture
   date: 2026-11-06
   rejected_alternatives: []
   assumptions: []
