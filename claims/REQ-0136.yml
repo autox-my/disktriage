@@ -1,0 +1,18 @@
+# REQ-0136 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0136
+statement: "The copy command shall write a manifest containing the schema version, the damage scope and per-file hashes."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L539
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0128_REQ0134_REQ0136_copiesAndAttributes()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0136_jsonReportHasStableSections()"
+  - "DiskTriageCoreTests.CopyModelTests::REQ0136_manifestKeys()"

@@ -1,0 +1,16 @@
+# REQ-0133 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0133
+statement: "The copy command shall refuse a non-NTFS filesystem as not implemented."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md#L245
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0133_nonNTFSIsRefused()"

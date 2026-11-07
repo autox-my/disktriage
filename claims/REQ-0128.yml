@@ -1,0 +1,17 @@
+# REQ-0128 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0128
+statement: "The copy command shall compare the hash of each written file with the hash of the bytes read from the image."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L545
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0128_REQ0134_REQ0136_copiesAndAttributes()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0128_detectsACorruptingWriter()"

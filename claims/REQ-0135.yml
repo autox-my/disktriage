@@ -1,0 +1,18 @@
+# REQ-0135 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0135
+statement: "The copy command shall subtract the partition offset and round a bad mapfile extent outward to whole clusters."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L551
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0135_wholeDiskOffsetIsSubtracted()"
+  - "DiskTriageCoreTests.CopyModelTests::REQ0135_partialClusterRoundsOutward()"
+  - "DiskTriageCoreTests.CopyModelTests::REQ0135_partitionOffsetIsSubtracted()"

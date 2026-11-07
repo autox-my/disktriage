@@ -154,26 +154,77 @@ public struct CommandPolicy: Sendable {
         }
     }
 
-    /// Inspect-only: the exact read-only shapes the NTFS tools use. The image
-    /// must be an absolute path outside `/dev`; `-f/--force`, `ntfsfix` and any
-    /// other tool are rejected before exec.
+    /// Inspect/copy-only: the exact read-only shapes the NTFS tools use. The
+    /// image must be an absolute path outside `/dev`; `-f/--force`, `ntfsfix`
+    /// and any other tool are rejected before exec. `ntfscat` reads one file,
+    /// `ntfscluster -c <range> -v` is the one-pass run map, and `ntfsls -l -R`
+    /// is the recursive listing with sizes.
     private func evaluateNtfsTool(_ argv: [String]) -> PolicyDecision {
-        guard argv.count == 3, argv[0].hasPrefix("/") else {
+        guard argv.count >= 3, argv[0].hasPrefix("/") else {
             return .rejected(.notAllowListed)
         }
         let tool = (argv[0] as NSString).lastPathComponent
-        let image = argv[2]
-        guard image.hasPrefix("/"), !image.hasPrefix("/dev/") else {
-            return .rejected(.notAllowListed)
-        }
         switch tool {
         case "ntfsinfo":
-            return argv[1] == "-m" ? .allowed : .rejected(.notAllowListed)
+            guard argv.count == 3, argv[1] == "-m", isSafeImage(argv[2]) else {
+                return .rejected(.notAllowListed)
+            }
+            return .allowed
         case "ntfsls":
-            return (argv[1] == "-l" || argv[1] == "-R") ? .allowed : .rejected(.notAllowListed)
+            let args = Array(argv.dropFirst())
+            guard args.count == 2 || args.count == 3 else {
+                return .rejected(.notAllowListed)
+            }
+            let image = args[args.count - 1]
+            let flags = Array(args.dropLast())
+            let validFlags = flags == ["-l"] || flags == ["-R"] || flags == ["-l", "-R"]
+            return validFlags && isSafeImage(image) ? .allowed : .rejected(.notAllowListed)
+        case "ntfscat":
+            // ntfscat [options] device [file]
+            guard argv.count == 3, isSafeImage(argv[1]), isSafeVolumePath(argv[2]) else {
+                return .rejected(.notAllowListed)
+            }
+            return .allowed
+        case "ntfscluster":
+            guard argv.count == 5,
+                  argv[1] == "-c",
+                  isClusterRange(argv[2]),
+                  argv[3] == "-v",
+                  isSafeImage(argv[4])
+            else {
+                return .rejected(.notAllowListed)
+            }
+            return .allowed
         default:
             return .rejected(.notAllowListed)
         }
+    }
+
+    /// An image argument is absolute and never a device node.
+    private func isSafeImage(_ path: String) -> Bool {
+        path.hasPrefix("/") && !path.hasPrefix("/dev/")
+    }
+
+    /// A volume path for `ntfscat`: absolute-looking, a real file path, and no
+    /// `..` component. A leading `-` is a flag, so it is rejected by the `/`.
+    private func isSafeVolumePath(_ path: String) -> Bool {
+        guard path.hasPrefix("/"), !path.contains("\0") else { return false }
+        let relative = path.dropFirst()
+        guard !relative.isEmpty else { return false }
+        let components = relative.split(separator: "/", omittingEmptySubsequences: false)
+        guard !components.isEmpty else { return false }
+        return components.allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
+    }
+
+    /// `0-16382`, never a flag or a comma list.
+    private func isClusterRange(_ value: String) -> Bool {
+        let parts = value.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              let first = Int64(parts[0]),
+              let last = Int64(parts[1]),
+              first >= 0, last >= first
+        else { return false }
+        return true
     }
 
     /// Check-only: a resolved absolute tool path and exactly `--version`. The

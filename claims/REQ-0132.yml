@@ -1,0 +1,16 @@
+# REQ-0132 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0132
+statement: "The copy command shall state that hash equality proves the copy matches the image and not the platter."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L540
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0132_hashEqualityWording()"

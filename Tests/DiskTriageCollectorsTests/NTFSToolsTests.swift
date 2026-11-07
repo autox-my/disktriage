@@ -16,6 +16,9 @@ struct NTFSToolsTests {
             ["/opt/ntfs/bin/ntfsinfo", "-m", "/images/plain.img"],
             ["/Users/fd/ntfs/bin/ntfsls", "-l", "/images/plain.img"],
             ["/Users/fd/ntfs/bin/ntfsls", "-R", "/images/plain.img"],
+            ["/Users/fd/ntfs/bin/ntfsls", "-l", "-R", "/images/plain.img"],
+            ["/opt/ntfs/bin/ntfscat", "/images/plain.img", "/docs/notes.md"],
+            ["/opt/ntfs/bin/ntfscluster", "-c", "0-16382", "-v", "/images/plain.img"],
         ]
         for argv in allowed {
             #expect(policy.evaluate(argv) == .allowed, "expected allowed: \(argv)")
@@ -27,7 +30,6 @@ struct NTFSToolsTests {
         let rejected: [[String]] = [
             [],
             ["/opt/ntfs/bin/ntfsfix", "-n", "/images/plain.img"],
-            ["/opt/ntfs/bin/ntfscat", "/images/plain.img", "/readme.txt"],
             ["/opt/ntfs/bin/ntfsinfo", "-m"],
             ["/opt/ntfs/bin/ntfsinfo", "-m", "/images/plain.img", "-f"],
             ["/opt/ntfs/bin/ntfsinfo", "-f", "-m", "/images/plain.img"],
@@ -36,6 +38,16 @@ struct NTFSToolsTests {
             ["/opt/ntfs/bin/ntfsinfo", "-m", "/dev/disk4"],
             ["ntfsinfo", "-m", "/images/plain.img"],
             ["/opt/ntfs/bin/ntfsinfo", "-m", "relative.img"],
+            // ntfscat: the volume path may not escape.
+            ["/opt/ntfs/bin/ntfscat", "/images/plain.img", "/docs/../etc/passwd"],
+            ["/opt/ntfs/bin/ntfscat", "/images/plain.img", "/docs//notes.md"],
+            ["/opt/ntfs/bin/ntfscat", "/images/plain.img", "-"],
+            ["/opt/ntfs/bin/ntfscat", "/dev/rdisk4", "/docs/notes.md"],
+            // ntfscluster: one numeric range, -v, no force or other flags.
+            ["/opt/ntfs/bin/ntfscluster", "-c", "0-1,4-5", "-v", "/images/plain.img"],
+            ["/opt/ntfs/bin/ntfscluster", "-c", "9-1", "-v", "/images/plain.img"],
+            ["/opt/ntfs/bin/ntfscluster", "-f", "-c", "0-1", "/images/plain.img"],
+            ["/opt/ntfs/bin/ntfscluster", "-c", "0-1", "/images/plain.img"],
         ]
         for argv in rejected {
             #expect(policy.evaluate(argv) != .allowed, "expected rejected: \(argv)")
@@ -84,6 +96,50 @@ struct NTFSToolsTests {
             .ntfsTool(path: "/opt/ntfs/bin/ntfsls", arguments: ["-R", "/images/plain.img"]),
         ])
         #expect(executor.requestedTimeouts == [30, 30, 120])
+    }
+
+    @Test("the copy runner builds the one-pass map, the file read and the tall listing")
+    func copyRunnerBuildsItsArgv() {
+        let executor = RecordingExecutor([:])
+        let runner = NTFSCopyToolRunner(
+            toolchain: NTFSCopyToolchain(
+                ntfsinfo: "/opt/ntfs/bin/ntfsinfo",
+                ntfsls: "/opt/ntfs/bin/ntfsls",
+                ntfscat: "/opt/ntfs/bin/ntfscat",
+                ntfscluster: "/opt/ntfs/bin/ntfscluster"
+            ),
+            executor: executor
+        )
+
+        _ = runner.volumeInfo(image: "/images/plain.img")
+        _ = runner.listing(image: "/images/plain.img")
+        _ = runner.catFile(image: "/images/plain.img", path: "/docs/notes.md")
+        _ = runner.clusterRuns(image: "/images/plain.img", lastCluster: 16_382)
+
+        #expect(executor.commands == [
+            .ntfsTool(path: "/opt/ntfs/bin/ntfsinfo", arguments: ["-m", "/images/plain.img"]),
+            .ntfsTool(path: "/opt/ntfs/bin/ntfsls", arguments: ["-l", "-R", "/images/plain.img"]),
+            .ntfsTool(path: "/opt/ntfs/bin/ntfscat", arguments: ["/images/plain.img", "/docs/notes.md"]),
+            .ntfsTool(
+                path: "/opt/ntfs/bin/ntfscluster",
+                arguments: ["-c", "0-16382", "-v", "/images/plain.img"]
+            ),
+        ])
+        #expect(executor.requestedTimeouts == [30, 120, 120, 120])
+    }
+
+    @Test("the copy locator requires all four tools")
+    func copyLocatorRequiresAllFour() throws {
+        let three = try makePrefix(tools: ["ntfsinfo", "ntfsls", "ntfscat"], sbinTools: [])
+        #expect(NTFSCopyToolLocator.locate(environment: ["DISKTRIAGE_NTFS_PREFIX": three]) == nil)
+
+        let four = try makePrefix(
+            tools: ["ntfsinfo", "ntfsls", "ntfscat", "ntfscluster"],
+            sbinTools: []
+        )
+        let chain = try #require(NTFSCopyToolLocator.locate(environment: ["DISKTRIAGE_NTFS_PREFIX": four]))
+        #expect(chain.ntfscat == four + "/bin/ntfscat")
+        #expect(chain.ntfscluster == four + "/bin/ntfscluster")
     }
 
     // MARK: - Support

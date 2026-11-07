@@ -124,14 +124,14 @@ struct CLITests {
     }
 
     @Test
-    func `planned commands are not implemented and exit 30`() {
-        for command in ["copy"] {
-            let result = run(arguments: [command])
-            #expect(result.exitCode == 30, "\(command): tool error, not a verdict")
-            #expect(result.stdout.isEmpty, "\(command): nothing on stdout")
-            #expect(result.stderr.contains("not implemented yet (planned P2/P3)"),
-                    "\(command): names the plan phase")
-        }
+    func `copy without an image or --to is a usage error`() {
+        let noImage = run(arguments: ["copy"])
+        #expect(noImage.exitCode == 2, "copy needs an image; the plan is silent, so usage is 2")
+        #expect(noImage.stderr.contains("image"))
+
+        let noDestination = run(arguments: ["copy", "/tmp/image.img"])
+        #expect(noDestination.exitCode == 2, "copy needs --to")
+        #expect(noDestination.stderr.contains("--to"))
     }
 }
 

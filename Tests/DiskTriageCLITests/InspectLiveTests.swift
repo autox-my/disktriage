@@ -158,7 +158,7 @@ private func hasLiveTools(_ prefix: String) -> Bool {
 
 /// The checkout and, when this is a linked worktree, the main repository whose
 /// gitignored `captures/` holds the spike build.
-private func candidateRepositoryRoots() -> [String] {
+func candidateRepositoryRoots() -> [String] {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()   // DiskTriageCLITests
         .deletingLastPathComponent()   // Tests

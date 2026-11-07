@@ -1,0 +1,16 @@
+# REQ-0129 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0129
+statement: "The copy command shall not write the source image."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L537
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0129_imageIsNeverWritten()"

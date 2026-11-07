@@ -1,0 +1,10 @@
+/:
+       0 Nov  7 09:31 2026 docs
+  131072 Nov  7 09:31 2026 payload.bin
+      24 Nov  7 09:31 2026 readme.txt
+
+/docs:
+       0 Nov  7 09:31 2026 .
+      13 Nov  7 09:31 2026 leaf.dat
+      27 Nov  7 09:31 2026 notes.md
+   20000 Nov  7 09:31 2026 payload.bin
