@@ -309,6 +309,43 @@ struct InspectCommandTests {
         #expect(human.stdout.contains("inspected; mapfile reports damage"))
     }
 
+    // REQ-0172: a mapfile's `*` and `/` extents are unreadable so far even
+    // though ddrescue has not yet confirmed them as bad. The real MiNaH run
+    // wrote 12 of them and printed "0 unreadable extents".
+    @Test("REQ0172 inspect counts failed and bad extents as unreadable, with a shrink note")
+    func REQ0172_REQ0177_failedExtentsAreUnreadable() throws {
+        let image = try makeBareNTFSImage()
+        defer { try? FileManager.default.removeItem(atPath: image) }
+        try Data(try Self.fixture("minah-partial-me.mapfile.txt").utf8)
+            .write(to: URL(fileURLWithPath: image + ".mapfile"))
+
+        let json = runInspect(
+            arguments: [image, "--json"],
+            dependencies: inspectDependencies(tools: try Self.workingTools())
+        )
+        #expect(json.exitCode == 1, "inspected, but the mapfile reports failed extents")
+
+        let object = try jsonObject(json)
+        let damage = try #require(object["damage"] as? [String: Any])
+        #expect(damage["status"] as? String == "ok")
+        #expect(damage["unreadable_extents"] as? Int == 12, "failed + bad")
+        #expect(damage["unreadable_bytes"] as? Int == 786_432)
+        #expect(damage["failed_extents"] as? Int == 12)
+        #expect(damage["failed_bytes"] as? Int == 786_432)
+        #expect(damage["bad_extents"] as? Int == 0)
+        #expect(damage["bad_bytes"] as? Int == 0)
+        #expect((damage["note"] as? String)?.contains("may shrink after trimming") == true,
+                "\(damage["note"] ?? "no note")")
+
+        let human = runInspect(
+            arguments: [image],
+            dependencies: inspectDependencies(tools: try Self.workingTools())
+        )
+        #expect(human.stdout.contains("12 unreadable extents"), "\(human.stdout)")
+        #expect(human.stdout.contains("786432 bytes"), "\(human.stdout)")
+        #expect(human.stdout.contains("may shrink after trimming"), "\(human.stdout)")
+    }
+
     @Test("a sidecar limit clamps the mapfile before the damage is counted")
     func sidecarLimitClampsTheMapfile() throws {
         let image = try makeBareNTFSImage()

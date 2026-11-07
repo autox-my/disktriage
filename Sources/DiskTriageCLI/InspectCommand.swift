@@ -234,8 +234,15 @@ private struct ListingReport {
 struct DamageReport {
     var status: String
     var mapfile: String?
+    /// Failed (`*`, `/`) plus bad (`-`): all are unreadable so far.
     var unreadableExtents: Int?
     var unreadableBytes: Int64?
+    /// `*` and `/`: read errors seen, not yet trimmed or scraped.
+    var failedExtents: Int?
+    var failedBytes: Int64?
+    /// `-`: ddrescue confirmed these.
+    var badExtents: Int?
+    var badBytes: Int64?
     var remainingBytes: Int64?
     /// `?`, `*` and `/` bytes: not read, so their damage is unknown. Bad (`-`)
     /// bytes are a known extent and are not included here.
@@ -244,7 +251,7 @@ struct DamageReport {
     var note: String?
     /// The `-` extents themselves (image bytes), which `copy` converts to
     /// volume clusters. `inspect` only reports their count and size.
-    var badExtents: [MapfileExtent] = []
+    var badRanges: [MapfileExtent] = []
 }
 
 /// The same mapfile parse, worded for the command reading it.
@@ -802,15 +809,22 @@ func readDamage(
             return report
         }
 
-        let bad = snapshot.extents.filter { $0.status == "-" }
+        let failed = snapshot.failedExtents
+        let bad = snapshot.badExtents
         report.status = "ok"
-        report.unreadableExtents = bad.count
-        report.unreadableBytes = bad.reduce(0) { $0 + $1.size }
+        // `*` and `/` contain read errors too, so they are unreadable so far.
+        // Only `-` is confirmed; the distinction is kept in the fields below.
+        report.failedExtents = failed.count
+        report.failedBytes = snapshot.failedBytes
+        report.badExtents = bad.count
+        report.badBytes = snapshot.badBytes
+        report.unreadableExtents = failed.count + bad.count
+        report.unreadableBytes = snapshot.failedBytes + snapshot.badBytes
         report.remainingBytes = snapshot.remainingBytes
         report.nonRescuedBytes = snapshot.nonTriedBytes
             + snapshot.nonTrimmedBytes
             + snapshot.nonScrapedBytes
-        report.badExtents = bad
+        report.badRanges = bad
 
         var notes: [String] = []
         switch audience {
@@ -825,7 +839,7 @@ func readDamage(
                     + "hash equality proves the copy matches the IMAGE, not the platter"
             )
         }
-        if bad.isEmpty {
+        if failed.isEmpty && bad.isEmpty {
             if snapshot.isComplete {
                 notes.append("no unreadable extent is recorded in the mapfile")
             } else {
@@ -834,6 +848,11 @@ func readDamage(
                         + "the damage extent is unknown"
                 )
             }
+        } else if !snapshot.isComplete && !failed.isEmpty {
+            notes.append(
+                "the mapfile is incomplete: failed extents may shrink after trimming and scraping; "
+                    + "\(snapshot.remainingBytes) bytes were not rescued"
+            )
         }
         report.note = notes.joined(separator: "; ")
     } catch {
@@ -939,9 +958,12 @@ private func renderTTY(_ report: InspectReport) -> String {
     if report.damage.status == "ok" {
         let extents = report.damage.unreadableExtents ?? 0
         let bytes = report.damage.unreadableBytes ?? 0
+        let failed = report.damage.failedExtents ?? 0
+        let confirmed = report.damage.badExtents ?? 0
         lines.append(pad("DAMAGE", 11)
             + "mapfile \(report.damage.mapfile ?? "?") · \(extents) unreadable "
-            + "\(extents == 1 ? "extent" : "extents") · \(bytes) bytes")
+            + "\(extents == 1 ? "extent" : "extents") · \(bytes) bytes "
+            + "(\(failed) failed, \(confirmed) confirmed bad)")
         if let note = report.damage.note {
             lines.append(pad("", 11) + note)
         }
@@ -1048,6 +1070,10 @@ private func renderJSON(_ report: InspectReport) -> String {
     if let mapfile = report.damage.mapfile { damage["mapfile"] = mapfile }
     if let extents = report.damage.unreadableExtents { damage["unreadable_extents"] = extents }
     if let bytes = report.damage.unreadableBytes { damage["unreadable_bytes"] = bytes }
+    if let extents = report.damage.failedExtents { damage["failed_extents"] = extents }
+    if let bytes = report.damage.failedBytes { damage["failed_bytes"] = bytes }
+    if let extents = report.damage.badExtents { damage["bad_extents"] = extents }
+    if let bytes = report.damage.badBytes { damage["bad_bytes"] = bytes }
     if let remaining = report.damage.remainingBytes { damage["remaining_bytes"] = remaining }
     if let limit = report.damage.limitBytes { damage["limit_bytes"] = limit }
     if report.damage.status == "ok" {

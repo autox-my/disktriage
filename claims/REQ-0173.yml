@@ -1,0 +1,17 @@
+# REQ-0173 — diskdoctor.md §8 the -T stop rule
+# Authored from the real MiNaH run: `STOPPED ddrescue error` after 996 s.
+schema: req.claim/2
+claim_id: REQ-0173
+statement: "The image command shall name a non-zero ddrescue exit that it did not cause as ddrescue stopped on its own, with the exit code and the -T stop rule when that option is in the command."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0173_ddrescueSIGINTIsInterrupted()"
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0173_stoppedOnItsOwnKeepsTheMapfile()"

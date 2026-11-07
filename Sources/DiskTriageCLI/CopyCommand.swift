@@ -517,7 +517,7 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
         }
 
         // Per-file attribution is a capability, never implied.
-        let badExtents = damage.badExtents.map {
+        let badExtents = damage.badRanges.map {
             ByteRange(position: $0.position, size: $0.size)
         }
         if damage.status == "ok" {
@@ -909,7 +909,11 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
                 unreadableExtents: damage.unreadableExtents,
                 unreadableBytes: damage.unreadableBytes,
                 limitBytes: damage.limitBytes,
-                note: damage.note
+                note: damage.note,
+                failedExtents: damage.failedExtents,
+                failedBytes: damage.failedBytes,
+                badExtents: damage.badExtents,
+                badBytes: damage.badBytes
             ),
             attribution: report.attribution,
             copy: .init(
@@ -1147,10 +1151,13 @@ private func renderTTY(_ report: CopyReport) -> String {
         case "ok":
             let extents = damage.unreadableExtents ?? 0
             let bytes = damage.unreadableBytes ?? 0
+            let failed = damage.failedExtents ?? 0
+            let confirmed = damage.badExtents ?? 0
             let notRescued = damage.nonRescuedBytes ?? 0
             lines.append(pad("DAMAGE", 11)
                 + "mapfile \(damage.mapfile ?? "?") · \(extents) unreadable "
-                + "\(extents == 1 ? "extent" : "extents") · \(bytes) bytes"
+                + "\(extents == 1 ? "extent" : "extents") · \(bytes) bytes "
+                + "(\(failed) failed, \(confirmed) confirmed bad)"
                 + (notRescued > 0 ? " · \(notRescued) bytes not rescued" : ""))
             if let note = damage.note { lines.append(pad("", 11) + note) }
         case "unsupported":
@@ -1278,6 +1285,10 @@ private func renderJSON(_ report: CopyReport) -> String {
         value["mapfile"] = damage.mapfile ?? NSNull()
         value["unreadable_extents"] = damage.unreadableExtents.map { $0 } ?? NSNull()
         value["unreadable_bytes"] = damage.unreadableBytes.map { $0 } ?? NSNull()
+        value["failed_extents"] = damage.failedExtents.map { $0 } ?? NSNull()
+        value["failed_bytes"] = damage.failedBytes.map { $0 } ?? NSNull()
+        value["bad_extents"] = damage.badExtents.map { $0 } ?? NSNull()
+        value["bad_bytes"] = damage.badBytes.map { $0 } ?? NSNull()
         value["remaining_bytes"] = damage.remainingBytes.map { $0 } ?? NSNull()
         value["limit_bytes"] = damage.limitBytes.map { $0 } ?? NSNull()
         if let note = damage.note { value["note"] = note }

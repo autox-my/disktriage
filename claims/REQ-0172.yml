@@ -1,0 +1,17 @@
+# REQ-0172 — diskdoctor.md §8 inspection damage reporting
+# Authored from the real MiNaH run: failed `*` extents are unreadable so far.
+schema: req.claim/2
+claim_id: REQ-0172
+statement: "The inspect and copy commands shall count failed and bad mapfile extents together as unreadable."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L533
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0172_REQ0177_copyCountsFailedExtentsAsUnreadable()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0172_REQ0177_failedExtentsAreUnreadable()"

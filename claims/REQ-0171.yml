@@ -1,0 +1,20 @@
+# REQ-0171 — diskdoctor.md §8 mapfile accounting
+# Authored from the real MiNaH run: 12 `*` extents were printed as `BAD 0`.
+schema: req.claim/2
+claim_id: REQ-0171
+statement: "The image command shall report failed mapfile extents separately from confirmed bad extents, with a byte count and an extent count for each."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L471
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImagingExecutionTests::REQ0171_summaryShowsFailedExtentsNotBadZero()"
+  - "DiskTriageCLITests.ImagingMapfileTests::REQ0171_minahMapfileKeepsFailedAndBadApart()"
+  - "DiskTriageCLITests.ImagingMapfileTests::REQ0171_nonScrapedExtentIsFailed()"
+  - "DiskTriageCLITests.ImagingMapfileTests::REQ0171_statusMeaningsAreSeparate(_:)"
+  - "DiskTriageCLITests.ImagingMapfileTests::REQ0171_trimmedMapfileIsBadNotFailed()"

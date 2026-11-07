@@ -139,14 +139,32 @@ public final class PosixDdrescueProcess: DdrescueProcessHandle, @unchecked Senda
     }
 }
 
-/// Why a pass stopped.
+/// Why a pass stopped. `stoppedOnItsOwn` is a ddrescue exit the supervisor did
+/// not cause; the summary appends its exit code and, when `-T` is in the
+/// command, the stop rule that explains it.
 public enum PassStopReason: String, Equatable, Sendable {
     case complete = "complete"
-    case stopRule = "stop rule"
+    case stopRule = "pass-2 stop rule"
     case deviceDisappeared = "device disappeared"
-    case ddrescueError = "ddrescue error"
+    case stoppedOnItsOwn = "ddrescue stopped on its own"
     case interrupted = "interrupted"
     case launchFailed = "launch failed"
+}
+
+/// GNU ddrescue 1.30's documented exit statuses (`man ddrescue`, EXIT STATUS).
+/// Anything else is reported as an unrecognised code, never guessed at.
+public enum DdrescueExitStatus {
+    public static func describe(_ code: Int32) -> String {
+        switch code {
+        case 0: return "normal exit"
+        case 1: return "environmental problem (file not found, invalid options, I/O error)"
+        case 2: return "corrupt or invalid input file"
+        case 3: return "internal consistency error (ddrescue bug)"
+        case 128 + Int32(SIGINT): return "interrupted by SIGINT"
+        case 128 + Int32(SIGTERM): return "terminated by SIGTERM"
+        default: return "unrecognised exit code"
+        }
+    }
 }
 
 public struct PassResult: Equatable, Sendable {
@@ -178,13 +196,27 @@ public struct PassResult: Equatable, Sendable {
 public struct ImagingProgress: Equatable, Sendable {
     public let pass: Int
     public let rescuedBytes: Int64
+    /// `*` plus `/`: read errors seen but not yet trimmed or scraped.
+    public let failedBytes: Int64
+    public let failedExtents: Int
+    /// `-`: confirmed bad.
     public let badBytes: Int64
     public let remainingBytes: Int64
     public let percent: Double
 
-    public init(pass: Int, rescuedBytes: Int64, badBytes: Int64, remainingBytes: Int64, percent: Double) {
+    public init(
+        pass: Int,
+        rescuedBytes: Int64,
+        failedBytes: Int64 = 0,
+        failedExtents: Int = 0,
+        badBytes: Int64,
+        remainingBytes: Int64,
+        percent: Double
+    ) {
         self.pass = pass
         self.rescuedBytes = rescuedBytes
+        self.failedBytes = failedBytes
+        self.failedExtents = failedExtents
         self.badBytes = badBytes
         self.remainingBytes = remainingBytes
         self.percent = percent
@@ -296,6 +328,8 @@ public struct DdrescueSupervisor {
                 configuration.progress(ImagingProgress(
                     pass: pass.pass,
                     rescuedBytes: current.rescuedBytes,
+                    failedBytes: current.failedBytes,
+                    failedExtents: current.failedExtents.count,
                     badBytes: current.badBytes,
                     remainingBytes: current.remainingBytes,
                     percent: current.rescuedFraction * 100
@@ -326,7 +360,7 @@ public struct DdrescueSupervisor {
                 let final = snapshot() ?? lastSnapshot
                 return PassResult(
                     pass: pass.pass,
-                    reason: exit == 0 ? .complete : .ddrescueError,
+                    reason: Self.stopReason(exitCode: exit),
                     exitCode: exit,
                     snapshot: final
                 )
@@ -334,6 +368,18 @@ public struct DdrescueSupervisor {
 
             configuration.sleep(configuration.pollInterval)
         }
+    }
+
+    /// A pass the supervisor did not stop ended by itself. A signal death
+    /// (130/143) is an interrupt — the user's Ctrl-C can reach ddrescue
+    /// directly — and any other non-zero code is ddrescue's own decision, not a
+    /// generic "error".
+    static func stopReason(exitCode: Int32) -> PassStopReason {
+        if exitCode == 0 { return .complete }
+        if exitCode == 128 + Int32(SIGINT) || exitCode == 128 + Int32(SIGTERM) {
+            return .interrupted
+        }
+        return .stoppedOnItsOwn
     }
 
     private func snapshot() -> MapfileSnapshot? {

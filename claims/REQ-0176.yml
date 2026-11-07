@@ -1,0 +1,17 @@
+# REQ-0176 — diskdoctor.md §7 the self-test's skip reason
+# Authored from the measured check hang with guard --suspend active.
+schema: req.claim/2
+claim_id: REQ-0176
+statement: "The check command shall report a row skipped because diskarbitrationd is stopped as UNVERIFIABLE with the reason that the daemon is stopped."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L433
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.LiveCheckProbesStoppedTests::REQ0174_REQ0176_mountGuardRowIsUnverifiableWhenStopped()"
+  - "DiskTriageCollectorsTests.LiveCheckProbesStoppedTests::REQ0174_REQ0176_wholeCheckCompletesWithoutDiskutilWhileStopped()"

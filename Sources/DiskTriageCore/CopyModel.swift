@@ -580,8 +580,16 @@ public struct CopyManifest: Equatable, Sendable {
 
     public struct DamageInfo: Equatable, Sendable {
         public let status: String
+        /// Failed (`*`, `/`) plus bad (`-`): every extent unreadable so far.
         public let unreadableExtents: Int?
         public let unreadableBytes: Int64?
+        /// `*` and `/`: read errors seen, not yet trimmed or scraped. They may
+        /// shrink on a later pass, so they are not called bad.
+        public let failedExtents: Int?
+        public let failedBytes: Int64?
+        /// `-`: ddrescue confirmed these.
+        public let badExtents: Int?
+        public let badBytes: Int64?
         public let limitBytes: Int64?
         public let note: String?
 
@@ -590,13 +598,21 @@ public struct CopyManifest: Equatable, Sendable {
             unreadableExtents: Int?,
             unreadableBytes: Int64?,
             limitBytes: Int64?,
-            note: String?
+            note: String?,
+            failedExtents: Int? = nil,
+            failedBytes: Int64? = nil,
+            badExtents: Int? = nil,
+            badBytes: Int64? = nil
         ) {
             self.status = status
             self.unreadableExtents = unreadableExtents
             self.unreadableBytes = unreadableBytes
             self.limitBytes = limitBytes
             self.note = note
+            self.failedExtents = failedExtents
+            self.failedBytes = failedBytes
+            self.badExtents = badExtents
+            self.badBytes = badBytes
         }
     }
 
@@ -676,6 +692,10 @@ public struct CopyManifest: Equatable, Sendable {
         ]
         damageObject["unreadable_extents"] = damage.unreadableExtents.map { $0 } ?? NSNull()
         damageObject["unreadable_bytes"] = damage.unreadableBytes.map { $0 } ?? NSNull()
+        damageObject["failed_extents"] = damage.failedExtents.map { $0 } ?? NSNull()
+        damageObject["failed_bytes"] = damage.failedBytes.map { $0 } ?? NSNull()
+        damageObject["bad_extents"] = damage.badExtents.map { $0 } ?? NSNull()
+        damageObject["bad_bytes"] = damage.badBytes.map { $0 } ?? NSNull()
         damageObject["limit_bytes"] = damage.limitBytes.map { $0 } ?? NSNull()
         damageObject["note"] = damage.note ?? NSNull()
 

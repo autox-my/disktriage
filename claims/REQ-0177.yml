@@ -1,0 +1,19 @@
+# REQ-0177 — diskdoctor.md §8 inspection damage reporting
+# Authored from the real MiNaH run: `*` extents are provisional, not confirmed bad.
+schema: req.claim/2
+claim_id: REQ-0177
+statement: "The inspect and copy commands shall state that failed mapfile extents in an incomplete mapfile are provisional until trimming and scraping finish."
+applicability: []
+relations:
+  - type: "refines"
+    to: "REQ-0172"
+rationale:
+  source: diskdoctor.md#L533
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0172_REQ0177_copyCountsFailedExtentsAsUnreadable()"
+  - "DiskTriageCLITests.InspectCommandTests::REQ0172_REQ0177_failedExtentsAreUnreadable()"
