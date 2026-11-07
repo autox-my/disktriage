@@ -1,0 +1,20 @@
+# REQ-0184 — diskdoctor.md §8 imaging `--min-read-rate`
+# The plan says the value is recorded in the mapfile header; the sidecar is the
+# tool's own record that it was used.
+schema: req.claim/2
+claim_id: REQ-0184
+statement: "The image sidecar shall record the resolved minimum read rate as informational metadata."
+applicability: []
+relations:
+  - type: "refines"
+    to: "REQ-0182"
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.MinReadRateTests::REQ0179_REQ0184_supervisedArgvAndSidecar()"
+  - "DiskTriageCLITests.MinReadRateTests::REQ0184_sidecarRecordsTheMinReadRate()"

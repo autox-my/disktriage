@@ -59,7 +59,10 @@ struct ImagingExecutionTests {
             rawDevice: "/dev/rdisk8",
             image: image,
             mapfile: mapfile,
-            blockSize: 512
+            blockSize: 512,
+            // The USB fixture is rotational, so the new slow-zone default
+            // puts `-a 10000000` in pass 1 (REQ-0180).
+            minReadRateBytesPerSecond: 10_000_000
         )[0].argv, "pass 1 is exactly the dry-run command")
 
         let sidecar = try decodeSidecar(image + ".disktriage.json")

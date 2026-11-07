@@ -1,0 +1,19 @@
+# REQ-0179 — diskdoctor.md §8 imaging `--min-read-rate`
+# ddrescue -a takes bytes/s, so 1 MB/s is 1,000,000 bytes/s.
+schema: req.claim/2
+claim_id: REQ-0179
+statement: "The image command shall convert the minimum read rate to 1000000 bytes per second before passing it to ddrescue as -a in pass 1 only."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "1000000"
+  unit: "bytes"
+tests:
+  - "DiskTriageCLITests.MinReadRateTests::REQ0179_REQ0184_supervisedArgvAndSidecar()"
+  - "DiskTriageCLITests.MinReadRateTests::REQ0179_minReadRateAppearsInPassOneOnly()"
+  - "DiskTriageCLITests.MinReadRateTests::REQ0179_minReadRateUsesDecimalMegabytes()"

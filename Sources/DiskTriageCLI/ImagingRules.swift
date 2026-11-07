@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import DiskTriageCore
 import DiskTriageCollectors
 
 // The pure rules behind `disktriage image` (diskdoctor.md §6, §8). Nothing in
@@ -23,19 +24,26 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
     /// full one, or with another limit (diskdoctor.md §8). Optional so a
     /// sidecar written before `--limit` existed still decodes as full.
     public let limitBytes: Int64?
+    /// The pass-1 slow-zone threshold (`ddrescue -a`) this run used, `nil`
+    /// when it was disabled. Informational only: the plan says changing it on
+    /// resume is allowed, so it is never part of the identity check
+    /// (diskdoctor.md §8, "Defer slow zones"; REQ-0183/REQ-0184).
+    public let minReadRateBytesPerSecond: Int64?
 
     public init(
         schema: String,
         device: ImageSidecarDevice,
         createdAt: String? = nil,
         command: [String]? = nil,
-        limitBytes: Int64? = nil
+        limitBytes: Int64? = nil,
+        minReadRateBytesPerSecond: Int64? = nil
     ) {
         self.schema = schema
         self.device = device
         self.createdAt = createdAt
         self.command = command
         self.limitBytes = limitBytes
+        self.minReadRateBytesPerSecond = minReadRateBytesPerSecond
     }
 
     enum CodingKeys: String, CodingKey {
@@ -44,6 +52,7 @@ public struct ImageSidecar: Codable, Equatable, Sendable {
         case command
         case createdAt = "created_at"
         case limitBytes = "limit_bytes"
+        case minReadRateBytesPerSecond = "min_read_rate_bytes_per_second"
     }
 }
 
@@ -209,6 +218,32 @@ func destinationSharesSourceDisk(backingWholeDisk: String?, sourceDisk: String?)
 func freeSpaceCoversDevice(freeBytes: Int64?, deviceBytes: Int64?) -> Bool? {
     guard let freeBytes, let deviceBytes else { return nil }
     return freeBytes >= deviceBytes
+}
+
+// MARK: - The slow-zone threshold
+
+/// `--min-read-rate <MB/s>` is decimal megabytes (diskdoctor.md §8): 1 MB/s is
+/// 1,000,000 bytes/s because `ddrescue -a` takes bytes/s. Zero disables the
+/// flag, so it returns `nil` (REQ-0179).
+func minReadRateBytesPerSecond(megabytesPerSecond: Int64) -> Int64? {
+    guard megabytesPerSecond > 0 else { return nil }
+    let (bytes, overflow) = megabytesPerSecond.multipliedReportingOverflow(by: 1_000_000)
+    return overflow ? nil : bytes
+}
+
+/// The plan's default: 10 MB/s on rotational (HDD) or unknown media, and 0
+/// (the flag is omitted) for SSD, flash, SD, NVMe or any media the plan calls
+/// unsupported (REQ-0180). Unknown media is never assumed to be solid-state.
+func defaultMinReadRateMBps(media: String?, bus: String?) -> Int64 {
+    if MediaSupport.unsupportedLabel(media: media, bus: bus) != nil {
+        return 0
+    }
+    switch media?.lowercased() {
+    case "hdd", "unknown", nil:
+        return 10
+    default:
+        return 0
+    }
 }
 
 // MARK: - The `--limit` seam
@@ -666,15 +701,20 @@ func rawDeviceNode(for bsd: String) -> String {
 /// size, `-T` timeout, and `caffeinate` to stop the Mac sleeping (REQ-0083).
 /// A partial image adds `-s <bytes>` to **both** passes, because pass 2 must
 /// still be bounded by the same limit (REQ-0102).
+///
+/// `minReadRateBytesPerSecond` is `ddrescue -a`: pass 1 skips a zone reading
+/// slower than the threshold and leaves it for pass 2, which deliberately has
+/// no `-a` because coming back to those zones is the point (REQ-0179).
 func ddrescuePasses(
     rawDevice: String,
     image: String,
     mapfile: String,
     blockSize: Int64,
     timeoutSeconds: Int = 90,
-    limitBytes: Int64? = nil
+    limitBytes: Int64? = nil,
+    minReadRateBytesPerSecond: Int64? = nil
 ) -> [DdrescuePass] {
-    func argv(_ mode: String) -> [String] {
+    func argv(_ mode: String, minReadRate: Int64?) -> [String] {
         var arguments = [
             "caffeinate", "-dimsu",
             "ddrescue", mode,
@@ -683,6 +723,9 @@ func ddrescuePasses(
             "-K", "65536",
             "-T", String(timeoutSeconds),
         ]
+        if let minReadRate {
+            arguments += ["-a", String(minReadRate)]
+        }
         if let limitBytes {
             arguments += ["-s", String(limitBytes)]
         }
@@ -690,8 +733,8 @@ func ddrescuePasses(
         return arguments
     }
     return [
-        DdrescuePass(pass: 1, argv: argv("-n")),
-        DdrescuePass(pass: 2, argv: argv("-r3")),
+        DdrescuePass(pass: 1, argv: argv("-n", minReadRate: minReadRateBytesPerSecond)),
+        DdrescuePass(pass: 2, argv: argv("-r3", minReadRate: nil)),
     ]
 }
 

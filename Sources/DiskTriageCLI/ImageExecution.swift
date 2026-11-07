@@ -27,6 +27,9 @@ struct ImagingPlan {
     /// The whole-GiB form for the printed resume command, `nil` when the limit
     /// came from the byte seam rather than `--limit`.
     let limitGiB: Int64?
+    /// The pass-1 `ddrescue -a` threshold, `nil` when disabled. Informational
+    /// in the sidecar, never part of the resume identity (REQ-0183).
+    let minReadRateBytesPerSecond: Int64?
 }
 
 /// The final summary: stdout and `--json` are two renderings of this value.
@@ -57,6 +60,9 @@ struct ImagingSummary {
     /// The effective partial limit, `nil` for a full image (REQ-0106).
     let partialLimitBytes: Int64?
     let deviceBytes: Int64?
+    /// The pass-1 slow-zone threshold in bytes/s, `nil` when disabled
+    /// (REQ-0182).
+    let minReadRateBytesPerSecond: Int64?
 
     init(
         status: String,
@@ -79,7 +85,8 @@ struct ImagingSummary {
         resumeCommand: String?,
         stop: Pass2Stop?,
         partialLimitBytes: Int64?,
-        deviceBytes: Int64?
+        deviceBytes: Int64?,
+        minReadRateBytesPerSecond: Int64? = nil
     ) {
         self.status = status
         self.exitCode = exitCode
@@ -102,6 +109,7 @@ struct ImagingSummary {
         self.stop = stop
         self.partialLimitBytes = partialLimitBytes
         self.deviceBytes = deviceBytes
+        self.minReadRateBytesPerSecond = minReadRateBytesPerSecond
     }
 
     var isComplete: Bool { exitCode == 0 }
@@ -202,7 +210,8 @@ func runImaging(
         ),
         createdAt: iso8601String(startedAt),
         command: plan.passes.map(\.line),
-        limitBytes: partialLimitBytes
+        limitBytes: partialLimitBytes,
+        minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond
     )
     do {
         let encoder = JSONEncoder()
@@ -296,7 +305,8 @@ func runImaging(
         resumeCommand: result.reason == .complete ? nil : resumeCommand(plan),
         stop: result.stop,
         partialLimitBytes: partialLimitBytes,
-        deviceBytes: plan.source.sizeBytes
+        deviceBytes: plan.source.sizeBytes,
+        minReadRateBytesPerSecond: plan.minReadRateBytesPerSecond
     )
 
     if let launchError = result.launchError {
@@ -379,6 +389,7 @@ func renderImagingTTY(_ summary: ImagingSummary) -> String {
         lines.append(pad("LIMIT", 10)
             + "first \(gib(limit)) of \(gib(summary.deviceBytes)) — PARTIAL image")
     }
+    lines.append(pad("MIN RATE", 10) + minReadRateDetail(summary.minReadRateBytesPerSecond))
     lines.append(pad("STOPPED", 10) + summary.stoppedDisplay)
     if let detail = summary.stopDetail {
         lines.append(pad("NOTE", 10) + detail)
@@ -423,6 +434,7 @@ func renderImagingJSON(_ summary: ImagingSummary) -> String {
     if let limit = summary.partialLimitBytes { object["limit_bytes"] = limit }
     if let device = summary.deviceBytes { object["device_bytes"] = device }
     if let resume = summary.resumeCommand { object["resume_command"] = resume }
+    object["min_read_rate_bytes_per_second"] = summary.minReadRateBytesPerSecond ?? NSNull()
     if let stop = summary.stop {
         object["stop_rule"] = [
             "marginal_yield_bytes": stop.marginalYieldBytes,
@@ -466,6 +478,17 @@ private func resumeCommand(_ plan: ImagingPlan) -> String {
 }
 
 // MARK: - Formatting
+
+/// The plan and summary wording for the slow-zone threshold. `nil` is
+/// "disabled", never "0 bytes/s" (REQ-0181).
+func minReadRateDetail(_ bytesPerSecond: Int64?) -> String {
+    guard let bytesPerSecond else {
+        return "disabled (no -a in pass 1); deferred zones are left for pass 2"
+    }
+    let megabytes = bytesPerSecond / 1_000_000
+    return "\(bytesPerSecond) bytes/s (\(megabytes) MB/s) in pass 1 only; "
+        + "slower zones are left for pass 2"
+}
 
 private func optionalBytes(_ value: Int64?) -> String {
     value.map(bytes) ?? "unknown"

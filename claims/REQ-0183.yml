@@ -1,0 +1,19 @@
+# REQ-0183 — diskdoctor.md §8 imaging `--min-read-rate`
+# The plan: changing it on resume is allowed.
+schema: req.claim/2
+claim_id: REQ-0183
+statement: "The sidecar's minimum read rate shall not be part of the resume-identity check, so a resume with a different value is allowed."
+applicability: []
+relations:
+  - type: "refines"
+    to: "REQ-0179"
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.MinReadRateTests::REQ0183_resumeWithAChangedValueIsAllowed()"
+  - "DiskTriageCLITests.MinReadRateTests::REQ0183_sidecarDoesNotCheckMinReadRate()"

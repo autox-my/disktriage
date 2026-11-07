@@ -66,6 +66,18 @@ func image(
             }
             options.limitGiB = gib
             index += 2
+        case "--min-read-rate":
+            guard index + 1 < arguments.count else {
+                return usageError("--min-read-rate needs an integer number of MB/s")
+            }
+            let value = arguments[index + 1]
+            guard let rate = Int64(value), rate >= 0, rate <= 10_000 else {
+                return usageError(
+                    "--min-read-rate '\(value)' is not an integer from 0 to 10000 MB/s"
+                )
+            }
+            options.minReadRateMBps = rate
+            index += 2
         case "--dry-run":
             options.sawDryRun = true
             index += 1
@@ -165,6 +177,12 @@ func image(
 
     let unsupportedLabel = MediaSupport.unsupportedLabel(media: source.media, bus: source.bus)
 
+    // `--min-read-rate` is decimal MB/s; the flag's absence takes the media
+    // default. 0 means "omit -a", never "-a 0" (REQ-0180/REQ-0181).
+    let minReadRateMBps = options.minReadRateMBps
+        ?? defaultMinReadRateMBps(media: source.media, bus: source.bus)
+    let resolvedMinReadRate = minReadRateBytesPerSecond(megabytesPerSecond: minReadRateMBps)
+
     let facts = (destinationProbe ?? SystemImageDestinationProbe(executor: executor))
         .probe(destination: destination, mapfile: mapfile)
     let checks = assessDestination(
@@ -184,7 +202,8 @@ func image(
             image: destination,
             mapfile: mapfile,
             blockSize: blockSize,
-            limitBytes: partialLimitBytes
+            limitBytes: partialLimitBytes,
+            minReadRateBytesPerSecond: resolvedMinReadRate
         )
         let bus = assumedBusSpeed(bus: source.bus)
         eta = etaRange(
@@ -249,7 +268,8 @@ func image(
             confirmSerial: options.confirmSerial,
             confirmSize: options.confirmSize,
             limitBytes: requestedLimitBytes,
-            limitGiB: options.limitGiB
+            limitGiB: options.limitGiB,
+            minReadRateBytesPerSecond: resolvedMinReadRate
         )
         return runImaging(
             plan,
@@ -275,6 +295,7 @@ func image(
             eta: eta,
             passes: passes,
             partialLimitBytes: partialLimitBytes,
+            minReadRateBytesPerSecond: resolvedMinReadRate,
             reasons: reasons
         )
         return CLIResult(
@@ -298,6 +319,7 @@ func image(
         eta: eta,
         passes: passes,
         partialLimitBytes: partialLimitBytes,
+        minReadRateBytesPerSecond: resolvedMinReadRate,
         reasons: reasons
     )
     return CLIResult(
@@ -316,6 +338,7 @@ private struct ImageOptions {
     var confirmSerial: String?
     var confirmSize: Int64?
     var limitGiB: Int64?
+    var minReadRateMBps: Int64?
     var override = false
     var acceptRisk = false
     var noGuardCheck = false
@@ -387,6 +410,7 @@ private func renderTTY(
     eta: ETARange?,
     passes: [DdrescuePass],
     partialLimitBytes: Int64?,
+    minReadRateBytesPerSecond: Int64?,
     reasons: [String]
 ) -> String {
     var lines: [String] = []
@@ -473,6 +497,8 @@ private func renderTTY(
         lines.append(field("ETA", text))
     }
 
+    lines.append(field("MIN RATE", minReadRateDetail(minReadRateBytesPerSecond)))
+
     lines.append("")
     if passes.isEmpty {
         lines.append("PASS 1 / PASS 2  not built: the block size or size is unknown")
@@ -542,6 +568,7 @@ private func renderJSON(
     eta: ETARange?,
     passes: [DdrescuePass],
     partialLimitBytes: Int64?,
+    minReadRateBytesPerSecond: Int64?,
     reasons: [String]
 ) -> String {
     struct Document: Encodable {
@@ -554,12 +581,24 @@ private func renderJSON(
         let confirmation: Confirmation
         let eta: ETA?
         let limit: Limit?
+        let minReadRateBytesPerSecond: NullableInt
         let passes: [String]
         let reasons: [String]
 
         enum CodingKeys: String, CodingKey {
             case dryRun = "dry_run"
             case status, source, triage, caveat, destination, confirmation, eta, limit, passes, reasons
+            case minReadRateBytesPerSecond = "min_read_rate_bytes_per_second"
+        }
+
+        /// Encodes `null` when disabled, never an omitted key and never 0.
+        struct NullableInt: Encodable {
+            let value: Int64?
+
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                if let value { try container.encode(value) } else { try container.encodeNil() }
+            }
         }
 
         struct Limit: Encodable {
@@ -684,6 +723,7 @@ private func renderJSON(
                 description: "PARTIAL (\(gib(limit)) of \(gib(device)))"
             )
         }(),
+        minReadRateBytesPerSecond: Document.NullableInt(value: minReadRateBytesPerSecond),
         passes: passes.map(\.line),
         reasons: reasons
     )
@@ -710,6 +750,9 @@ private let imageUsage = "usage: disktriage image <disk> --to <file> [options]\n
     + "  --confirm-size <GiB>    the size, when the serial is unreadable\n"
     + "  --limit <GiB>           image only the first N GiB (partial); the\n"
     + "                          confirmation still names the whole device\n"
+    + "  --min-read-rate <MB/s>  pass 1 skips zones slower than N MB/s for a\n"
+    + "                          later pass (default 10 on HDD/unknown, 0 on\n"
+    + "                          SSD/flash/NVMe; 0 disables)\n"
     + "  --override              skip the triage-attempt requirement explicitly\n"
     + "  --dry-run               print the command; do not execute (default)\n"
     + "  --no-dry-run            run the two passes; needs root and --accept-risk\n"

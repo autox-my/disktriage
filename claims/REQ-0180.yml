@@ -1,0 +1,18 @@
+# REQ-0180 — diskdoctor.md §8 imaging `--min-read-rate`
+# Rotational or unknown media default to 10 MB/s; unsupported media disable it.
+schema: req.claim/2
+claim_id: REQ-0180
+statement: "The image command shall derive the default minimum read rate from the media classification as 10 MB/s for rotational or unknown media and disabled for SSD, flash, NVMe or unsupported media."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L494
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  value: "10"
+  unit: "mb/s"
+tests:
+  - "DiskTriageCLITests.MinReadRateTests::REQ0180_REQ0181_dryRunDefaultsAndZero()"
+  - "DiskTriageCLITests.MinReadRateTests::REQ0180_defaultFollowsTheMediaClassification()"
