@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCore
 import DiskTriageCollectors
 import DiskTriageCLI
@@ -9,13 +10,12 @@ import DiskTriageCLI
 /// only hand-invented data is the SMART attribute table (never a committed
 /// prior-history fixture).
 struct HistoryCLITests {
+    private let temp = TempDir()
+
     private static let serial = "SYNTH0000ABCD"
 
     private func makeTempDirectory() throws -> URL {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-cli-history-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        URL(fileURLWithPath: try temp.makeDirectory("history"))
     }
 
     private func smartJSON(reallocated: Int) -> String {

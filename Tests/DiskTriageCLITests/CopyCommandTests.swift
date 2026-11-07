@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCollectors
 import DiskTriageCore
 import DiskTriageCLI
@@ -9,6 +10,8 @@ import DiskTriageCLI
 /// filesystem in a temporary directory. No image is a device and no tool runs;
 /// the fixtures are real ntfs-3g output recorded from the spike's small image.
 struct CopyCommandTests {
+    private let temp = TempDir()
+
 
     private static func fixture(_ name: String) throws -> String {
         try String(contentsOfFile: fixturePath(name), encoding: .utf8)
@@ -59,7 +62,7 @@ struct CopyCommandTests {
     @Test("REQ0128_REQ0136 copy hashes every file, writes a manifest, and names the damaged file")
     func REQ0128_REQ0134_REQ0136_copiesAndAttributes() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -124,7 +127,7 @@ struct CopyCommandTests {
     @Test("REQ0172 copy reports failed extents as unreadable and claims no per-file integrity")
     func REQ0172_REQ0177_copyCountsFailedExtentsAsUnreadable() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -158,7 +161,7 @@ struct CopyCommandTests {
     // REQ-0125: copy takes an image file, never a device node.
     @Test("REQ0125 copy refuses a device node and a symlink to one")
     func REQ0125_refusesADeviceNode() throws {
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(atPath: destination) }
 
         let direct = runCopy(
@@ -169,7 +172,7 @@ struct CopyCommandTests {
         #expect(direct.stderr.contains("/dev"))
         #expect(direct.stderr.contains("image"))
 
-        let directory = temporaryDirectory()
+        let directory = temp.child("copy-\(UUID().uuidString)")
         try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: directory) }
         let link = directory + "/ordinary.img"
@@ -186,7 +189,7 @@ struct CopyCommandTests {
     @Test("REQ0142 a file above the per-file cap makes the copy partial")
     func REQ0142_capsMakeTheCopyPartial() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -220,7 +223,7 @@ struct CopyCommandTests {
     @Test("REQ0145 the final partial chunk is part of the read hash")
     func REQ0145_hashesTheLastPartialChunk() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -255,7 +258,7 @@ struct CopyCommandTests {
     @Test("REQ0143 a streamed file is handled one chunk at a time")
     func REQ0143_holdsOnlyOneChunk() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -284,7 +287,7 @@ struct CopyCommandTests {
     @Test("REQ0144_REQ0146 a failed writer leaves no final or temporary file")
     func REQ0144_REQ0146_failedWriterLeavesNothing() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -319,7 +322,7 @@ struct CopyCommandTests {
     @Test("REQ0144 a read-back mismatch is caught before the file is installed")
     func REQ0144_readBackIsCheckedBeforeInstall() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -353,7 +356,7 @@ struct CopyCommandTests {
     @Test("REQ0146 a timeout mid-stream marks the file incomplete")
     func REQ0146_timeoutMidStreamIsIncomplete() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -384,7 +387,7 @@ struct CopyCommandTests {
     @Test("REQ0148 --max-bytes stops a stream and makes the copy partial")
     func REQ0148_maxBytesStopsTheStream() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -421,7 +424,7 @@ struct CopyCommandTests {
     @Test("REQ0149 a zero-length file is copied with the empty-input hash")
     func REQ0149_copiesAZeroLengthFile() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -450,7 +453,7 @@ struct CopyCommandTests {
     @Test("REQ0126 an existing destination file is refused before any write")
     func REQ0126_refusesToOverwrite() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -476,7 +479,7 @@ struct CopyCommandTests {
     @Test("REQ0127 a '..' component in a listed name is refused")
     func REQ0127_refusesPathTraversal() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -504,7 +507,7 @@ struct CopyCommandTests {
     @Test("REQ0128 a writer that corrupts bytes is detected as a hash mismatch")
     func REQ0128_detectsACorruptingWriter() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -533,7 +536,7 @@ struct CopyCommandTests {
     @Test("REQ0129 copying an image never writes it")
     func REQ0129_imageIsNeverWritten() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -553,7 +556,7 @@ struct CopyCommandTests {
     @Test("REQ0130_REQ0131 no mapfile leaves damage unknown and makes no per-file claim")
     func REQ0130_REQ0131_REQ0134_noMapfileMakesNoClaim() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -584,7 +587,7 @@ struct CopyCommandTests {
     @Test("REQ0131 a failed ntfscluster pass makes no per-file claim on a damaged image")
     func REQ0131_failedAttributionMakesNoClaim() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -615,7 +618,7 @@ struct CopyCommandTests {
     @Test("REQ0131 an incomplete mapfile makes no per-file claim")
     func REQ0131_incompleteMapfileMakesNoClaim() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -651,7 +654,7 @@ struct CopyCommandTests {
     func REQ0135_wholeDiskOffsetIsSubtracted() throws {
         let partitionOffset: Int64 = 4096
         let image = try makeWholeDiskImage(partitionOffset: partitionOffset)
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -694,7 +697,7 @@ struct CopyCommandTests {
     @Test("REQ0136 --json carries the stable copy, damage and attribution sections")
     func REQ0136_jsonReportHasStableSections() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -728,7 +731,7 @@ struct CopyCommandTests {
     @Test("REQ0132 the manifest says hash equality is against the image, not the platter")
     func REQ0132_hashEqualityWording() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -746,8 +749,8 @@ struct CopyCommandTests {
     @Test("REQ0137 --hash-image records the image hash and the default records null")
     func REQ0137_hashImageIsOptional() throws {
         let image = try makeBareNTFSImage()
-        let offDestination = temporaryDirectory()
-        let onDestination = temporaryDirectory()
+        let offDestination = temp.child("copy-\(UUID().uuidString)")
+        let onDestination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: offDestination)
@@ -775,7 +778,7 @@ struct CopyCommandTests {
         var bytes = [UInt8](repeating: 0, count: 8192)
         bytes.replaceSubrange(32..<36, with: Array("NXSB".utf8))
         let image = try makeFile(bytes)
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -795,7 +798,7 @@ struct CopyCommandTests {
     @Test("missing copy tools exit 30 with the prefix hint")
     func missingToolsExitThirty() throws {
         let image = try makeBareNTFSImage()
-        let destination = temporaryDirectory()
+        let destination = temp.child("copy-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
@@ -844,12 +847,6 @@ struct CopyCommandTests {
         )
     }
 
-    private func temporaryDirectory() -> String {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-copy-\(UUID().uuidString)")
-            .path
-    }
-
     private func writeMapfile(at image: String) throws -> String {
         let path = image + ".mapfile"
         try Data(try Self.fixture("ntfs-copy-damaged.mapfile.txt").utf8)
@@ -885,8 +882,7 @@ struct CopyCommandTests {
 
     /// A 16 MiB sparse bare NTFS volume: only the boot sector is material.
     private func makeBareNTFSImage(clusters: Int64 = 4096) throws -> String {
-        let path = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-copy-image-\(UUID().uuidString).img").path
+        let path = temp.child("disktriage-copy-image-\(UUID().uuidString).img")
         try makeSparseFile(path: path, bytes: clusters * 4096)
         try write(makeBootSector(totalSectors: UInt64(clusters * 8)), to: path, offset: 0)
         return path
@@ -895,8 +891,7 @@ struct CopyCommandTests {
     /// A whole-disk image: an MBR at LBA 0, an NTFS partition at `offset`.
     private func makeWholeDiskImage(partitionOffset: Int64) throws -> String {
         let volumeBytes = Int64(16 * 1024 * 1024)
-        let path = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-copy-disk-\(UUID().uuidString).img").path
+        let path = temp.child("disktriage-copy-disk-\(UUID().uuidString).img")
         try makeSparseFile(path: path, bytes: partitionOffset + volumeBytes + 4096)
 
         var mbr = [UInt8](repeating: 0, count: 512)
@@ -911,8 +906,7 @@ struct CopyCommandTests {
     }
 
     private func makeFile(_ bytes: [UInt8]) throws -> String {
-        let path = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-copy-\(UUID().uuidString).img").path
+        let path = temp.child("disktriage-copy-\(UUID().uuidString).img")
         try Data(bytes).write(to: URL(fileURLWithPath: path))
         return path
     }

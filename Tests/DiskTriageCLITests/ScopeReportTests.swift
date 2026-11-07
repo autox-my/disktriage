@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCore
 import DiskTriageCollectors
 @testable import DiskTriageCLI
@@ -269,6 +270,7 @@ struct ScopeReportTests {
 // MARK: - The harness
 
 private final class ScopeReportHarness {
+    private let temp = TempDir()
     let directory: String
     let source: String
     let image: String
@@ -279,7 +281,7 @@ private final class ScopeReportHarness {
 
     init(sourceBytes: Data? = nil) throws {
         let capture = try #require(ntfsDiskImagePath(), "captures/ntfs-spike/img/disk.img")
-        directory = try temporaryDirectory()
+        directory = temp.path
         source = directory + "/device.bin"
         image = directory + "/disk.img"
         let bytes = try sourceBytes ?? Data(contentsOf: URL(fileURLWithPath: capture))
@@ -418,9 +420,11 @@ struct ScopeReportLiveTests {
         let imageBytes = (attributes[.size] as? NSNumber)?.int64Value ?? 0
         #expect(imageBytes < harness.deviceSize, "a metadata-only image, not the device")
     }
+
 }
 
 private final class ScopeLiveHarness {
+    private let temp = TempDir()
     let directory: String
     let source: String
     let image: String
@@ -429,7 +433,7 @@ private final class ScopeLiveHarness {
 
     init() throws {
         let capture = try #require(ntfsDiskImagePath(), "captures/ntfs-spike/img/disk.img")
-        directory = try temporaryDirectory()
+        directory = temp.path
         source = directory + "/device.bin"
         image = directory + "/disk.img"
         try Data(contentsOf: URL(fileURLWithPath: capture)).write(

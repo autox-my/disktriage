@@ -4,11 +4,14 @@ import Testing
 @testable import DiskTriageCLI
 @testable import DiskTriageCollectors
 import DiskTriageCore
+import DiskTriageTestSupport
 
 /// P3b: the supervised two-pass image run, driven through the injected seams.
 /// No test opens a device: the "device" is a regular file path, and ddrescue is
 /// a fake that rewrites a real mapfile.
 struct ImagingExecutionTests {
+
+    private let temp = TempDir()
 
     private static let size: Int64 = 1_073_741_824
     private static let serialHash =
@@ -18,7 +21,7 @@ struct ImagingExecutionTests {
 
     @Test("REQ0076_REQ0077_REQ0083 the sidecar exists before the first read and both passes run")
     func REQ0076_REQ0077_REQ0083_sidecarBeforeReadAndTwoPasses() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let environment = FakeImagingEnvironment()
@@ -83,7 +86,7 @@ struct ImagingExecutionTests {
 
     @Test("--json carries the final summary")
     func jsonSummary() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let launcher = FakeDdrescueLauncher()
@@ -227,7 +230,7 @@ struct ImagingExecutionTests {
 
     @Test("REQ0085 the pass-2 stop rule SIGINTs ddrescue and prints what remains and the resume command")
     func REQ0085_stopRuleInterruptsAndReports() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let clock = TestClock()
@@ -281,7 +284,7 @@ struct ImagingExecutionTests {
 
     @Test("REQ0081 a disappearing device gets SIGINT then SIGTERM and the mapfile state")
     func REQ0081_deviceDisappearanceInterruptsThenTerminates() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let environment = FakeImagingEnvironment()
@@ -321,7 +324,7 @@ struct ImagingExecutionTests {
     // error" the real MiNaH run printed.
     @Test("REQ0173 a non-zero ddrescue exit shows its code, the -T rule, and keeps the mapfile")
     func REQ0173_stoppedOnItsOwnKeepsTheMapfile() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let launcher = FakeDdrescueLauncher()
@@ -373,7 +376,7 @@ struct ImagingExecutionTests {
 
     @Test("REQ0173 ddrescue dying by SIGINT without our request is an interrupt, not an error")
     func REQ0173_ddrescueSIGINTIsInterrupted() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let launcher = FakeDdrescueLauncher()
@@ -485,7 +488,7 @@ struct ImagingExecutionTests {
 
     @Test("REQ0077 an interrupted run resumes from the mapfile and finishes")
     func REQ0077_resumeAfterInterrupt() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let environment = FakeImagingEnvironment()
@@ -557,7 +560,7 @@ struct ImagingExecutionTests {
     // image is not resumed as a full one (or with another limit).
     @Test("REQ0105 resuming with a different limit or full versus partial exits 30")
     func REQ0105_resumingWithADifferentLimitIsRefused() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let limit: Int64 = 536_870_912 // 512 MiB, below the 1 GiB device
@@ -624,7 +627,7 @@ struct ImagingExecutionTests {
         let limit: Int64 = 8 * 1_048_576 // 8 MiB, injected at the byte seam
 
         func runPartial(asJSON: Bool) throws -> CLIResult {
-            let directory = try temporaryDirectory()
+            let directory = try temp.makeDirectory()
             let image = directory + "/disk8.img"
             let mapfile = image + ".mapfile"
             let launcher = FakeDdrescueLauncher()
@@ -675,7 +678,7 @@ struct ImagingExecutionTests {
     @Test("REQ0107 the pass-2 stop rule uses the limited image size")
     func REQ0107_stopRuleUsesTheLimitedImageSize() throws {
         let limit: Int64 = 8 * 1_048_576
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let clock = TestClock()
@@ -730,7 +733,7 @@ struct ImagingExecutionTests {
         let rescued: Int64 = 268_435_456 // 256 MiB
 
         func runPartial(asJSON: Bool) throws -> CLIResult {
-            let directory = try temporaryDirectory()
+            let directory = try temp.makeDirectory()
             let image = directory + "/disk8.img"
             let mapfile = image + ".mapfile"
             let launcher = FakeDdrescueLauncher()
@@ -785,7 +788,7 @@ struct ImagingExecutionTests {
     @Test("REQ0109 a partial pass exiting 0 is complete without reading the huge tail")
     func REQ0109_partialCompletionUsesDdrescueExitNotTheUnclampedTail() throws {
         let limit: Int64 = 536_870_912 // 512 MiB of a 1 GiB device
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let launcher = FakeDdrescueLauncher()
@@ -832,7 +835,7 @@ struct ImagingExecutionTests {
     @Test("REQ0110 the pass-2 stop rule measures remaining inside the limit")
     func REQ0110_stopRuleUsesClampedRemaining() throws {
         let limit: Int64 = 536_870_912 // 512 MiB of a 1 GiB device
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let clock = TestClock()
@@ -893,7 +896,8 @@ struct ImagingExecutionTests {
         interruptRequested: @escaping () -> Bool = { false },
         limitBytes: Int64? = nil
     ) -> CLIResult {
-        let destination = image ?? "/tmp/disktriage-test-\(UUID().uuidString).img"
+        let scratch = image == nil ? TempDir() : nil
+        let destination = image ?? scratch!.child("disktriage-test.img")
         let destinationProbe = probe ?? FakeImageProbe(facts: emptyDestination())
         let map = mapfile ?? destination + ".mapfile"
         let dependencies = ImagingDependencies(
@@ -1023,6 +1027,9 @@ final class FakeDdrescueProcess: DdrescueProcessHandle, @unchecked Sendable {
 /// Reads the real image/mapfile/sidecar from a temp directory, so the resume
 /// test exercises the same validation the shipped probe does.
 struct DiskDestinationProbe: ImageDestinationProbing {
+    var freeBytes: Int64? = 2_000_000_000_000
+    var containerFilesystem: String? = "apfs"
+
     func probe(destination: String, mapfile: String) -> DestinationFacts {
         let manager = FileManager.default
         let imageExists = manager.fileExists(atPath: destination)
@@ -1044,8 +1051,8 @@ struct DiskDestinationProbe: ImageDestinationProbing {
             mapfileExists: mapfileExists,
             sidecar: sidecar,
             sidecarError: sidecarError,
-            freeBytes: 2_000_000_000_000,
-            containerFilesystem: "apfs",
+            freeBytes: freeBytes,
+            containerFilesystem: containerFilesystem,
             parentIsWritable: true,
             backingWholeDisk: "disk0"
         )
@@ -1062,13 +1069,6 @@ final class Box<Value>: @unchecked Sendable {
 }
 
 // MARK: - Fixtures
-
-func temporaryDirectory() throws -> String {
-    let path = FileManager.default.temporaryDirectory
-        .appendingPathComponent("disktriage-tests-\(UUID().uuidString)").path
-    try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
-    return path
-}
 
 func writeMapfile(
     _ path: String,

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 @testable import DiskTriageCollectors
 import DiskTriageCore
 
@@ -11,15 +12,14 @@ import DiskTriageCore
 /// is the file-system seam used to prove a write failure is reported, not
 /// thrown.
 struct SnapshotStoreTests {
+    private let temp = TempDir()
+
     private static let serial = "SYNTH0000ABCD"
     // The independent SHA-256 of the serial: `printf 'SYNTH0000ABCD' | shasum -a 256`.
     private static let key = "140a7381765287afbe4ee54904e08feabe9024b26a0a769284e63f5a81ee1b57"
 
     private func makeTempDirectory() throws -> URL {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-history-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        URL(fileURLWithPath: try temp.makeDirectory("history"))
     }
 
     private func record(

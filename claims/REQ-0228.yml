@@ -1,0 +1,16 @@
+# REQ-0228 — docs/sdlc.md
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0228
+statement: "A test shall remove every temporary directory it creates, and the directory's contents, when the test finishes, including when the test fails or throws."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.TempDirTests::REQ0228_tempDirRemovesItselfAndItsContents()"

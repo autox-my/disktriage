@@ -1,0 +1,16 @@
+# REQ-0231 — docs/sdlc.md
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0231
+statement: "The gate shall answer a disktriage-* directory that existed before the test run with a warning rather than a failure."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.GateLeakGuardTests::REQ0231_preexistingDirectoryIsAWarningOnly()"

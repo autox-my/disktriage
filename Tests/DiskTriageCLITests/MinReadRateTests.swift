@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 @testable import DiskTriageCLI
 @testable import DiskTriageCollectors
 
@@ -8,6 +9,8 @@ import Testing
 /// unknown media, 0 (flag omitted) for SSD/flash/NVMe or unsupported media,
 /// and 1 MB/s = 1,000,000 bytes/s as `ddrescue -a` takes bytes/s.
 struct MinReadRateTests {
+    private let temp = TempDir()
+
 
     private static let syntheticSerial = "SYNTH0000ABCD"
     private static let syntheticSerialHash =
@@ -203,7 +206,7 @@ struct MinReadRateTests {
     // `-a 10000000` in pass 1 only, and the sidecar records it.
     @Test("REQ0179_REQ0184 the supervised passes defer slow zones in pass 1 only")
     func REQ0179_REQ0184_supervisedArgvAndSidecar() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let launcher = FakeDdrescueLauncher()
@@ -254,7 +257,7 @@ struct MinReadRateTests {
     // the same number.
     @Test("REQ0182 the final summary reports the min read rate")
     func REQ0182_finalSummaryReportsTheValue() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let launcher = FakeDdrescueLauncher()

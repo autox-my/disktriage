@@ -71,6 +71,13 @@ run_build() {
 # which proves the pass/fail/skip rule bites without running the suite.
 . "$ROOT/scripts/lib/junit-report.sh"
 
+# Lists the `disktriage-*` directories under the temp roots before and after the
+# suite. Shared with scripts/check-gate-probe.sh, which proves the leak rule
+# bites without touching a real leftover.
+. "$ROOT/scripts/lib/temp-leak.sh"
+TEMP_BEFORE="$LOG_DIR/temp-before.txt"
+TEMP_AFTER="$LOG_DIR/temp-after.txt"
+
 run_tests() {
     echo "== test =="
     mkdir -p "$REPORT_DIR" || {
@@ -79,9 +86,20 @@ run_tests() {
     }
     rm -f "$REQUESTED_REPORT" "$SWIFT_TESTING_REPORT"
 
+    # The temp directory's `disktriage-*` directories are the suite's property.
+    # Snapshot before the runner starts; pre-existing ones are a warning only.
+    temp_leak_snapshot >"$TEMP_BEFORE"
+
     "$SWIFT_BIN" test --xunit-output "$REQUESTED_REPORT" >"$TEST_LOG" 2>&1
     local rc=$?
     cat "$TEST_LOG"
+
+    temp_leak_snapshot >"$TEMP_AFTER"
+
+    local leak_output leak_rc
+    leak_output="$(temp_leak_verdict "$TEMP_BEFORE" "$TEMP_AFTER")"
+    leak_rc=$?
+    echo "$leak_output"
 
     local report total=0 failed=0 skipped=0 seen=0 counts written=""
     local report_total report_failed report_skipped
@@ -92,7 +110,7 @@ run_tests() {
         counts="$(count_report "$report")"
         case "$?" in
             0) ;;
-            *) echo "$counts"; return 3 ;;
+            *) echo "$counts"; [ "$leak_rc" -ne 0 ] && return 1; return 3 ;;
         esac
         seen=$((seen + 1))
         read -r report_total report_failed report_skipped <<< "$counts"
@@ -104,6 +122,7 @@ run_tests() {
 
     if [ "$seen" -eq 0 ]; then
         echo "UNVERIFIABLE  no JUnit report was written ($REQUESTED_REPORT, $SWIFT_TESTING_REPORT)"
+        [ "$leak_rc" -ne 0 ] && return 1
         return 3
     fi
 
@@ -125,6 +144,11 @@ run_tests() {
         printf '%s' "$written" | while IFS= read -r report; do
             [ -n "$report" ] && echo "report        $report"
         done
+    fi
+
+    # A leaked temp directory is a real failure, even beside a skip.
+    if [ "$leak_rc" -ne 0 ]; then
+        return 1
     fi
     return "$verdict_rc"
 }

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCore
 @testable import DiskTriageCollectors
 
@@ -7,6 +8,8 @@ import DiskTriageCore
 /// DiskArbitration is stopped that call hangs, so the row must say
 /// UNVERIFIABLE with the same reason the identity path uses.
 struct LiveCheckProbesStoppedTests {
+    private let temp = TempDir()
+
 
     @Test("REQ0168 a stopped daemon makes the filesystem row unverifiable, not hung")
     func REQ0168_filesystemRowIsUnverifiableWhenStopped() {
@@ -99,7 +102,7 @@ struct LiveCheckProbesStoppedTests {
     @Test("REQ0175 the ntfs row names the prefix it searched when a tool is absent")
     func REQ0175_ntfsRowNamesThePrefixSearched() throws {
         let prefix = try temporaryPrefix(
-            tools: ["ntfsinfo", "ntfscluster", "ntfscat"]
+            in: temp, tools: ["ntfsinfo", "ntfscluster", "ntfscat"]
         )
         defer { try? FileManager.default.removeItem(atPath: prefix) }
         let executor = RecordingExecutor([
@@ -124,7 +127,7 @@ struct LiveCheckProbesStoppedTests {
     @Test("REQ0175 a found tool whose --version exits non-zero is present, not missing")
     func REQ0175_versionExitIsNotMissing() throws {
         let prefix = try temporaryPrefix(
-            tools: ["ntfsinfo", "ntfsls", "ntfscat", "ntfscluster"]
+            in: temp, tools: ["ntfsinfo", "ntfsls", "ntfscat", "ntfscluster"]
         )
         defer { try? FileManager.default.removeItem(atPath: prefix) }
         let ntfsls = prefix + "/bin/ntfsls"
@@ -152,7 +155,7 @@ struct LiveCheckProbesStoppedTests {
     @Test("REQ0175 a banner on stderr counts as a version line for the ntfs tools")
     func REQ0175_stderrBannerIsAVersion() throws {
         let prefix = try temporaryPrefix(
-            tools: ["ntfsinfo", "ntfsls", "ntfscat", "ntfscluster"]
+            in: temp, tools: ["ntfsinfo", "ntfsls", "ntfscat", "ntfscluster"]
         )
         defer { try? FileManager.default.removeItem(atPath: prefix) }
         let ntfscat = prefix + "/bin/ntfscat"
@@ -230,9 +233,8 @@ final class HangingDaExecutor: CommandExecuting, @unchecked Sendable {
     }
 }
 
-func temporaryPrefix(tools: [String]) throws -> String {
-    let prefix = FileManager.default.temporaryDirectory
-        .appendingPathComponent("disktriage-prefix-\(UUID().uuidString)").path
+func temporaryPrefix(in temp: TempDir, tools: [String]) throws -> String {
+    let prefix = temp.child("prefix-\(UUID().uuidString)")
     let bin = prefix + "/bin"
     try FileManager.default.createDirectory(atPath: bin, withIntermediateDirectories: true)
     for tool in tools {

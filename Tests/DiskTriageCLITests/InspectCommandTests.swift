@@ -1,12 +1,15 @@
 import Foundation
 import CryptoKit
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCollectors
 import DiskTriageCLI
 
 /// `disktriage inspect` through the injected tool runner and the real local
 /// filesystem in a temporary directory. No image is a device and no tool runs.
 struct InspectCommandTests {
+    private let temp = TempDir()
+
 
     private static func fixture(_ name: String) throws -> String {
         try String(contentsOfFile: fixturePath(name), encoding: .utf8)
@@ -42,10 +45,7 @@ struct InspectCommandTests {
     // target is what the /dev refusal must see.
     @Test("REQ0111_REQ0123 a symlink to a device node is refused")
     func REQ0111_REQ0123_symlinkToADeviceIsRefused() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-inspect-link-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        let directory = URL(fileURLWithPath: try temp.makeDirectory("link"))
         let link = directory.appendingPathComponent("ordinary.img").path
         try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: "/dev/null")
 
@@ -61,10 +61,7 @@ struct InspectCommandTests {
     // REQ-0112: a directory, socket or device is not an image file.
     @Test("REQ0112 inspect refuses a non-regular file")
     func REQ0112_refusesANonRegularFile() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-inspect-dir-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        let directory = URL(fileURLWithPath: try temp.makeDirectory("directory"))
 
         let result = runInspect(
             arguments: [directory.path],
@@ -145,10 +142,7 @@ struct InspectCommandTests {
     // relative path before the runner (and therefore the policy) sees it.
     @Test("REQ0123 a relative image path is resolved before the command policy")
     func REQ0123_relativeImagePathIsResolvedBeforeThePolicy() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-inspect-relative-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        let directory = URL(fileURLWithPath: try temp.makeDirectory("relative"))
 
         let absolute = directory.appendingPathComponent("volume.img").path
         var bytes = [UInt8](repeating: 0, count: 65_536)
@@ -190,10 +184,7 @@ struct InspectCommandTests {
     // as a bare relative name.
     @Test("REQ0123 a relative --mapfile and --to are resolved too")
     func REQ0123_relativeMapfileAndWorkingCopyAreResolved() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-inspect-relpaths-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        let directory = URL(fileURLWithPath: try temp.makeDirectory("relpaths"))
 
         var bytes = [UInt8](repeating: 0, count: 8192)
         bytes.replaceSubrange(7680..<8192, with: makeBootSector(totalSectors: 15))
@@ -722,8 +713,7 @@ struct InspectCommandTests {
     }
 
     private func makeImage(_ bytes: [UInt8]) throws -> String {
-        let path = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-inspect-\(UUID().uuidString).img").path
+        let path = temp.child("inspect-\(UUID().uuidString).img")
         try Data(bytes).write(to: URL(fileURLWithPath: path))
         return path
     }

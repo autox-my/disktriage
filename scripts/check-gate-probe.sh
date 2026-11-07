@@ -20,6 +20,8 @@ fi
 
 # shellcheck source=lib/junit-report.sh
 . "$ROOT/scripts/lib/junit-report.sh"
+# shellcheck source=lib/temp-leak.sh
+. "$ROOT/scripts/lib/temp-leak.sh"
 
 TMP="$(mktemp -d)" || {
     echo "UNVERIFIABLE  cannot create a temporary directory"
@@ -143,8 +145,43 @@ else
     fail "skipped names" "expected the skipped test id, got '$names'"
 fi
 
+# The leak guard: a pre-existing `disktriage-*` directory is a warning and not
+# a failure; a directory the run added is FAIL (1) and is named. The probe uses
+# a fake root, never a real temp-directory leftover.
+probe_root="$TMP/temp-root"
+mkdir -p "$probe_root/disktriage-preexisting"
+leak_before="$TMP/leak-before.txt"
+leak_clean="$TMP/leak-clean.txt"
+leak_dirty="$TMP/leak-dirty.txt"
+temp_leak_list "$probe_root" >"$leak_before"
+temp_leak_list "$probe_root" >"$leak_clean"
+
+output="$(temp_leak_verdict "$leak_before" "$leak_clean")"
+got=$?
+if [ "$got" -ne 0 ]; then
+    fail "no new temp directory" "expected exit 0, got $got ($output)"
+elif [[ "$output" != *"pre-existing"* ]] || [[ "$output" != *"PASS"* ]]; then
+    fail "no new temp directory" "expected a pre-existing warning and PASS: $output"
+else
+    echo "ok   probe no new temp directory -> 0: $(printf '%s' "$output" | tr '\n' ' ')"
+fi
+
+mkdir -p "$probe_root/disktriage-new-leftover"
+temp_leak_list "$probe_root" >"$leak_dirty"
+output="$(temp_leak_verdict "$leak_before" "$leak_dirty")"
+got=$?
+if [ "$got" -ne 1 ]; then
+    fail "new temp directory" "expected exit 1, got $got ($output)"
+elif [[ "$output" != *"1 new"* ]] || [[ "$output" != *"disktriage-new-leftover"* ]]; then
+    fail "new temp directory" "expected the count and the name: $output"
+elif [[ "$output" == *"disktriage-preexisting"* ]]; then
+    fail "new temp directory" "a pre-existing directory was reported as new: $output"
+else
+    echo "ok   probe new temp directory -> 1: $(printf '%s' "$output" | tr '\n' ' ')"
+fi
+
 if [ "$failures" -ne 0 ]; then
     echo "FAIL          $failures probe(s) failed"
     exit 1
 fi
-echo "PASS          the gate's pass/fail/skip rule bites"
+echo "PASS          the gate's pass/fail/skip and temp-leak rules bite"

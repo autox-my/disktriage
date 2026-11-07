@@ -1,11 +1,18 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 @testable import DiskTriageCollectors
 
 /// Real-process tests for the collector framework (diskdoctor.md §2.7).
 /// These run actual subprocesses; the commands are local test fixtures, not
 /// triage commands, so they use the internal test-only policy.
 struct ProcessRunnerTests {
+    private let temp = TempDir()
+
+    private func makeTempDirectory() throws -> URL {
+        URL(fileURLWithPath: try temp.makeDirectory())
+    }
+
     // REQ-0011: hard timeout and process-group kill.
     // REQ-0012: a timeout is an unresponsive-device signal, not a crash.
     @Test("a timeout is a result and kills the whole process group")
@@ -147,13 +154,6 @@ struct ProcessRunnerTests {
         #expect(result.policyViolation == .notAllowListed, "violation")
         #expect(!FileManager.default.fileExists(atPath: marker.path), "the binary must not have run")
     }
-}
-
-private func makeTempDirectory() throws -> URL {
-    let url = FileManager.default.temporaryDirectory
-        .appendingPathComponent("disktriage-p1c-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-    return url
 }
 
 /// Fails unless `pgrep -f <marker>` finds nothing within `within` seconds.
