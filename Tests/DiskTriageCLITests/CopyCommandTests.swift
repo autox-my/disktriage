@@ -817,6 +817,7 @@ struct CopyCommandTests {
         #expect(result.exitCode == 30)
         #expect(result.stderr.contains("DISKTRIAGE_NTFS_PREFIX"))
         #expect(result.stderr.contains("ntfscluster"))
+        #expect(result.stderr.contains("libexec/ntfs-3g"), "the installed keg location is named")
     }
 
     @Test("copy --help exits 0 and reads nothing")

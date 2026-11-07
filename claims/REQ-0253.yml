@@ -1,0 +1,18 @@
+# REQ-0253 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0253
+statement: "The Homebrew formula shall build the ntfs-3g userspace tools from the pinned upstream tarball with --disable-ntfs-3g and install them under the keg's libexec/ntfs-3g."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives:
+    - "The core ntfs-3g formula is Linux-only and the tap variant requires macFUSE; both were rejected (docs/ntfs-spike.md, How to build)."
+  assumptions:
+    - "The build is performed by the user's machine from source; the GPL tools remain a separate subprocess and are not linked into the disktriage binary. docs/adr/0022-homebrew-packaging.md records the licence reasoning."
+pins:
+  modality: "SHALL"

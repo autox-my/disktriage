@@ -65,6 +65,31 @@ struct NTFSToolsTests {
         #expect(policy.evaluate(version) != .allowed)
     }
 
+    // REQ-0251: the policy's allow-list is the tool basename plus an absolute
+    // path, so a located libexec path is allowed while the same directory's
+    // other binaries are not. There is deliberately no prefix wildcard.
+    @Test("REQ0251 the inspect policy accepts a located libexec tool and rejects its neighbours")
+    func REQ0251_libexecPathIsAllowListed() {
+        let libexec = "/opt/homebrew/Cellar/disktriage/0.1.0/libexec/ntfs-3g"
+        let allowed: [[String]] = [
+            [libexec + "/bin/ntfsinfo", "-m", "/images/plain.img"],
+            [libexec + "/bin/ntfsls", "-R", "/images/plain.img"],
+            [libexec + "/sbin/ntfscat", "/images/plain.img", "/docs/notes.md"],
+            [libexec + "/sbin/ntfscluster", "-c", "0-16382", "-v", "/images/plain.img"],
+        ]
+        for argv in allowed {
+            #expect(policy.evaluate(argv) == .allowed, "expected allowed: \(argv)")
+        }
+        let rejected: [[String]] = [
+            [libexec + "/bin/ntfsfix", "-n", "/images/plain.img"],
+            [libexec + "/bin/ntfsinfo", "-m", "plain.img"],
+            [libexec + "/bin/ntfsinfo", "-m", "/dev/disk4"],
+        ]
+        for argv in rejected {
+            #expect(policy.evaluate(argv) != .allowed, "expected rejected: \(argv)")
+        }
+    }
+
     @Test("the locator finds the tools through DISKTRIAGE_NTFS_PREFIX bin and sbin")
     func locatesThroughThePrefix() throws {
         let prefix = try makePrefix(tools: ["ntfsinfo", "ntfsls"], sbinTools: ["mkntfs"])
@@ -79,6 +104,103 @@ struct NTFSToolsTests {
     @Test("a locator with no prefix and an empty PATH finds nothing")
     func missingToolsAreNil() {
         #expect(NTFSToolLocator.locate(environment: ["PATH": "", "DISKTRIAGE_NTFS_PREFIX": ""]) == nil)
+    }
+
+    // REQ-0249: a Homebrew keg is reached through the symlink brew puts in
+    // bin/, so the executable path is resolved before its ../libexec is used.
+    // The order is prefix, installed libexec, PATH — never PATH first, because
+    // sudo strips the environment that carries the prefix.
+    @Test("REQ0249 the locator searches the executable's libexec after the prefix and before PATH")
+    func REQ0249_executableRelativeLibexecOrder() throws {
+        let keg = temp.child("Cellar/disktriage/0.1.0")
+        let libexec = keg + "/libexec/ntfs-3g"
+        try writeExecutable(libexec + "/bin/ntfsinfo")
+        try writeExecutable(libexec + "/bin/ntfsls")
+        try writeExecutable(libexec + "/sbin/mkntfs")
+        try writeExecutable(keg + "/bin/disktriage")
+
+        let link = temp.child("bin/disktriage")
+        try FileManager.default.createDirectory(
+            at: URL(fileURLWithPath: temp.child("bin")),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(
+            atPath: link,
+            withDestinationPath: keg + "/bin/disktriage"
+        )
+
+        let pathTools = temp.child("path-tools")
+        try writeExecutable(pathTools + "/ntfsinfo")
+        try writeExecutable(pathTools + "/ntfsls")
+
+        let prefix = try makePrefix(tools: ["ntfsinfo", "ntfsls"], sbinTools: [])
+
+        // 1. The explicit prefix outranks the installed tree.
+        let prefixed = try #require(NTFSToolLocator.locate(
+            environment: ["DISKTRIAGE_NTFS_PREFIX": prefix, "PATH": pathTools],
+            executablePath: link
+        ))
+        #expect(prefixed.ntfsinfo == prefix + "/bin/ntfsinfo")
+
+        // 2. Without the prefix, the resolved keg's libexec outranks PATH.
+        let installed = try #require(NTFSToolLocator.locate(
+            environment: ["PATH": pathTools],
+            executablePath: link
+        ))
+        #expect(installed.ntfsinfo == canonical(libexec + "/bin/ntfsinfo"))
+        #expect(installed.ntfsls == canonical(libexec + "/bin/ntfsls"))
+        #expect(NTFSToolLocator.resolve(
+            "mkntfs",
+            environment: ["PATH": ""],
+            executablePath: link
+        ) == canonical(libexec + "/sbin/mkntfs"))
+
+        // 3. It still works with a stripped PATH (the sudo case).
+        let stripped = try #require(NTFSToolLocator.locate(
+            environment: ["PATH": ""],
+            executablePath: link
+        ))
+        #expect(stripped.ntfsinfo == canonical(libexec + "/bin/ntfsinfo"))
+    }
+
+    // REQ-0250: `check` must not answer UNVERIFIABLE for a Homebrew install:
+    // the row resolves the same installed libexec the locator does, and names
+    // it in the detail.
+    @Test("REQ0250 check reports ntfs-3g found in the installed libexec beside the executable")
+    func REQ0250_selfTestFindsInstalledLibexec() throws {
+        let keg = temp.child("Cellar/disktriage/0.1.0")
+        let libexec = keg + "/libexec/ntfs-3g"
+        let tools = ["ntfsinfo", "ntfsls", "ntfscat", "ntfscluster"]
+        for tool in tools {
+            try writeExecutable(libexec + "/bin/\(tool)")
+        }
+        try writeExecutable(keg + "/bin/disktriage")
+        let link = temp.child("bin/disktriage")
+        try FileManager.default.createDirectory(
+            at: URL(fileURLWithPath: temp.child("bin")),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(
+            atPath: link,
+            withDestinationPath: keg + "/bin/disktriage"
+        )
+
+        let executor = RecordingExecutor(Dictionary(
+            uniqueKeysWithValues: tools.map { tool in
+                (.toolVersion(path: libexec + "/bin/\(tool)"), .ok("\(tool) v2026.9.28"))
+            }
+        ))
+        let probes = LiveCheckProbes(
+            executor: executor,
+            environment: ["PATH": "", "DISKTRIAGE_NTFS_PREFIX": ""],
+            versionRunner: executor,
+            executablePath: link
+        )
+
+        let report = CheckRunner(probes: probes).run()
+        let row = try #require(report.rows.first { $0.id == "ntfs-3g" })
+        #expect(row.status == .pass, "\(row.detail)")
+        #expect(row.detail.contains(canonical(libexec)), "the installed location is named: \(row.detail)")
     }
 
     @Test("the runner issues the exact read-only argv and its own timeouts")
@@ -156,6 +278,16 @@ struct NTFSToolsTests {
             try writeExecutable(prefix.appendingPathComponent("sbin/\(tool)"))
         }
         return prefix.path
+    }
+
+    private func writeExecutable(_ path: String) throws {
+        try writeExecutable(URL(fileURLWithPath: path))
+    }
+
+    /// The locator resolves symlinks, which on macOS also resolves the
+    /// `/var` -> `/private/var` temp root. Expectations compare the same way.
+    private func canonical(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
     }
 
     private func writeExecutable(_ url: URL) throws {

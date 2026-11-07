@@ -1,0 +1,17 @@
+# REQ-0256 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0256
+statement: "The Homebrew formula test shall assert that neither disktriage nor the ntfs-3g tools link a FUSE library."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions:
+    - "otool -L in the formula test is the evidence; the tools are built --disable-shared --enable-static, so a FUSE reference would be a build regression, not a runtime option."
+pins:
+  modality: "SHALL"

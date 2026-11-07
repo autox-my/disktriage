@@ -1,0 +1,17 @@
+# REQ-0254 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0254
+statement: "The packaging script shall produce a source tarball and a formula whose source url and sha256 are taken from that tarball."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions:
+    - "scripts/package.sh tarball and formula are the evidence; verify re-runs ruby -c, brew audit and a from-source install. The tarball content is git archive HEAD, so a dirty tree is never packaged silently."
+pins:
+  modality: "SHALL"

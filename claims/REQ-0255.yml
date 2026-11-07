@@ -1,0 +1,17 @@
+# REQ-0255 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0255
+statement: "The Homebrew formula test shall run disktriage --version and disktriage check --json and require the ntfs-3g row to be found without root or Full Disk Access."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions:
+    - "brew test is the evidence; the check exit status is accepted as 0, 1 or 3 because a host without Full Disk Access may grey other rows, but the ntfs-3g row itself must be PASS."
+pins:
+  modality: "SHALL"

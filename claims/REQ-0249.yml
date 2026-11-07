@@ -1,0 +1,16 @@
+# REQ-0249 — diskdoctor.md §13 naming & distribution
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0249
+statement: "The ntfs-3g tool locator shall search the resolved executable's ../libexec/ntfs-3g bin and sbin directories after DISKTRIAGE_NTFS_PREFIX and before PATH."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#13-naming--distribution
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.NTFSToolsTests::REQ0249_executableRelativeLibexecOrder()"

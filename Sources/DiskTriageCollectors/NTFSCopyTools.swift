@@ -19,11 +19,22 @@ public struct NTFSCopyToolchain: Equatable, Sendable {
 public enum NTFSCopyToolLocator {
     /// All four tools or nothing: a half-installed prefix must not make a copy
     /// look possible and then fail halfway through.
-    public static func locate(environment: [String: String]) -> NTFSCopyToolchain? {
-        guard let info = NTFSToolLocator.resolve("ntfsinfo", environment: environment),
-              let ls = NTFSToolLocator.resolve("ntfsls", environment: environment),
-              let cat = NTFSToolLocator.resolve("ntfscat", environment: environment),
-              let cluster = NTFSToolLocator.resolve("ntfscluster", environment: environment)
+    public static func locate(
+        environment: [String: String],
+        executablePath: String? = nil
+    ) -> NTFSCopyToolchain? {
+        guard let info = NTFSToolLocator.resolve(
+                  "ntfsinfo", environment: environment, executablePath: executablePath
+              ),
+              let ls = NTFSToolLocator.resolve(
+                  "ntfsls", environment: environment, executablePath: executablePath
+              ),
+              let cat = NTFSToolLocator.resolve(
+                  "ntfscat", environment: environment, executablePath: executablePath
+              ),
+              let cluster = NTFSToolLocator.resolve(
+                  "ntfscluster", environment: environment, executablePath: executablePath
+              )
         else { return nil }
         return NTFSCopyToolchain(ntfsinfo: info, ntfsls: ls, ntfscat: cat, ntfscluster: cluster)
     }
@@ -235,9 +246,13 @@ public struct NTFSCopyToolRunner: NTFSCopyToolRunning, Sendable {
     /// stderr (and to the buffered fallback), while the run map keeps its own
     /// lower bound.
     public static func live(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        executablePath: String? = Bundle.main.executablePath
     ) -> NTFSCopyToolRunner? {
-        guard let chain = NTFSCopyToolLocator.locate(environment: environment) else { return nil }
+        guard let chain = NTFSCopyToolLocator.locate(
+            environment: environment,
+            executablePath: executablePath
+        ) else { return nil }
         let volume = ProcessRunner(
             policy: .inspect,
             timeout: volumeTimeout,

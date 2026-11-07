@@ -31,6 +31,8 @@ public struct CopyDependencies: Sendable {
     public var maxBytesOverride: Int64?
     /// Test-only chunk observer; `nil` in production.
     public var chunkObserver: (any CopyChunkObserving)?
+    /// The running executable, resolved for the keg-relative libexec lookup.
+    public var executablePath: String?
 
     public init(
         fileSystem: any CopyFileSystem = LiveCopyFileSystem(),
@@ -41,7 +43,8 @@ public struct CopyDependencies: Sendable {
         now: @escaping @Sendable () -> Date = Date.init,
         chunkSize: Int = CopyLimits.streamChunkBytes,
         maxBytesOverride: Int64? = nil,
-        chunkObserver: (any CopyChunkObserving)? = nil
+        chunkObserver: (any CopyChunkObserving)? = nil,
+        executablePath: String? = Bundle.main.executablePath
     ) {
         self.fileSystem = fileSystem
         self.environment = environment
@@ -52,12 +55,18 @@ public struct CopyDependencies: Sendable {
         self.chunkSize = chunkSize
         self.maxBytesOverride = maxBytesOverride
         self.chunkObserver = chunkObserver
+        self.executablePath = executablePath
     }
 
     public static func live(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        executablePath: String? = Bundle.main.executablePath
     ) -> CopyDependencies {
-        CopyDependencies(fileSystem: LiveCopyFileSystem(), environment: environment)
+        CopyDependencies(
+            fileSystem: LiveCopyFileSystem(),
+            environment: environment,
+            executablePath: executablePath
+        )
     }
 }
 
@@ -307,7 +316,10 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
                 30,
                 "the ntfs-3g tools were not found: set DISKTRIAGE_NTFS_PREFIX to a built "
                     + "prefix (with bin/ntfsinfo, bin/ntfsls, bin/ntfscat and bin/ntfscluster) "
-                    + "or add them to PATH. copy never falls back to mounting the image."
+                    + "or add them to PATH. A Homebrew install keeps them in "
+                    + "\(installedNTFSLocation(executablePath: dependencies.executablePath))/bin; "
+                    + "check that directory or reinstall. "
+                    + "copy never falls back to mounting the image."
             )
         }
 
@@ -1049,7 +1061,10 @@ private func resolveCopyTools(
         return (injected, nil)
     }
     guard dependencies.resolveTools,
-          let live = NTFSCopyToolRunner.live(environment: dependencies.environment)
+          let live = NTFSCopyToolRunner.live(
+              environment: dependencies.environment,
+              executablePath: dependencies.executablePath
+          )
     else {
         return (nil, nil)
     }

@@ -47,6 +47,8 @@ public func run(
     switch command {
     case "--help", "-h", "help":
         return rootHelp()
+    case "--version", "version":
+        return help("disktriage \(DisktriageVersion.current)\n")
     case "triage":
         return triage(
             rest,
@@ -505,6 +507,8 @@ private func rootHelp() -> CLIResult {
             + "  copy     copy an image's files with a hashed manifest\n"
             + "  check    permissions and tooling self-test\n"
             + "  guard    hold mounts; start it before connecting the disk\n"
+            + "\n"
+            + "  --version       print 'disktriage <version>'\n"
             + "\n"
             + "Run 'disktriage <command> --help' for options.\n"
     )

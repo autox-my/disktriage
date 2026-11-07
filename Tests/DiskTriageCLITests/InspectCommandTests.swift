@@ -101,6 +101,7 @@ struct InspectCommandTests {
         #expect(result.exitCode == 30)
         #expect(result.stderr.contains("DISKTRIAGE_NTFS_PREFIX"))
         #expect(result.stderr.contains("ntfs-3g"))
+        #expect(result.stderr.contains("libexec/ntfs-3g"), "the installed keg location is named")
         #expect(!result.stderr.localizedCaseInsensitiveContains("mount /dev"))
     }
 
