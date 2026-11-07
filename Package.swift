@@ -37,13 +37,22 @@ let package = Package(
         // inconvenient. See docs/sdlc.md.
         .testTarget(
             name: "DiskTriageCoreTests",
-            dependencies: ["DiskTriageCore"],
+            dependencies: ["DiskTriageCore", "DiskTriageTestSupport"],
             path: "Tests/DiskTriageCoreTests"
         ),
         .testTarget(
             name: "DiskTriageCLITests",
-            dependencies: ["DiskTriageCLI", "DiskTriageCollectors", "DiskTriageCore", "DiskTriageGuard"],
+            dependencies: [
+                "DiskTriageCLI", "DiskTriageCollectors", "DiskTriageCore",
+                "DiskTriageGuard", "DiskTriageTestSupport",
+            ],
             path: "Tests/DiskTriageCLITests"
+        ),
+        // Test-only helpers shared by every suite: one `TempDir` implementation
+        // rather than a copy per target. Not a product.
+        .target(
+            name: "DiskTriageTestSupport",
+            path: "Tests/TestSupport"
         ),
         // P1c: the collector framework. OS calls, subprocesses and filesystem
         // reads live here, never in DiskTriageCore (diskdoctor.md §3).
@@ -54,7 +63,7 @@ let package = Package(
         ),
         .testTarget(
             name: "DiskTriageCollectorsTests",
-            dependencies: ["DiskTriageCollectors", "DiskTriageCore"],
+            dependencies: ["DiskTriageCollectors", "DiskTriageCore", "DiskTriageTestSupport"],
             path: "Tests/DiskTriageCollectorsTests"
         ),
         // P3a: the mount guard. macOS-only, and the decision logic is pure so

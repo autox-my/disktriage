@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCore
 import DiskTriageCollectors
 @testable import DiskTriageCLI
@@ -85,6 +86,7 @@ struct NTFSAllocationImageLiveTests {
 // MARK: - Harness
 
 private final class RealAllocationHarness {
+    private let temp = TempDir()
     let directory: String
     let source: String
     let image: String
@@ -92,7 +94,7 @@ private final class RealAllocationHarness {
 
     init() throws {
         let capture = try #require(ntfsDiskImagePath())
-        directory = try temporaryDirectory()
+        directory = temp.path
         source = directory + "/device.bin"
         image = directory + "/disk.img"
         try Data(contentsOf: URL(fileURLWithPath: capture)).write(

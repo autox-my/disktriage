@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCore
 @testable import DiskTriageCLI
 
@@ -13,6 +14,8 @@ import DiskTriageCore
 /// `<skipped>` case. The pure tests for the same rules are in
 /// `DiskTriageCoreTests.NTFSAllocationTests`.
 struct NTFSAllocationLiveTests {
+    private let temp = TempDir()
+
 
     // MARK: - 5. Domain mapfile
 
@@ -72,10 +75,7 @@ struct NTFSAllocationLiveTests {
     )
     func REQ0197_liveDdrescueCopiesOnlyTheDomainExtents() throws {
         let ddrescue = try #require(ddrescueExecutable())
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-domain-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        let directory = URL(fileURLWithPath: try temp.makeDirectory("domain"))
 
         let deviceSize: Int64 = 8 * 1_048_576
         let source = directory.appendingPathComponent("src.bin")

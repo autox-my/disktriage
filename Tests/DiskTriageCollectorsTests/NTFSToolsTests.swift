@@ -1,10 +1,13 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 @testable import DiskTriageCollectors
 
 /// The inspect-side additions: an argv shape per tool (never a write flag,
 /// never a device node), the tool locator, and the runner that builds them.
 struct NTFSToolsTests {
+    private let temp = TempDir()
+
 
     private let policy = CommandPolicy.inspect
 
@@ -145,8 +148,7 @@ struct NTFSToolsTests {
     // MARK: - Support
 
     private func makePrefix(tools: [String], sbinTools: [String]) throws -> String {
-        let prefix = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-ntfs-\(UUID().uuidString)")
+        let prefix = URL(fileURLWithPath: temp.child("prefix-\(UUID().uuidString)"))
         for tool in tools {
             try writeExecutable(prefix.appendingPathComponent("bin/\(tool)"))
         }

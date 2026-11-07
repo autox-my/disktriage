@@ -281,6 +281,35 @@ struct ImageCommandTests {
         #expect(full.stdout.contains("233.8 GiB"))
     }
 
+    // REQ-0233 / REQ-0234: a scope-report dry run on APFS passes the
+    // metadata free-space rule while full and --used-only runs keep the
+    // full-size rule on the same 1.3 GiB destination.
+    @Test("REQ0233_REQ0234 a scope report fits where a full run does not")
+    func REQ0233_REQ0234_scopeReportFreeSpaceOnAPFS() {
+        let facts = DestinationFacts(
+            destinationExists: false,
+            mapfileExists: false,
+            freeBytes: 1_396_000_000,
+            containerFilesystem: "apfs",
+            parentIsWritable: true,
+            backingWholeDisk: "disk8"
+        )
+
+        let report = internalRun(["--confirm-size", "233", "--scope-report"], facts: facts)
+        #expect(report.exitCode == 0, "\(report.stdout)\(report.stderr)")
+        #expect(report.stdout.contains(
+            "sparse image on apfs: scope report writes metadata only"
+        ), "\(report.stdout)")
+
+        let full = internalRun(["--confirm-size", "233"], facts: facts)
+        #expect(full.exitCode == 2, "the full device still does not fit: \(full.stdout)")
+        #expect(full.stdout.contains("233.8 GiB"), "the device size is still the requirement")
+
+        let usedOnly = internalRun(["--confirm-size", "233", "--used-only"], facts: facts)
+        #expect(usedOnly.exitCode == 2, "--used-only is a full imaging run: \(usedOnly.stdout)")
+        #expect(usedOnly.stdout.contains("233.8 GiB"))
+    }
+
     // REQ-0104: the size confirmation is the whole device, never the limit.
     @Test("REQ0104 the size confirmation names the whole device, not the limit")
     func REQ0104_confirmationNamesTheWholeDevice() {

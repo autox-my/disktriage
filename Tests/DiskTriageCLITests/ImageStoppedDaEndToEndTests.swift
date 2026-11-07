@@ -1,6 +1,7 @@
 import Foundation
 import Darwin
 import Testing
+import DiskTriageTestSupport
 @testable import DiskTriageCLI
 @testable import DiskTriageCollectors
 import DiskTriageCore
@@ -8,6 +9,7 @@ import DiskTriageCore
 /// The destination walk and the whole `image --no-dry-run` path with
 /// DiskArbitration stopped: `diskutil` is never allowed to hang the run.
 struct ImageStoppedDaEndToEndTests {
+    private let temp = TempDir()
 
     private func fixture(_ name: String) -> String {
         (try? String(contentsOfFile: fixturePath(name), encoding: .utf8)) ?? ""
@@ -184,7 +186,7 @@ struct ImageStoppedDaEndToEndTests {
     // including the FDA precondition, identity, triage and destination walk.
     @Test("REQ0169 image --no-dry-run completes with zero diskutil calls while stopped")
     func REQ0169_fullImageNeverCallsDiskutil() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let executor = stoppedExecutor(destinationPath: directory)
@@ -232,7 +234,7 @@ struct ImageStoppedDaEndToEndTests {
     // The same flow with a running daemon keeps today's diskutil-first path.
     @Test("REQ0169 a running daemon keeps the diskutil-first image flow")
     func REQ0169_runningDaKeepsDiskutilFirst() throws {
-        let directory = try temporaryDirectory()
+        let directory = try temp.makeDirectory()
         let image = directory + "/disk8.img"
         let mapfile = image + ".mapfile"
         let executor = runningExecutor()

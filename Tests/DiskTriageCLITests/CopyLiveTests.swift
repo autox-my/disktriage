@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCLI
 import DiskTriageCollectors
 
@@ -12,6 +13,8 @@ import DiskTriageCollectors
 /// either is absent it is reported as **skipped**, never as a pass;
 /// `scripts/check.sh` answers 3 for a JUnit `<skipped>` case.
 struct CopyLiveTests {
+    private let temp = TempDir()
+
 
     @Test(
         "live: the spike's damaged image names clip.dat and leaves readme.txt intact",
@@ -22,10 +25,7 @@ struct CopyLiveTests {
     )
     func REQ0140_liveCopyAttributesTheDamagedFile() throws {
         let fixture = try #require(liveCopyFixture())
-        let destination = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-copy-live-\(UUID().uuidString)")
-            .path
-        defer { try? FileManager.default.removeItem(atPath: destination) }
+        let destination = temp.child("copy-live")
 
         let before = try sha256(path: fixture.image)
         var environment = ProcessInfo.processInfo.environment
@@ -80,10 +80,7 @@ struct CopyLiveTests {
     )
     func REQ0143_liveStreamsAFileLargerThanItsChunk() throws {
         let fixture = try #require(liveCopyFixture())
-        let destination = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-copy-live-stream-\(UUID().uuidString)")
-            .path
-        defer { try? FileManager.default.removeItem(atPath: destination) }
+        let destination = temp.child("copy-live-stream")
 
         var environment = ProcessInfo.processInfo.environment
         environment["DISKTRIAGE_NTFS_PREFIX"] = fixture.prefix

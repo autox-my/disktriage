@@ -965,3 +965,78 @@ second ddrescue invocation is built.
   `mode: whole-device` and no stage-1/2 state when stage 0 fails, because no
   fallback pass ran. No change is made to `diskdoctor.md`; the above are
   findings.
+
+## Test temp directories are removed, and the gate notices when they are not (v3.9)
+
+The suite used to leak its working directories: after the scope-report work
+`getconf DARWIN_USER_TEMP_DIR` held 1,589 `disktriage-*` directories (about
+22 GiB), the disk filled to 1.3 GiB free, and image and gate runs failed. The
+fix is one helper and one gate rule, not a cleanup script.
+
+- **One helper.** `Tests/TestSupport/TempDir.swift` (the `DiskTriageTestSupport`
+  target, test-only) creates a unique `disktriage-tests-<uuid>` directory under
+  `FileManager.default.temporaryDirectory`. Its `deinit` removes the tree, so a
+  test struct's `private let temp = TempDir()` cleans up when the test returns —
+  passing, failing or throwing. Removal first makes every item writable (a
+  `0500` destination or a `0400` snapshot is legitimate fixture data), then
+  removes the tree. No test creates a directory with `FileManager` or
+  `NSTemporaryDirectory` directly any more; a harness holds its `TempDir` so
+  its lifetime covers the test.
+- **Every suite is converted**, including the capture-backed fake-ddrescue and
+  real-ddrescue harnesses, `copy`'s sparse 16 MiB images, the NTFS tool
+  prefixes, the process-runner marker directories and the built-binary seams.
+  Images that used to land in `/tmp` (`/tmp/disktriage-test-<uuid>.img`) are
+  inside a per-call `TempDir` too.
+- **The leak guard.** `scripts/lib/temp-leak.sh` lists the `disktriage-*`
+  directories directly under `getconf DARWIN_USER_TEMP_DIR` and `$TMPDIR` (once
+  each, when they exist). `scripts/check.sh` snapshots before the runner starts
+  and after it exits. A directory that appears only after the run is **FAIL
+  (exit 1)**, with its count and paths, even when the tests themselves were
+  skipped (3) — a real failure beside a skip is still a failure. A directory
+  already present is a **warning only** and the gate never deletes it: it is
+  not the gate's property.
+- **The probe proves it bites.** `scripts/check-gate-probe.sh` builds a fake
+  temp root under its own `mktemp` directory: a pre-existing entry plus no new
+  one answers 0 with the warning, and a faked `disktriage-new-leftover` answers
+  1 naming it, never touching a real leftover. Mutation check: re-introducing
+  one leaked directory in a test call site turned the gate red with that path;
+  restoring it turned the gate green.
+- **The gate's own temp files** (`mktemp -d` for the logs and the probe) are not
+  named `disktriage-*`, so they are not counted; the leak guard measures the
+  suite, not the harness.
+
+## The scope report's destination needs metadata room, not the device (v3.9)
+
+`disktriage image disk0 --to <file> --scope-report` used to refuse on a 233.8 GiB
+device with 1.3 GiB free, although a scope report writes stage 0's few MB into a
+sparse image: the apparent size is large because the backup boot sector sits
+near the partition end, but the allocated blocks are only the metadata.
+
+- **Only APFS changes.** `filesystemSupportsSparseFiles` accepts exactly `apfs`
+  (from `statfs.f_fstypename`). Every other filesystem, and an unknown one, keeps
+  the full-size rule unchanged.
+- **The rule.** For a scope report on APFS the free-space requirement is
+  `max(1 GiB, 2 × NTFSStage0ReadPlan.scopeReportByteBudget(deviceBytes:))`. The
+  budget is a pure upper bound on the stage-0 read (the whole `$Bitmap` at one
+  bit per 512-byte cluster, plus a 2 MiB fixed-metadata bound), not a
+  measurement; `if available` means a nil source size falls back to the 1 GiB
+  floor. A pass prints
+  `sparse image on apfs: scope report writes metadata only (~N MiB)`; a refusal
+  prints the free and required numbers beside the same sentence.
+- **Unchanged.** The "not on the source disk" and writable rules are untouched.
+  Every mode that is not a scope report — a full dry run, a full run,
+  `--used-only`, and a partial limit — keeps the full-size (or limit) rule on
+  APFS, and the CLI passes `scopeReport` to the one assessment so there is no
+  second copy of the rule.
+- **The real-file proof.** `ScopeReportLiveTests` runs real ddrescue 1.30 on the
+  capture with a 233.8 GiB source size in the seam and 1.3 GiB free: the only
+  run that passes is the scope report, and its image's `st_blocks` (allocated)
+  is far below its apparent size. On a host whose temp directory is not APFS,
+  or without ddrescue or the capture, the test is `<skipped>`, which the gate
+  answers as 3, never a pass.
+- **Mutation checks.** (a) applying the scope rule to every run turned the
+  full/`--used-only` tests red, (b) treating a non-APFS filesystem as
+  sparse-capable turned the HFS/exFAT/MS-DOS test red, and (c) removing the
+  1 GiB floor made the half-gigabyte destination pass. Restoring each turned the
+  suite green. No change is made to `diskdoctor.md`; the pre-read budget is an
+  addition the plan does not spell out.

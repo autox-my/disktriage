@@ -1,0 +1,17 @@
+# REQ-0234 — diskdoctor.md §8 scope report
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0234
+statement: "A full or used-only imaging run shall require free space for the full image, even on APFS."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageCommandTests::REQ0233_REQ0234_scopeReportFreeSpaceOnAPFS()"
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0234_fullRunsKeepTheFullSizeRule()"

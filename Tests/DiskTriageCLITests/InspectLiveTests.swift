@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCLI
 import DiskTriageCollectors
 
@@ -15,6 +16,8 @@ import DiskTriageCollectors
 /// than passing or failing it; that is a gate property recorded in
 /// docs/sdlc.md, not a hidden pass.
 struct InspectLiveTests {
+    private let temp = TempDir()
+
 
     @Test(
         "live: a mkntfs image is inspected read-only, bare and whole-disk",
@@ -25,10 +28,7 @@ struct InspectLiveTests {
     )
     func liveInspection() throws {
         let prefix = try #require(liveNTFSPrefix())
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("disktriage-live-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        let directory = URL(fileURLWithPath: try temp.makeDirectory("live"))
 
         let volumePath = directory.appendingPathComponent("volume.img").path
         try makeSparseFile(path: volumePath, bytes: 16 * 1_048_576)

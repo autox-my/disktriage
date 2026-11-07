@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import DiskTriageTestSupport
 import DiskTriageCore
 import DiskTriageCollectors
 @testable import DiskTriageCLI
@@ -458,6 +459,7 @@ struct NTFSAllocationImageTests {
 /// A copy of the synthetic whole-disk NTFS image as the "device", the fake
 /// launcher that copies its domain, and the real file seams.
 private final class NTFSImageHarness {
+    private let temp = TempDir()
     let directory: String
     let source: String
     let image: String
@@ -467,7 +469,7 @@ private final class NTFSImageHarness {
 
     init(sourceBytes: Data? = nil) throws {
         let capture = try #require(ntfsDiskImagePath(), "captures/ntfs-spike/img/disk.img")
-        directory = try temporaryDirectory()
+        directory = temp.path
         source = directory + "/device.bin"
         image = directory + "/disk.img"
         mapfile = image + ".mapfile"

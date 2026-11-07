@@ -365,6 +365,35 @@ func freeSpaceCoversDevice(freeBytes: Int64?, deviceBytes: Int64?) -> Bool? {
     return freeBytes >= deviceBytes
 }
 
+/// Only APFS is treated as sparse-capable. Every other filesystem — and an
+/// unknown one — keeps the full-size rule, because only APFS was measured to
+/// write the scope report's metadata-only image as a sparse file.
+func filesystemSupportsSparseFiles(_ filesystem: String?) -> Bool {
+    filesystem?.lowercased() == "apfs"
+}
+
+/// The scope report's destination requirement: `max(1 GiB, 2 × the stage-0
+/// byte budget)`. The floor protects a destination whose budget is tiny; the
+/// doubling leaves room for the mapfiles, sidecar and filesystem overhead.
+func scopeReportFreeSpaceRequirement(stage0BudgetBytes: Int64?) -> Int64 {
+    let floor: Int64 = 1_073_741_824
+    guard let budget = stage0BudgetBytes, budget > 0 else { return floor }
+    let (twice, overflow) = budget.multipliedReportingOverflow(by: 2)
+    return max(floor, overflow ? Int64.max : twice)
+}
+
+/// `nil` free space is unknown, never a pass.
+func scopeReportFreeSpaceCovers(freeBytes: Int64?, stage0BudgetBytes: Int64?) -> Bool? {
+    guard let freeBytes else { return nil }
+    return freeBytes >= scopeReportFreeSpaceRequirement(stage0BudgetBytes: stage0BudgetBytes)
+}
+
+/// The budget in whole MiB, rounded up, for the human detail line.
+func scopeMetadataMiB(_ bytes: Int64) -> Int64 {
+    let mib: Int64 = 1_048_576
+    return max(1, (bytes + mib - 1) / mib)
+}
+
 // MARK: - The slow-zone threshold
 
 /// `--min-read-rate <MB/s>` is decimal megabytes (diskdoctor.md §8): 1 MB/s is
@@ -480,7 +509,8 @@ func sidecarLimitMismatch(_ sidecar: ImageSidecar?, limitBytes: Int64?) -> Bool 
 func assessDestination(
     facts: DestinationFacts,
     source: ImageSource,
-    limitBytes: Int64? = nil
+    limitBytes: Int64? = nil,
+    scopeReport: Bool = false
 ) -> [DestinationCheck] {
     var checks: [DestinationCheck] = []
     let imageBytes = effectiveImageBytes(deviceBytes: source.sizeBytes, limitBytes: limitBytes)
@@ -517,25 +547,60 @@ func assessDestination(
     let partialNote = isPartial
         ? " (partial limit of the \(gib(source.sizeBytes)) device)"
         : ""
-    switch freeSpaceCoversDevice(freeBytes: facts.freeBytes, deviceBytes: imageBytes) {
-    case .some(true):
-        checks.append(DestinationCheck(
-            name: "free space",
-            outcome: .pass,
-            detail: "\(gib(facts.freeBytes)) free ≥ \(gib(imageBytes)) needed\(partialNote)"
-        ))
-    case .some(false):
-        checks.append(DestinationCheck(
-            name: "free space",
-            outcome: .refuse,
-            detail: "\(gib(facts.freeBytes)) free, \(gib(imageBytes)) needed\(partialNote)"
-        ))
-    case .none:
-        checks.append(DestinationCheck(
-            name: "free space",
-            outcome: .unknown,
-            detail: "free space or source size is unknown"
-        ))
+
+    if scopeReport, filesystemSupportsSparseFiles(facts.containerFilesystem) {
+        // A scope report writes stage 0's metadata into a sparse image: the
+        // apparent size is large because the backup boot sector sits near the
+        // partition end, but the allocated blocks are only a few MB. The
+        // budget is a pre-read upper bound; the parsed allocation is printed
+        // after the read (REQ-0233).
+        let budget = source.sizeBytes.map {
+            NTFSStage0ReadPlan.scopeReportByteBudget(deviceBytes: $0)
+        }
+        let required = scopeReportFreeSpaceRequirement(stage0BudgetBytes: budget)
+        let metadata = budget.map { " (~\(scopeMetadataMiB($0)) MiB)" } ?? ""
+        switch scopeReportFreeSpaceCovers(freeBytes: facts.freeBytes, stage0BudgetBytes: budget) {
+        case .some(true):
+            checks.append(DestinationCheck(
+                name: "free space",
+                outcome: .pass,
+                detail: "sparse image on apfs: scope report writes metadata only\(metadata)"
+            ))
+        case .some(false):
+            checks.append(DestinationCheck(
+                name: "free space",
+                outcome: .refuse,
+                detail: "\(gib(facts.freeBytes)) free, \(gib(required)) needed; "
+                    + "sparse image on apfs: scope report writes metadata only\(metadata)"
+            ))
+        case .none:
+            checks.append(DestinationCheck(
+                name: "free space",
+                outcome: .unknown,
+                detail: "free space or the source size is unknown"
+            ))
+        }
+    } else {
+        switch freeSpaceCoversDevice(freeBytes: facts.freeBytes, deviceBytes: imageBytes) {
+        case .some(true):
+            checks.append(DestinationCheck(
+                name: "free space",
+                outcome: .pass,
+                detail: "\(gib(facts.freeBytes)) free ≥ \(gib(imageBytes)) needed\(partialNote)"
+            ))
+        case .some(false):
+            checks.append(DestinationCheck(
+                name: "free space",
+                outcome: .refuse,
+                detail: "\(gib(facts.freeBytes)) free, \(gib(imageBytes)) needed\(partialNote)"
+            ))
+        case .none:
+            checks.append(DestinationCheck(
+                name: "free space",
+                outcome: .unknown,
+                detail: "free space or source size is unknown"
+            ))
+        }
     }
 
     switch filesystemAllowsLargeFiles(facts.containerFilesystem) {

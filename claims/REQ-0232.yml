@@ -1,0 +1,16 @@
+# REQ-0232 — docs/sdlc.md
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0232
+statement: "The gate shall compare the disktriage-* directories in the temporary directory before and after the test run."
+applicability: []
+relations: []
+rationale:
+  source: docs/sdlc.md
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.GateLeakGuardTests::REQ0232_onlyTheDeltaIsNew()"
