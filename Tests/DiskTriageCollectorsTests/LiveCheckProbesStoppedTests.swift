@@ -145,6 +145,35 @@ struct LiveCheckProbesStoppedTests {
         #expect(probe.status == .pass, "\(probe.detail)")
         #expect(probe.detail.contains("ntfsls v2026.9.28"), "\(probe.detail)")
     }
+
+    // REQ-0175: the real `ntfscat --version` writes its banner to STDERR and
+    // exits 0 (measured on ntfs-3g 2026.9.28), so a probe that reads only stdout
+    // called a present, working binary "missing" in the first MiNaH run.
+    @Test("REQ0175 a banner on stderr counts as a version line for the ntfs tools")
+    func REQ0175_stderrBannerIsAVersion() throws {
+        let prefix = try temporaryPrefix(
+            tools: ["ntfsinfo", "ntfsls", "ntfscat", "ntfscluster"]
+        )
+        defer { try? FileManager.default.removeItem(atPath: prefix) }
+        let ntfscat = prefix + "/bin/ntfscat"
+        let executor = RecordingExecutor([
+            .toolVersion(path: ntfscat): CollectorResult(
+                outcome: .ok,
+                exitCode: 0,
+                stdout: "",
+                stderr: "\nntfscat v2026.9.28 (libntfs-3g) - Concatenate files and print on the standard output.\n"
+            ),
+        ])
+        let probes = LiveCheckProbes(
+            executor: executor,
+            environment: ["DISKTRIAGE_NTFS_PREFIX": prefix],
+            versionRunner: executor
+        )
+
+        let probe = probes.tool(.ntfscat)
+        #expect(probe.status == .pass, "\(probe.detail)")
+        #expect(probe.detail.contains("ntfscat v2026.9.28"), "\(probe.detail)")
+    }
 }
 
 // MARK: - Seams

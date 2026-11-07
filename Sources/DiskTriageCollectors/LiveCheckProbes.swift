@@ -64,7 +64,8 @@ public struct LiveCheckProbes: CheckProbing {
         let result = checkRunner.run(.toolVersion(path: path))
         switch result.outcome {
         case .ok:
-            guard let version = firstLine(result.stdout) else {
+            // ntfs-3g's ntfscat prints its banner on stderr (measured).
+            guard let version = firstLine(result.stdout) ?? (ntfs ? firstLine(result.stderr) : nil) else {
                 return .unverifiable("\(path) --version printed nothing")
             }
             return .pass(version)
@@ -81,7 +82,7 @@ public struct LiveCheckProbes: CheckProbing {
             // ntfs-3g's `ntfsls --version` prints its banner and exits 1. A
             // found, runnable binary is present even when the version flag's
             // exit status is not 0; it is never reported as "missing".
-            if ntfs, let line = firstLine(result.stdout),
+            if ntfs, let line = firstLine(result.stdout) ?? firstLine(result.stderr),
                line.lowercased().contains(tool.rawValue) {
                 return .pass("\(line) (found at \(path); --version exited \(code))")
             }
