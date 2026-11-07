@@ -759,7 +759,12 @@ Distribution: Homebrew tap first, signed `.app` wrapper later. Triage depends on
 (smartmontools) and imaging on `ddrescue`; the formula declares both. NTFS inspection depends on
 the ntfs-3g userspace tools, built from the upstream tarball with `--disable-ntfs-3g` (no FUSE).
 Homebrew's core formula is Linux-only and the tap variant requires macFUSE, so the formula builds
-from source or ships a pinned static build (GPL: comply if bundled). A bootable Linux rescue image
+from source or ships a pinned static build (GPL: comply if bundled). The tap formula builds the
+ntfs tools into the keg's `libexec/ntfs-3g` (separate GPL subprocess, no FUSE linkage), and
+`check`/`inspect`/`copy` find them beside the resolved executable, which survives `sudo` stripping
+the environment. `disktriage --version` is the single-source version surface. `dadissent` is not
+installed by the tap. Pre-publication gates for the human: choose a licence (none exists yet),
+fix the homepage, publish the tap, and decide the bundle identifier. A bootable Linux rescue image
 is the ultimate answer to TCC — it sidesteps the permission model entirely — but is a separate
 product, and awkward on Apple Silicon.
 
@@ -775,6 +780,8 @@ product, and awkward on Apple Silicon.
 - §8 imaging: mapfile statuses (failed `*`/`/` vs bad `-`); unreadable `$Bitmap` bytes are unknown
   allocation, counted as used.
 - §4 history: store contract (hashed key, 50-snapshot cap, `ok`-only, live-only, failure-tolerant).
+- §13 packaging: Homebrew formula in `packaging/homebrew/` (ADR 0022); keg-relative ntfs-3g lookup;
+  `--version`; licence is an open pre-publication decision.
 - Implementation-level decisions are recorded as ADRs in `docs/adr/`; claims may anchor there.
 
 **v3.8 (2026-11-07), after the first real MiNaH image run and performance research:**
