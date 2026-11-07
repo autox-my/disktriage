@@ -162,7 +162,7 @@ enum InspectPathRules {
     }
 }
 
-private func deviceNodeRefusal(
+func deviceNodeRefusal(
     argument: String,
     resolved: String,
     prefix: String,
@@ -194,7 +194,8 @@ private enum InspectStatus: String {
     case unsupported
 }
 
-private struct LayoutReport {
+/// Shared with `copy`: the same partition parse decides what the tools see.
+struct LayoutReport {
     let kind: String
     let scheme: PartitionScheme?
     let partition: Int?
@@ -230,14 +231,26 @@ private struct ListingReport {
     var note: String?
 }
 
-private struct DamageReport {
+struct DamageReport {
     var status: String
     var mapfile: String?
     var unreadableExtents: Int?
     var unreadableBytes: Int64?
     var remainingBytes: Int64?
+    /// `?`, `*` and `/` bytes: not read, so their damage is unknown. Bad (`-`)
+    /// bytes are a known extent and are not included here.
+    var nonRescuedBytes: Int64?
     var limitBytes: Int64?
     var note: String?
+    /// The `-` extents themselves (image bytes), which `copy` converts to
+    /// volume clusters. `inspect` only reports their count and size.
+    var badExtents: [MapfileExtent] = []
+}
+
+/// The same mapfile parse, worded for the command reading it.
+enum DamageAudience {
+    case inspect
+    case copy
 }
 
 private struct InspectReport {
@@ -256,7 +269,7 @@ private struct InspectReport {
     var notes: [String] = []
 }
 
-private enum DetectedLayout {
+enum DetectedLayout {
     case volume(LayoutReport, FileSystemKind)
     case unsupported(filesystem: FileSystemKind, partition: Int?, message: String)
     case failure(String)
@@ -494,7 +507,7 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
             report.status = .toolError
             report.exitCode = code
             report.message = message
-            report.damage = readDamage(image: image, options: options, fs: fs)
+            report.damage = readDamage(image: image, mapfile: options.mapfile, fs: fs)
             return finish(report, options: options)
         }
 
@@ -557,7 +570,7 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
             report.listing.status = "ok"
         }
 
-        report.damage = readDamage(image: image, options: options, fs: fs)
+        report.damage = readDamage(image: image, mapfile: options.mapfile, fs: fs)
 
         // Exit-code precedence inside inspect: a tool error (30) outranks the
         // partial/damage note (1), and any damage note outranks a clean 0.
@@ -596,7 +609,7 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
 
 // MARK: - Layout
 
-private func detectLayout(image: String, size: Int64, fs: any InspectFileSystem) throws -> DetectedLayout {
+func detectLayout(image: String, size: Int64, fs: any InspectFileSystem) throws -> DetectedLayout {
     let prefix = try fs.read(image, offset: 0, count: Int(min(2048, size)))
     if FileSystemDetector.detect(prefix) == .ntfs {
         return .volume(LayoutReport(
@@ -701,7 +714,7 @@ private func detectLayout(image: String, size: Int64, fs: any InspectFileSystem)
     return .failure("no NTFS partition and no recognised filesystem in the image's partition table")
 }
 
-private func unsupportedMessage(_ kind: FileSystemKind) -> String {
+func unsupportedMessage(_ kind: FileSystemKind) -> String {
     if kind == .unknown {
         return "unrecognised filesystem: native read-only attach not implemented yet"
     }
@@ -739,7 +752,7 @@ private func policyRejection(tool: String, image: String, result: CollectorResul
 
 // MARK: - Mapfile
 
-private struct InspectSidecar: Decodable {
+struct InspectSidecar: Decodable {
     let limitBytes: Int64?
 
     enum CodingKeys: String, CodingKey {
@@ -747,7 +760,7 @@ private struct InspectSidecar: Decodable {
     }
 }
 
-private func sidecarLimit(image: String, fs: any InspectFileSystem) -> Int64? {
+func sidecarLimit(image: String, fs: any InspectFileSystem) -> Int64? {
     let path = image + ".disktriage.json"
     guard fs.exists(path),
           let size = try? fs.size(path),
@@ -758,13 +771,14 @@ private func sidecarLimit(image: String, fs: any InspectFileSystem) -> Int64? {
     return (try? JSONDecoder().decode(InspectSidecar.self, from: data))?.limitBytes
 }
 
-private func readDamage(
+func readDamage(
     image: String,
-    options: InspectOptions,
-    fs: any InspectFileSystem
+    mapfile: String?,
+    fs: any InspectFileSystem,
+    audience: DamageAudience = .inspect
 ) -> DamageReport {
     let defaultMapfile = image + ".mapfile"
-    let path = options.mapfile ?? (fs.exists(defaultMapfile) ? defaultMapfile : nil)
+    let path = mapfile ?? (fs.exists(defaultMapfile) ? defaultMapfile : nil)
     guard let path else {
         var report = DamageReport(status: "unsupported")
         report.note = "absent is never a zero: supply --mapfile or place <image>.mapfile "
@@ -793,12 +807,24 @@ private func readDamage(
         report.unreadableExtents = bad.count
         report.unreadableBytes = bad.reduce(0) { $0 + $1.size }
         report.remainingBytes = snapshot.remainingBytes
+        report.nonRescuedBytes = snapshot.nonTriedBytes
+            + snapshot.nonTrimmedBytes
+            + snapshot.nonScrapedBytes
+        report.badExtents = bad
 
         var notes: [String] = []
-        notes.append(
-            "unreadable regions are zero-filled in the image; a listing that exits 0 is not proof "
-                + "of intact data; per-file attribution is a copy feature and is not claimed here"
-        )
+        switch audience {
+        case .inspect:
+            notes.append(
+                "unreadable regions are zero-filled in the image; a listing that exits 0 is not proof "
+                    + "of intact data; per-file attribution is a copy feature and is not claimed here"
+            )
+        case .copy:
+            notes.append(
+                "unreadable regions are zero-filled in the image, so a copy of them hashes perfectly; "
+                    + "hash equality proves the copy matches the IMAGE, not the platter"
+            )
+        }
         if bad.isEmpty {
             if snapshot.isComplete {
                 notes.append("no unreadable extent is recorded in the mapfile")
@@ -1058,11 +1084,11 @@ private func volumeDetail(_ info: NTFSVolumeInfo) -> String {
     return parts.isEmpty ? "opened" : parts.joined(separator: " · ")
 }
 
-private func trimmed(_ text: String) -> String {
+func trimmed(_ text: String) -> String {
     text.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
-private func firstLine(_ text: String) -> String? {
+func firstLine(_ text: String) -> String? {
     let line = trimmed(text).split(separator: "\n").first.map(String.init)
     return line?.isEmpty == false ? line : nil
 }
@@ -1070,7 +1096,7 @@ private func firstLine(_ text: String) -> String? {
 /// A bounded one-paragraph note from a tool's stderr: every non-empty line is
 /// kept, because `ntfsls`'s meaningful line ("Corrupt index block signature")
 /// is often the second one.
-private func shortNote(_ text: String) -> String {
+func shortNote(_ text: String) -> String {
     let lines = trimmed(text)
         .split(separator: "\n")
         .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -1079,11 +1105,11 @@ private func shortNote(_ text: String) -> String {
     return joined.count <= 400 ? joined : String(joined.prefix(400)) + "…"
 }
 
-private func isDevicePath(_ path: String) -> Bool {
+func isDevicePath(_ path: String) -> Bool {
     path == "/dev" || path.hasPrefix("/dev/")
 }
 
-private func describe(_ error: Error) -> String {
+func describe(_ error: Error) -> String {
     if let inspectError = error as? InspectFileSystemError {
         return inspectError.description
     }

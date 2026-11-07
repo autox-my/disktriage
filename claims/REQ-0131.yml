@@ -1,0 +1,18 @@
+# REQ-0131 — diskdoctor.md §8 copy
+# Authored from the copy contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0131
+statement: "The copy command shall not claim per-file integrity when attribution is unavailable."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L553
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.CopyCommandTests::REQ0130_REQ0131_REQ0134_noMapfileMakesNoClaim()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0131_failedAttributionMakesNoClaim()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0131_incompleteMapfileMakesNoClaim()"

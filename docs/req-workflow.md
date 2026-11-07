@@ -206,15 +206,16 @@ only if that is impossible).
 
 ## Current state
 
-- 124 claims, all structured, 72 pins held, 0 lints (`req canon --fail-on-flag` → 0).
+- 140 claims, all structured, 88 pins held, 0 lints (`req canon --fail-on-flag` → 0).
 - The suite runs under Swift Testing and writes a JUnit report that `req` reads (measured above).
-  Eighty-four claims are linked to tests by a `REQ` tag in the test function name; P3c added
-  `REQ-0111`–`REQ-0122` for `inspect`, and `REQ-0123`–`REQ-0124` record the relative-path and
-  damage-unknown fixes. The other 40 have no linked test — linking is a judgement
-  about evidence, and only a test that demonstrably proves the obligation is linked. `req gate
-  --test-report .build/test-results/junit-swift-testing.xml` is therefore still exit 3 (*no linked
-  test* on the 40), which is not a pass. `scripts/req-link.sh --check` reports 0 drift for the
-  eighty-four; `req-link.sh` keeps them in step with the report.
+  One hundred claims are linked to tests by a `REQ` tag in the test function name; P3c added
+  `REQ-0111`–`REQ-0122` for `inspect`, `REQ-0123`–`REQ-0124` for the relative-path and
+  damage-unknown fixes, and `REQ-0125`–`REQ-0142` for `copy` (0138 and 0141 are unused numbers,
+  kept free by the split of the copy obligations). The other 40 have no linked test — linking is a
+  judgement about evidence, and only a test that demonstrably proves the obligation is linked.
+  `req gate --test-report .build/test-results/junit-swift-testing.xml` is therefore still exit 3
+  (*no linked test* on the 40), which is not a pass. `scripts/req-link.sh --check` reports 0 drift
+  for the one hundred; `req-link.sh` keeps them in step with the report.
 - No `.req/variants` and no `.req/projections` are committed yet; `req check` therefore runs the
   default variant and checks no projection. Add a variant line in the commit that first uses
   `applicability`, and pin `docs/spec.md` only when a projection is a deliverable. Those two

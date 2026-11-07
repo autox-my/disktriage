@@ -100,14 +100,28 @@ public struct NTFSListingEntry: Equatable, Sendable {
 public struct NTFSListing: Equatable, Sendable {
     public let entries: [NTFSListingEntry]
     public let directoryCount: Int
+    /// Every directory header in the listing, including the root `/`. `copy`
+    /// creates these even when a directory is empty and has no entry.
+    public let directories: [String]
     /// The parse or the process output was capped. A capped listing is not a
     /// complete answer (the spike's `ntfsls` exits 0 on partial output).
     public let truncated: Bool
 
-    public init(entries: [NTFSListingEntry], directoryCount: Int, truncated: Bool) {
+    public init(
+        entries: [NTFSListingEntry],
+        directoryCount: Int,
+        directories: [String] = [],
+        truncated: Bool
+    ) {
         self.entries = entries
         self.directoryCount = directoryCount
+        self.directories = directories
         self.truncated = truncated
+    }
+
+    /// The entry's volume path with a leading `/`, ready to hand to `ntfscat`.
+    public func volumePath(for entry: NTFSListingEntry) -> String {
+        CopyPathRules.volumePath(directory: entry.directory, name: entry.name)
     }
 }
 
@@ -121,6 +135,8 @@ public enum NTFSListingParser {
         var entries: [NTFSListingEntry] = []
         var directory: String?
         var directoryCount = 0
+        var directories: [String] = []
+        var seenDirectories: Set<String> = []
         var truncated = false
 
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
@@ -130,6 +146,9 @@ public enum NTFSListingParser {
             if line.hasPrefix("/") && line.hasSuffix(":") {
                 directory = String(line.dropLast())
                 directoryCount += 1
+                if let directory, seenDirectories.insert(directory).inserted {
+                    directories.append(directory)
+                }
                 continue
             }
 
@@ -143,7 +162,12 @@ public enum NTFSListingParser {
             entries.append(parsed)
         }
 
-        return NTFSListing(entries: entries, directoryCount: directoryCount, truncated: truncated)
+        return NTFSListing(
+            entries: entries,
+            directoryCount: directoryCount,
+            directories: directories,
+            truncated: truncated
+        )
     }
 
     private static let months: Set<String> = [

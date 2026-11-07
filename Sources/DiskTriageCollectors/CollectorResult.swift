@@ -63,3 +63,41 @@ public struct CollectorResult: Sendable, Equatable {
         CollectorResult(outcome: .denied, stderr: stderr)
     }
 }
+
+/// A subprocess result whose stdout is kept as bytes. `copy` uses it for
+/// `ntfscat`, whose output is file data and must never pass through UTF-8
+/// decoding. The outcome fields mirror `CollectorResult`.
+public struct CommandDataResult: Sendable, Equatable {
+    public let outcome: CollectOutcome
+    public let exitCode: Int32?
+    public let stdout: Data
+    public let stderr: String
+    public let stdoutTruncated: Bool
+    public let stderrTruncated: Bool
+    public let durationMs: Int
+    public let policyViolation: PolicyViolation?
+
+    public init(
+        outcome: CollectOutcome,
+        exitCode: Int32? = nil,
+        stdout: Data = Data(),
+        stderr: String = "",
+        stdoutTruncated: Bool = false,
+        stderrTruncated: Bool = false,
+        durationMs: Int = 0,
+        policyViolation: PolicyViolation? = nil
+    ) {
+        self.outcome = outcome
+        self.exitCode = exitCode
+        self.stdout = stdout
+        self.stderr = stderr
+        self.stdoutTruncated = stdoutTruncated
+        self.stderrTruncated = stderrTruncated
+        self.durationMs = durationMs
+        self.policyViolation = policyViolation
+    }
+
+    public static func ok(_ stdout: Data = Data(), stderr: String = "", exitCode: Int32 = 0) -> CommandDataResult {
+        CommandDataResult(outcome: .ok, exitCode: exitCode, stdout: stdout, stderr: stderr)
+    }
+}

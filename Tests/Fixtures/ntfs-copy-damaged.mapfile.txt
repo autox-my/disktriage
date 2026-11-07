@@ -1,0 +1,11 @@
+# Mapfile. Created by hand for the disktriage copy tests
+# Command line: simulated mapfile, no device was read
+# Start time:   2026-11-07 09:40:00
+# Current time: 2026-11-07 09:41:00
+# Finished
+# current_pos  current_status  current_pass
+0x00000000     +               1
+#      pos        size  status
+0x00000000  0x00A00000  +
+0x00A00000  0x00001000  -
+0x00A01000  0x005FF000  +

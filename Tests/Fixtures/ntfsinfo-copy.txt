@@ -1,0 +1,47 @@
+Volume Information 
+	Name of device: /images/copy-fixture.img
+	Device state: 3
+	Volume Name: COPYFIX
+	Volume State: 91
+	Volume Flags: 0x0000
+	Volume Version: 3.1
+	Sector Size: 512
+	Cluster Size: 4096
+	Index Block Size: 4096
+	Volume Size in Clusters: 4095
+MFT Information 
+	MFT Record Size: 1024
+	MFT Zone Multiplier: 0
+	MFT Data Position: 24
+	MFT Zone Start: 0
+	MFT Zone End: 515
+	MFT Zone Position: 4
+	Current Position in First Data Zone: 515
+	Current Position in Second Data Zone: 0
+	Allocated clusters 19 (0.5%)
+	LCN of Data Attribute for FILE_MFT: 4
+	FILE_MFTMirr Size: 4
+	LCN of Data Attribute for File_MFTMirr: 2047
+	Size of Attribute Definition Table: 2560
+	Number of Attached Extent Inodes: 0
+FILE_Bitmap Information 
+	FILE_Bitmap MFT Record Number: 6
+	State of FILE_Bitmap Inode: 80
+	Length of Attribute List: 0
+	Number of Attached Extent Inodes: 0
+FILE_Bitmap Data Attribute Information
+	Decompressed Runlist: not done yet
+	Base Inode: 6
+	Attribute Types: not done yet
+	Attribute Name Length: 0
+	Attribute State: 3
+	Attribute Allocated Size: 4096
+	Attribute Data Size: 512
+	Attribute Initialized Size: 512
+	Attribute Compressed Size: 0
+	Compression Block Size: 0
+	Compression Block Size Bits: 0
+	Compression Block Clusters: 0
+	Free Clusters: 3421 (83.5%)
+File_Logfile Information
+	No restart page

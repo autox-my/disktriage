@@ -8,11 +8,29 @@ public protocol CommandExecuting: Sendable {
     /// ask for its own hard timeout. The default ignores it and keeps the
     /// executor's configured timeout.
     func run(_ command: TriageCommand, timeout: TimeInterval) -> CollectorResult
+    /// The same call with stdout kept as bytes (`copy` reads file data through
+    /// `ntfscat`). The default encodes a recorded string result, which is all a
+    /// text-only test executor needs.
+    func runData(_ command: TriageCommand, timeout: TimeInterval) -> CommandDataResult
 }
 
 public extension CommandExecuting {
     func run(_ command: TriageCommand, timeout: TimeInterval) -> CollectorResult {
         run(command)
+    }
+
+    func runData(_ command: TriageCommand, timeout: TimeInterval) -> CommandDataResult {
+        let result = run(command, timeout: timeout)
+        return CommandDataResult(
+            outcome: result.outcome,
+            exitCode: result.exitCode,
+            stdout: Data(result.stdout.utf8),
+            stderr: result.stderr,
+            stdoutTruncated: result.stdoutTruncated,
+            stderrTruncated: result.stderrTruncated,
+            durationMs: result.durationMs,
+            policyViolation: result.policyViolation
+        )
     }
 }
 
@@ -62,12 +80,71 @@ public struct ProcessRunner: CommandExecuting, Sendable {
         execute(argv, timeout: timeout)
     }
 
+    public func runData(_ command: TriageCommand, timeout: TimeInterval) -> CommandDataResult {
+        let raw = executeRaw(command.argv, timeout: timeout)
+        return CommandDataResult(
+            outcome: raw.outcome,
+            exitCode: raw.exitCode,
+            stdout: raw.stdout,
+            stderr: raw.stderr,
+            stdoutTruncated: raw.stdoutTruncated,
+            stderrTruncated: raw.stderrTruncated,
+            durationMs: raw.durationMs,
+            policyViolation: raw.policyViolation
+        )
+    }
+
     private func execute(_ argv: [String], timeout: TimeInterval) -> CollectorResult {
+        let raw = executeRaw(argv, timeout: timeout)
+        return CollectorResult(
+            outcome: raw.outcome,
+            exitCode: raw.exitCode,
+            stdout: String(decoding: raw.stdout, as: UTF8.self),
+            stderr: raw.stderr,
+            stdoutTruncated: raw.stdoutTruncated,
+            stderrTruncated: raw.stderrTruncated,
+            durationMs: raw.durationMs,
+            policyViolation: raw.policyViolation
+        )
+    }
+
+    private struct RawResult {
+        var outcome: CollectOutcome
+        var exitCode: Int32?
+        var stdout: Data
+        var stderr: String
+        var stdoutTruncated: Bool
+        var stderrTruncated: Bool
+        var durationMs: Int
+        var policyViolation: PolicyViolation?
+
+        init(
+            outcome: CollectOutcome,
+            exitCode: Int32? = nil,
+            stdout: Data = Data(),
+            stderr: String = "",
+            stdoutTruncated: Bool = false,
+            stderrTruncated: Bool = false,
+            durationMs: Int = 0,
+            policyViolation: PolicyViolation? = nil
+        ) {
+            self.outcome = outcome
+            self.exitCode = exitCode
+            self.stdout = stdout
+            self.stderr = stderr
+            self.stdoutTruncated = stdoutTruncated
+            self.stderrTruncated = stderrTruncated
+            self.durationMs = durationMs
+            self.policyViolation = policyViolation
+        }
+    }
+
+    private func executeRaw(_ argv: [String], timeout: TimeInterval) -> RawResult {
         let started = DispatchTime.now().uptimeNanoseconds
 
         switch policy.evaluate(argv) {
         case .rejected(let violation):
-            return CollectorResult(
+            return RawResult(
                 outcome: .policyRejected,
                 stderr: "rejected before exec: \(violation.rawValue)",
                 durationMs: elapsedMs(since: started),
@@ -78,7 +155,7 @@ public struct ProcessRunner: CommandExecuting, Sendable {
         }
 
         guard let path = resolveExecutable(argv[0]) else {
-            return CollectorResult(
+            return RawResult(
                 outcome: .notFound,
                 stderr: "not found: \(argv[0])",
                 durationMs: elapsedMs(since: started)
@@ -88,7 +165,7 @@ public struct ProcessRunner: CommandExecuting, Sendable {
         var stdoutPipe: [Int32] = [-1, -1]
         var stderrPipe: [Int32] = [-1, -1]
         guard pipe(&stdoutPipe) == 0, pipe(&stderrPipe) == 0 else {
-            return CollectorResult(
+            return RawResult(
                 outcome: .error,
                 stderr: "cannot create pipes: \(String(cString: strerror(errno)))",
                 durationMs: elapsedMs(since: started)
@@ -110,7 +187,7 @@ public struct ProcessRunner: CommandExecuting, Sendable {
         guard spawnResult == 0 else {
             close(stdoutPipe[0])
             close(stderrPipe[0])
-            return CollectorResult(
+            return RawResult(
                 outcome: spawnFailureOutcome(spawnResult),
                 stderr: "cannot spawn: \(String(cString: strerror(spawnResult)))",
                 durationMs: elapsedMs(since: started)
@@ -155,10 +232,10 @@ public struct ProcessRunner: CommandExecuting, Sendable {
         let duration = elapsedMs(since: started)
 
         if timedOut {
-            return CollectorResult(
+            return RawResult(
                 outcome: .timeout,
                 exitCode: exitCode(from: status),
-                stdout: String(decoding: out.data, as: UTF8.self),
+                stdout: out.data,
                 stderr: String(decoding: err.data, as: UTF8.self),
                 stdoutTruncated: out.truncated,
                 stderrTruncated: err.truncated,
@@ -167,10 +244,10 @@ public struct ProcessRunner: CommandExecuting, Sendable {
         }
 
         let code = exitCode(from: status)
-        return CollectorResult(
+        return RawResult(
             outcome: code == 0 && wasExited(status) ? .ok : .error,
             exitCode: code,
-            stdout: String(decoding: out.data, as: UTF8.self),
+            stdout: out.data,
             stderr: String(decoding: err.data, as: UTF8.self),
             stdoutTruncated: out.truncated,
             stderrTruncated: err.truncated,

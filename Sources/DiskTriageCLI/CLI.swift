@@ -35,7 +35,8 @@ public func run(
     now: @escaping () -> Date = Date.init,
     destinationProbe: (any ImageDestinationProbing)? = nil,
     imaging: ImagingDependencies? = nil,
-    inspectDependencies: InspectDependencies? = nil
+    inspectDependencies: InspectDependencies? = nil,
+    copyDependencies: CopyDependencies? = nil
 ) -> CLIResult {
     guard let command = arguments.first else {
         return rootHelp()
@@ -66,7 +67,7 @@ public func run(
     case "inspect":
         return runInspect(arguments: rest, dependencies: inspectDependencies)
     case "copy":
-        return planned(command, rest)
+        return runCopy(arguments: rest, dependencies: copyDependencies)
     default:
         return usageError("unknown command '\(command)'")
     }
@@ -385,24 +386,6 @@ private func sha256Hex(_ value: String) -> String {
         .joined()
 }
 
-// MARK: - Planned commands
-
-/// Every other command is deliberately unimplemented: it says so and exits 30,
-/// so a script can never mistake it for a working run (diskdoctor.md §6).
-private func planned(_ command: String, _ arguments: [String]) -> CLIResult {
-    if arguments.contains("--help") || arguments.contains("-h") {
-        return help(
-            "usage: disktriage \(command) [options]\n\n"
-                + "Not implemented yet (planned P2/P3). See diskdoctor.md §6.\n"
-        )
-    }
-    return CLIResult(
-        stdout: "",
-        stderr: "disktriage: \(command) is not implemented yet (planned P2/P3)\n",
-        exitCode: 30
-    )
-}
-
 // MARK: - Help and usage
 
 func help(_ text: String) -> CLIResult {
@@ -418,7 +401,7 @@ private func rootHelp() -> CLIResult {
             + "  list            list whole disks; no health judgement\n"
             + "  image    image a device to a file (dry-run default)\n"
             + "  inspect  inspect an image read-only (NTFS, ntfs-3g tools)\n"
-            + "  copy     copy an image with a manifest      (planned P3)\n"
+            + "  copy     copy an image's files with a hashed manifest\n"
             + "  check    permissions and tooling self-test\n"
             + "  guard    hold mounts; start it before connecting the disk\n"
             + "\n"
