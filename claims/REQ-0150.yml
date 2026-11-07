@@ -1,0 +1,18 @@
+# REQ-0150 — diskdoctor.md §4 local snapshot history
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0150
+statement: "The triage command shall derive smart.history from the most recent prior snapshot for the same device key."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L164
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.HistoryCLITests::REQ0150_REQ0151_REQ0159_storeWrittenPriorDrivesTheTrendRule()"
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0150_loadPriorReturnsTheMostRecent()"
+  - "DiskTriageCoreTests.SnapshotHistoryTests::REQ0150_historyComesFromTheMostRecentPriorSnapshot()"

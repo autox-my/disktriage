@@ -1,0 +1,17 @@
+# REQ-0152 — diskdoctor.md §4 an absent signal is never a zero
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0152
+statement: "The triage command shall not derive smart.history from a prior snapshot whose SMART section status was not ok."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L167
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0152_nonOkSnapshotYieldsNoHistory()"
+  - "DiskTriageCoreTests.SnapshotHistoryTests::REQ0152_nonOkPriorYieldsNoHistory(status:)"

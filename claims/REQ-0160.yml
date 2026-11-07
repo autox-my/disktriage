@@ -1,0 +1,17 @@
+# REQ-0160 — diskdoctor.md §6 a snapshot write never changes the verdict
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0160
+statement: "The triage command shall not change the verdict or exit code when the snapshot write fails."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L355
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.HistoryCLITests::REQ0160_writeFailureLeavesTheVerdictAlone()"
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0160_writeFailureIsReported()"

@@ -1,0 +1,18 @@
+# REQ-0154 — diskdoctor.md §4 what is worth storing
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0154
+statement: "The triage command shall store a snapshot only when the SMART section status is ok."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L167
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0154_storeRefusesNonOkSnapshots(status:)"
+  - "DiskTriageCoreTests.SnapshotHistoryTests::REQ0154_onlyOkSmartIsWorthStoring(status:)"
+  - "DiskTriageCoreTests.SnapshotHistoryTests::REQ0154_onlyOkSmartIsWorthStoring_okCase()"

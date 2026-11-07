@@ -1,0 +1,18 @@
+# REQ-0156 — diskdoctor.md §4 hashed serial
+# Authored from the history contract; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0156
+statement: "The snapshot store shall identify a device on disk only by the full SHA-256 of its serial."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L168
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0156_keyIsTheFullSha256OfTheSerial()"
+  - "DiskTriageCollectorsTests.SnapshotStoreTests::REQ0156_snapshotOnDiskUsesTheHashOnly()"
+  - "DiskTriageCoreTests.SnapshotHistoryTests::REQ0156_theRecordHasNoSerialField()"
