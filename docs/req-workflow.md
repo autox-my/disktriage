@@ -206,7 +206,7 @@ only if that is impossible).
 
 ## Current state
 
-- 242 claims, all structured, 195 pins held, 0 lints (`req canon --fail-on-flag` → 0).
+- 242 claims, all structured, 196 pins held, 0 lints (`req canon --fail-on-flag` → 0).
 - The suite runs under Swift Testing and writes a JUnit report that `req` reads (measured above).
   Two hundred and two claims are linked to tests by a `REQ` tag in the test function name; P3c added
   `REQ-0111`–`REQ-0122` for `inspect`, `REQ-0123`–`REQ-0124` for the relative-path and
