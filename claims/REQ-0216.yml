@@ -1,0 +1,16 @@
+# REQ-0216 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0216
+statement: "The --used-only choice shall not be part of the image resume identity."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageTests::REQ0207_REQ0216_sidecarRecordsStageStateAndUsedOnlyIsNotIdentity()"

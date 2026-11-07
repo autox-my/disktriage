@@ -49,6 +49,11 @@ public enum NTFSAllocationFailure: Error, Equatable, Sendable {
     case bitmap(NTFSBitmapFailure)
     case mftOutsidePartition(mftOffset: Int64, partitionLength: Int64)
     case partitionOverflow
+    /// The bitmap parsed but does not mark the clusters the `$MFT` itself
+    /// occupies as used. A zeroed or truncated-but-long-enough bitmap is not a
+    /// trustworthy "nothing is used"; treating it as all-free would skip every
+    /// cluster, so it is a stage-0 failure.
+    case mftClustersNotMarkedUsed(cluster: Int64)
 }
 
 /// The allocation domain the imager uses. `used` and `free` are **device**
@@ -184,6 +189,20 @@ public enum NTFSAllocation {
             return .failure(.mftOutsidePartition(
                 mftOffset: geometry.mftOffset, partitionLength: partitionLength
             ))
+        }
+
+        // The bitmap must at least describe the metadata it was read through.
+        // A bitmap that marks none of the $MFT runs used is corrupt (a zeroed
+        // data run is the common case) and must not become "all free".
+        let orderedUsed = usedClusters.sorted()
+        for run in mftRuns {
+            guard let lcn = run.lcn, run.clusterCount > 0 else { continue }
+            let last = lcn + run.clusterCount - 1
+            guard let covering = orderedUsed.first(where: {
+                $0.first <= lcn && lcn <= $0.last
+            }), covering.last >= last else {
+                return .failure(.mftClustersNotMarkedUsed(cluster: lcn))
+            }
         }
 
         var relative: [ByteRange] = []

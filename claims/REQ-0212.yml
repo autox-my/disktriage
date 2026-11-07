@@ -1,0 +1,16 @@
+# REQ-0212 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0212
+statement: "The live progress line for an allocation-aware stage shall express rescued bytes as a percentage of that stage's scope."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageTests::REQ0212_progressPercentIsOfTheStageScope()"

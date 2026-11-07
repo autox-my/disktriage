@@ -16,9 +16,10 @@ func image(
     executor: any CommandExecuting,
     now: @escaping () -> Date,
     destinationProbe: (any ImageDestinationProbing)?,
-    writeFile: (String, Data) throws -> Void,
+    writeFile: @escaping (String, Data) throws -> Void,
     imaging: ImagingDependencies?,
-    limitBytesOverride: Int64? = nil
+    limitBytesOverride: Int64? = nil,
+    deviceSizeOverride: Int64? = nil
 ) -> CLIResult {
     if arguments.contains("--help") || arguments.contains("-h") {
         return help(imageUsage)
@@ -81,6 +82,9 @@ func image(
         case "--dry-run":
             options.sawDryRun = true
             index += 1
+        case "--used-only":
+            options.usedOnly = true
+            index += 1
         case "--no-dry-run":
             options.sawNoDryRun = true
             index += 1
@@ -138,7 +142,7 @@ func image(
             exitCode: 30
         )
     }
-    let source = ImageSource(identity: identity)
+    let source = ImageSource(identity: identity, sizeBytesOverride: deviceSizeOverride)
 
     // The limit is resolved against the whole device: a limit at or above the
     // device is the full device, never a partial image (REQ-0101). The test
@@ -194,6 +198,7 @@ func image(
     let confirmation = confirmationState(options: options, source: source)
 
     var passes: [DdrescuePass] = []
+    var stages: [PlannedStage] = []
     var eta: ETARange?
     var toolError: String?
     if let blockSize = source.blockSize, let size = source.sizeBytes {
@@ -204,6 +209,15 @@ func image(
             blockSize: blockSize,
             limitBytes: partialLimitBytes,
             minReadRateBytesPerSecond: resolvedMinReadRate
+        )
+        stages = plannedStages(
+            rawDevice: rawDeviceNode(for: source.bsd),
+            image: destination,
+            mapfile: mapfile,
+            blockSize: blockSize,
+            limitBytes: partialLimitBytes,
+            minReadRateBytesPerSecond: resolvedMinReadRate,
+            usedOnly: options.usedOnly
         )
         let bus = assumedBusSpeed(bus: source.bus)
         eta = etaRange(
@@ -258,6 +272,7 @@ func image(
             mapfile: mapfile,
             source: source,
             passes: passes,
+            plannedStages: stages,
             destinationChecks: checks,
             triageAttempted: triageAttempted || triageSkipped,
             confirmationInstruction: confirmation.satisfied ? nil : confirmation.instruction,
@@ -269,7 +284,9 @@ func image(
             confirmSize: options.confirmSize,
             limitBytes: requestedLimitBytes,
             limitGiB: options.limitGiB,
-            minReadRateBytesPerSecond: resolvedMinReadRate
+            minReadRateBytesPerSecond: resolvedMinReadRate,
+            usedOnly: options.usedOnly,
+            previousAllocation: facts.sidecar?.allocation
         )
         return runImaging(
             plan,
@@ -294,6 +311,8 @@ func image(
             confirmation: confirmation,
             eta: eta,
             passes: passes,
+            stages: stages,
+            usedOnly: options.usedOnly,
             partialLimitBytes: partialLimitBytes,
             minReadRateBytesPerSecond: resolvedMinReadRate,
             reasons: reasons
@@ -318,6 +337,8 @@ func image(
         confirmation: confirmation,
         eta: eta,
         passes: passes,
+        stages: stages,
+        usedOnly: options.usedOnly,
         partialLimitBytes: partialLimitBytes,
         minReadRateBytesPerSecond: resolvedMinReadRate,
         reasons: reasons
@@ -345,6 +366,7 @@ private struct ImageOptions {
     var asJSON = false
     var sawDryRun = false
     var sawNoDryRun = false
+    var usedOnly = false
 }
 
 // MARK: - Confirmation
@@ -409,6 +431,8 @@ private func renderTTY(
     confirmation: ConfirmationState,
     eta: ETARange?,
     passes: [DdrescuePass],
+    stages: [PlannedStage],
+    usedOnly: Bool,
     partialLimitBytes: Int64?,
     minReadRateBytesPerSecond: Int64?,
     reasons: [String]
@@ -500,9 +524,37 @@ private func renderTTY(
     lines.append(field("MIN RATE", minReadRateDetail(minReadRateBytesPerSecond)))
 
     lines.append("")
+    if !stages.isEmpty {
+        lines.append("STAGE 0 (metadata)")
+        for stage in stages {
+            if stage.stage != 0 { lines.append("") }
+            let title = stage.stage == 0
+                ? "STAGE 0 (metadata)"
+                : "STAGE \(stage.stage) (\(stage.name))"
+            if stage.stage != 0 { lines.append(title) }
+            if let note = stage.note {
+                lines.append("  " + note)
+            }
+            for line in stage.lines {
+                lines.append("  " + line)
+            }
+            if stage.lines.isEmpty, stage.note == nil {
+                lines.append("  not built: the block size or size is unknown")
+            }
+        }
+        lines.append("")
+        if usedOnly {
+            lines.append("SCOPE    used clusters + metadata (free space NOT imaged: --used-only)")
+        } else {
+            lines.append("SCOPE    whole device (the allocation-aware order; "
+                + "plain passes if the $Bitmap cannot be read)")
+        }
+        lines.append("")
+    }
     if passes.isEmpty {
         lines.append("PASS 1 / PASS 2  not built: the block size or size is unknown")
     } else {
+        lines.append("FALLBACK: plain whole-device passes (non-NTFS, or stage 0 cannot read the bitmap)")
         for pass in passes {
             let label = pass.pass == 1 ? "PASS 1 (fast sweep, -n)" : "PASS 2 (scrape, -r3)"
             lines.append(label)
@@ -567,6 +619,8 @@ private func renderJSON(
     confirmation: ConfirmationState,
     eta: ETARange?,
     passes: [DdrescuePass],
+    stages: [PlannedStage],
+    usedOnly: Bool,
     partialLimitBytes: Int64?,
     minReadRateBytesPerSecond: Int64?,
     reasons: [String]
@@ -583,12 +637,21 @@ private func renderJSON(
         let limit: Limit?
         let minReadRateBytesPerSecond: NullableInt
         let passes: [String]
+        let stages: [Stage]
+        let scope: String
         let reasons: [String]
 
         enum CodingKeys: String, CodingKey {
             case dryRun = "dry_run"
-            case status, source, triage, caveat, destination, confirmation, eta, limit, passes, reasons
+            case status, source, triage, caveat, destination, confirmation, eta, limit, passes, stages, scope, reasons
             case minReadRateBytesPerSecond = "min_read_rate_bytes_per_second"
+        }
+
+        struct Stage: Encodable {
+            let stage: Int
+            let name: String
+            let commands: [String]
+            let note: String?
         }
 
         /// Encodes `null` when disabled, never an omitted key and never 0.
@@ -725,6 +788,17 @@ private func renderJSON(
         }(),
         minReadRateBytesPerSecond: Document.NullableInt(value: minReadRateBytesPerSecond),
         passes: passes.map(\.line),
+        stages: stages.map {
+            Document.Stage(
+                stage: $0.stage,
+                name: $0.name,
+                commands: $0.lines,
+                note: $0.note
+            )
+        },
+        scope: usedOnly
+            ? "used clusters + metadata (free space NOT imaged: --used-only)"
+            : "whole device",
         reasons: reasons
     )
 
@@ -753,6 +827,8 @@ private let imageUsage = "usage: disktriage image <disk> --to <file> [options]\n
     + "  --min-read-rate <MB/s>  pass 1 skips zones slower than N MB/s for a\n"
     + "                          later pass (default 10 on HDD/unknown, 0 on\n"
     + "                          SSD/flash/NVMe; 0 disables)\n"
+    + "  --used-only             NTFS: stop after the allocated clusters and\n"
+    + "                          metadata; free space is NOT imaged\n"
     + "  --override              skip the triage-attempt requirement explicitly\n"
     + "  --dry-run               print the command; do not execute (default)\n"
     + "  --no-dry-run            run the two passes; needs root and --accept-risk\n"

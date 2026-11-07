@@ -1,0 +1,17 @@
+# REQ-0210 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0210
+statement: "The allocation-domain builder shall not accept a $Bitmap that fails to mark the $MFT's own clusters as used."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageTests::REQ0203_REQ0210_zeroedBitmapFallsBackAndSkipsNothing()"
+  - "DiskTriageCoreTests.NTFSAllocationTests::REQ0210_bitmapMustMarkTheMFTRunsUsed()"

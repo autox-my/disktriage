@@ -1,0 +1,16 @@
+# REQ-0211 — diskdoctor.md §8 allocation-aware NTFS imaging
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0211
+statement: "A resumed image run shall continue at the stage after the last completed stage rather than restarting completed stages."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NTFSAllocationImageTests::REQ0211_resumeContinuesAfterAnInterruptedStage()"
