@@ -160,6 +160,7 @@ cleanup() {
 
 verify() {
     REPORTING=1
+    mkdir -p "$DIST" || die "cannot create $DIST"
     : >"$REPORT"
     note "== disktriage package verify =="
     note "host: $(sw_vers -productVersion 2>/dev/null || uname -s) $(uname -m)"
@@ -225,13 +226,16 @@ verify() {
     fi
 
     brew install --build-from-source "$TAP/disktriage" >"$DIST/brew-install.txt" 2>&1
-    [ $? -eq 0 ] || {
+    local install_rc=$?
+    # A failed install may still have installed a dependency; let cleanup
+    # remove anything not in the before list either way.
+    CLEAN_DEPS=1
+    [ "$install_rc" -eq 0 ] || {
         note "FAIL          brew install --build-from-source (see $DIST/brew-install.txt)"
         tail -40 "$DIST/brew-install.txt" | sed 's/^/              /'
         return 1
     }
     INSTALLED=1
-    CLEAN_DEPS=1
     note "PASS          brew install --build-from-source $TAP/disktriage"
 
     local prefix vout vrc check_rc
