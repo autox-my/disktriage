@@ -2,7 +2,8 @@ import Foundation
 
 /// Where the ntfs-3g userspace tools were found. The same rules as the
 /// self-test's row: `DISKTRIAGE_NTFS_PREFIX` (a built tree with `bin/`, and
-/// `sbin/` for `mkntfs`), then PATH, then the usual Homebrew/system
+/// `sbin/` for `mkntfs`), then the installed keg's `libexec/ntfs-3g` beside
+/// the resolved executable, then PATH, then the usual Homebrew/system
 /// directories. There is deliberately no mount fallback.
 public struct NTFSToolchain: Equatable, Sendable {
     public let ntfsinfo: String
