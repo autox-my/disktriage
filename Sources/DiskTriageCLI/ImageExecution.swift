@@ -384,6 +384,7 @@ func runImaging(
             limitBytes: partialLimitBytes,
             writeFile: writeFile,
             readImage: dependencies.readImage,
+            readMapfile: dependencies.readMapfile,
             run: { pass, extentScope in
                 lastPass = pass
                 passReached = max(passReached, 1)

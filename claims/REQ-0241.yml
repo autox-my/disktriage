@@ -1,0 +1,17 @@
+# REQ-0241 — diskdoctor.md §8 bitmap trust
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0241
+statement: "The scope report shall report unknown clusters, bytes and extents separately from the bitmap's used and free counts and derive the stage-1 byte count and ETA from used plus unknown."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L513
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0241_scopeReportSeparatesUsedFreeAndUnknown()"
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0241_usedOnlyImagesUnknownClustersAndTheReportIsSeparate()"

@@ -1,0 +1,16 @@
+# REQ-0245 — diskdoctor.md §8 bitmap trust
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0245
+statement: "The tool shall report other unfinished $MFT records as unreadable metadata records and leave them unused."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0245_otherUnfinishedMFTRecordsAreReported()"

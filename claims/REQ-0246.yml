@@ -1,0 +1,15 @@
+# REQ-0246 — diskdoctor.md §8 ETA
+# The first real run measured 557 MB in 15 s (about 37 MB/s) on a good zone.
+schema: req.claim/2
+claim_id: REQ-0246
+statement: "The tool shall assume a USB bridge imaging rate of 30 to 37 MB/s, based on the 37 MB/s measured on the MiNaH drive."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L462
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins: {}
+tests:
+  - "DiskTriageCLITests.ImagingRulesTests::REQ0246_usb2AssumptionUsesTheMeasuredRate()"

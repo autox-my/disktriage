@@ -1,0 +1,17 @@
+# REQ-0239 — diskdoctor.md §8 bitmap trust
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0239
+statement: "The tool shall classify the clusters an untrustworthy $Bitmap byte describes as unknown allocation and read them in the stage-1 domain."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0239_REQ0240_unknownBitmapClustersAreStageOneNotStageTwo()"
+  - "DiskTriageCoreTests.NTFSBitmapTrustTests::REQ0239_unknownClustersJoinTheStageOneUsedDomain()"

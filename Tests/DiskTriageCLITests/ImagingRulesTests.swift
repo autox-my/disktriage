@@ -250,20 +250,37 @@ struct ImagingRulesTests {
     func REQ0087_etaIsARange() throws {
         let range = try #require(etaRange(
             deviceBytes: 1_073_741_824,
-            lowBytesPerSecond: 25_000_000,
-            highBytesPerSecond: 30_000_000,
-            basis: "assumed USB 25–30 MB/s"
+            lowBytesPerSecond: 30_000_000,
+            highBytesPerSecond: 37_000_000,
+            basis: "assumed USB 2: 30–37 MB/s"
         ))
 
-        // 1 GiB / 30 MB/s and / 25 MB/s, hand-computed.
-        #expect(abs(range.lowSeconds - 35.7913941333) < 0.001)
-        #expect(abs(range.highSeconds - 42.94967296) < 0.001)
+        // 1 GiB / 37 MB/s and / 30 MB/s, hand-computed.
+        #expect(abs(range.lowSeconds - 29.0200492973) < 0.001)
+        #expect(abs(range.highSeconds - 35.7913941333) < 0.001)
         #expect(range.basis.contains("assumed"))
 
         let bus = assumedBusSpeed(bus: "usb")
-        #expect(bus.lowBytesPerSecond < bus.highBytesPerSecond)
+        #expect(bus.lowBytesPerSecond == 30_000_000)
+        #expect(bus.highBytesPerSecond == 37_000_000)
+        #expect(bus.basis == "assumed USB 2: 30–37 MB/s (37 MB/s measured on a clean zone of the MiNaH drive)")
         #expect(bus.basis.lowercased().contains("assumed"),
                 "the range must say it is derived from an assumed speed")
+    }
+
+    // REQ-0246
+    @Test("REQ0246 the USB 2 assumption is 30–37 MB/s from the measured MiNaH zone")
+    func REQ0246_usb2AssumptionUsesTheMeasuredRate() {
+        let bus = assumedBusSpeed(bus: "usb")
+        #expect(bus.lowBytesPerSecond == 30_000_000)
+        #expect(bus.highBytesPerSecond == 37_000_000)
+        #expect(bus.basis == "assumed USB 2: 30–37 MB/s (37 MB/s measured on a clean zone of the MiNaH drive)")
+
+        // Bus unknown is the same measured basis, labelled as unknown.
+        let unknown = assumedBusSpeed(bus: nil)
+        #expect(unknown.lowBytesPerSecond == 30_000_000)
+        #expect(unknown.highBytesPerSecond == 37_000_000)
+        #expect(unknown.basis.contains("37 MB/s measured on a clean zone of the MiNaH drive"))
     }
 
     // REQ-0084: the reference trigger from the bench (~200 B/s, ~9.9 MB left).

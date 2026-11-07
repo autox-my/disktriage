@@ -184,7 +184,8 @@ struct ImageCommandTests {
         #expect(result.stdout.contains("ETA"))
         #expect(result.stdout.contains("assumed"))
         #expect(result.stdout.contains("–"), "a range, not a single number")
-        #expect(result.stdout.contains("not measured"))
+        #expect(result.stdout.contains("measured"),
+                "the new USB 2 assumption cites the measured clean-zone rate")
     }
 
     // Non-dry-run refuses before any probe without the explicit consent flag.

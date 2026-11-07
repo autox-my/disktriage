@@ -1,0 +1,18 @@
+# REQ-0242 — diskdoctor.md §8 bitmap trust
+# Authored from the plan; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0242
+statement: "The tool shall fall back to plain whole-device passes above an unreadable $Bitmap share of greater than 10 percent."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L500
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  operator: "GT"
+  value: "0.1"
+  unit: "none"
+tests:
+  - "DiskTriageCLITests.ScopeUnknownBitmapTests::REQ0242_moreThanTenPercentUnreadableBitmapFallsBack()"
