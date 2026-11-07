@@ -1,0 +1,17 @@
+# REQ-0163 — diskdoctor.md §4 an absent serial is never invented
+# Authored from the P0 phase B/C finding that a USB bridge can hide the serial.
+schema: req.claim/2
+claim_id: REQ-0163
+statement: "The device collector shall leave the serial absent when the ioreg tree does not expose one."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L363
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.ImageIORegFallbackTests::REQ0163_serialConfirmationFromIOReg()"
+  - "DiskTriageCLITests.ImageIORegFallbackTests::REQ0163_sizeConfirmationFromIOReg()"

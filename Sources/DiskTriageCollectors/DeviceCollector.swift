@@ -8,27 +8,36 @@ public struct DeviceIdentity: Sendable, Equatable {
     public let bsd: String
     public let sizeBytes: Int64?
     public let model: String?
+    /// `Vendor Name` from the ioreg device tree; diskutil's plist has no
+    /// equivalent field.
+    public let vendor: String?
     public let serial: String?
     /// `hdd`, `ssd` or `unknown` (diskdoctor.md §5 step [2]).
     public let media: String
     /// `usb`, `sata`, `nvme`, … after the `BusProtocol` mapping below.
     public let bus: String?
     public let removable: Bool?
+    /// IOMedia's `Ejectable`, when the ioreg path supplies it.
+    public let ejectable: Bool?
     public let blockSize: Int64?
     public let internalDisk: Bool?
     /// `Virtual`, `Physical` or `Unknown` from `diskutil info -plist`. The
     /// internal Apple NVMe reports `Unknown`; synthesized APFS containers and
-    /// disk images report `Virtual`, which `list` filters out.
+    /// disk images report `Virtual`, which `list` filters out. The ioreg path
+    /// leaves it nil: the registry has no such field, and absent is not a
+    /// guess.
     public let virtualOrPhysical: String?
 
     public init(
         bsd: String,
         sizeBytes: Int64? = nil,
         model: String? = nil,
+        vendor: String? = nil,
         serial: String? = nil,
         media: String = "unknown",
         bus: String? = nil,
         removable: Bool? = nil,
+        ejectable: Bool? = nil,
         blockSize: Int64? = nil,
         internalDisk: Bool? = nil,
         virtualOrPhysical: String? = nil
@@ -36,14 +45,24 @@ public struct DeviceIdentity: Sendable, Equatable {
         self.bsd = bsd
         self.sizeBytes = sizeBytes
         self.model = model
+        self.vendor = vendor
         self.serial = serial
         self.media = media
         self.bus = bus
         self.removable = removable
+        self.ejectable = ejectable
         self.blockSize = blockSize
         self.internalDisk = internalDisk
         self.virtualOrPhysical = virtualOrPhysical
     }
+}
+
+/// Which command produced the identity. `diskutil` is the normal path; `ioreg`
+/// is the path that keeps working while DiskArbitration is stopped, and the
+/// fallback when `diskutil` times out.
+public enum DeviceCollectionSource: String, Sendable, Equatable {
+    case diskutil
+    case ioreg
 }
 
 /// One device section plus the status it was collected with.
@@ -51,11 +70,24 @@ public struct DeviceCollection: Sendable, Equatable {
     public let status: SignalStatus
     public let identity: DeviceIdentity?
     public let reason: String?
+    public let source: DeviceCollectionSource?
+    /// The `diskutil info` timeout that forced an ioreg fallback, when one
+    /// did. A timeout is evidence and must not disappear when the fallback
+    /// succeeds.
+    public let diskutilTimeoutMs: Int?
 
-    public init(status: SignalStatus, identity: DeviceIdentity? = nil, reason: String? = nil) {
+    public init(
+        status: SignalStatus,
+        identity: DeviceIdentity? = nil,
+        reason: String? = nil,
+        source: DeviceCollectionSource? = nil,
+        diskutilTimeoutMs: Int? = nil
+    ) {
         self.status = status
         self.identity = identity
         self.reason = reason
+        self.source = source
+        self.diskutilTimeoutMs = diskutilTimeoutMs
     }
 }
 
@@ -82,9 +114,16 @@ public enum DeviceParseError: Error, Equatable {
 /// from `diskutil info -plist`, read-only and without root (diskdoctor.md §4).
 public struct DeviceCollector: Sendable {
     private let executor: any CommandExecuting
+    /// Test-only override: `DISKTRIAGE_FORCE_IOREG=1` forces the path that
+    /// bypasses DiskArbitration, so a healthy Mac can exercise it.
+    private let forceIOReg: Bool
 
-    public init(executor: any CommandExecuting = ProcessRunner()) {
+    public init(
+        executor: any CommandExecuting = ProcessRunner(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
         self.executor = executor
+        self.forceIOReg = environment["DISKTRIAGE_FORCE_IOREG"] == "1"
     }
 
     /// `[0] enumerate` for the decision tree: whole disks only, never slices.
@@ -113,6 +152,22 @@ public struct DeviceCollector: Sendable {
     }
 
     public func collect(bsd: String) -> DeviceCollection {
+        if forceIOReg {
+            return collectFromIOReg(
+                bsd: bsd,
+                reason: "DISKTRIAGE_FORCE_IOREG=1 (test-only); diskutil skipped",
+                diskutilTimeoutMs: nil
+            )
+        }
+
+        if diskArbitrationIsStopped() {
+            return collectFromIOReg(
+                bsd: bsd,
+                reason: "diskarbitrationd is stopped; diskutil skipped",
+                diskutilTimeoutMs: nil
+            )
+        }
+
         let result = executor.run(.diskutilInfo(disk: bsd))
 
         switch result.outcome {
@@ -123,27 +178,123 @@ public struct DeviceCollector: Sendable {
             else {
                 return DeviceCollection(
                     status: .error,
-                    reason: "diskutil info returned output that is not the whole-disk plist for \(bsd)"
+                    reason: "diskutil info returned output that is not the whole-disk plist for \(bsd)",
+                    source: .diskutil
                 )
             }
-            return DeviceCollection(status: .ok, identity: identity)
+            return DeviceCollection(status: .ok, identity: identity, source: .diskutil)
         case .timeout:
-            return DeviceCollection(
-                status: .timeout,
-                reason: "diskutil info \(bsd) did not answer within \(result.durationMs) ms"
+            // `diskutil` can also time out because the disk is failing, not
+            // only because DiskArbitration is stopped. The timeout stays as
+            // evidence, and one ioreg attempt is allowed.
+            return collectFromIOReg(
+                bsd: bsd,
+                reason: "diskutil info \(bsd) timed out after \(result.durationMs) ms; identity read from ioreg",
+                diskutilTimeoutMs: result.durationMs
             )
         case .denied:
-            return DeviceCollection(status: .denied, reason: "diskutil info \(bsd) was denied")
+            return DeviceCollection(
+                status: .denied,
+                reason: "diskutil info \(bsd) was denied",
+                source: .diskutil
+            )
         case .notFound:
-            return DeviceCollection(status: .error, reason: "diskutil was not found")
+            return DeviceCollection(
+                status: .error,
+                reason: "diskutil was not found",
+                source: .diskutil
+            )
         case .error:
             return DeviceCollection(
                 status: .error,
-                reason: "diskutil info \(bsd) exited \(result.exitCode.map(String.init) ?? "on a signal")"
+                reason: "diskutil info \(bsd) exited \(result.exitCode.map(String.init) ?? "on a signal")",
+                source: .diskutil
             )
         case .policyRejected:
-            return DeviceCollection(status: .error, reason: "diskutil info \(bsd) is not allow-listed")
+            return DeviceCollection(
+                status: .error,
+                reason: "diskutil info \(bsd) is not allow-listed",
+                source: .diskutil
+            )
         }
+    }
+
+    /// Reads diskarbitrationd's state through the same argv shapes the guard
+    /// uses (`pgrep -x`, `ps -o stat= -p`). Only a positive stopped state
+    /// skips `diskutil`; an unknown state falls through to the normal path.
+    private func diskArbitrationIsStopped() -> Bool {
+        let pidResult = executor.run(.pgrepDiskArbitrationDaemon)
+        guard pidResult.outcome == .ok,
+              let pid = pidResult.stdout
+                  .split(whereSeparator: \.isWhitespace)
+                  .first
+                  .flatMap({ Int32($0) })
+        else { return false }
+
+        let stateResult = executor.run(.processState(pid: pid))
+        guard stateResult.outcome == .ok else { return false }
+        return ProcessState.isStopped(stateResult.stdout)
+    }
+
+    /// The identity path that never calls `diskutil`. Both the stopped-daemon
+    /// path and the timeout fallback land here.
+    private func collectFromIOReg(
+        bsd: String,
+        reason: String,
+        diskutilTimeoutMs: Int?
+    ) -> DeviceCollection {
+        let result = executor.run(.ioregDeviceTree)
+        guard result.outcome == .ok else {
+            return DeviceCollection(
+                status: result.outcome.signalStatus,
+                reason: reason + "; ioreg device tree \(result.outcome.rawValue) after \(result.durationMs) ms",
+                source: .ioreg,
+                diskutilTimeoutMs: diskutilTimeoutMs
+            )
+        }
+        guard let parsed = IORegDeviceParser.parse(result.stdout, bsd: bsd) else {
+            return DeviceCollection(
+                status: .error,
+                reason: reason + "; ioreg device tree has no whole disk \(bsd)",
+                source: .ioreg,
+                diskutilTimeoutMs: diskutilTimeoutMs
+            )
+        }
+
+        // A USB bridge can hide the serial on the block device while the USB
+        // host device still exposes it. One extra, small query, and only when
+        // the serial is missing: the association is the same BSD name in the
+        // same subtree, never a guess by order.
+        var serial = parsed.serial
+        if serial == nil {
+            let usb = executor.run(.ioregUSBDeviceTree)
+            if usb.outcome == .ok,
+               let usbIdentity = IORegDeviceParser.parse(usb.stdout, bsd: bsd) {
+                serial = usbIdentity.serial
+            }
+        }
+
+        let identity = DeviceIdentity(
+            bsd: parsed.bsd,
+            sizeBytes: parsed.sizeBytes,
+            model: parsed.model,
+            vendor: parsed.vendor,
+            serial: serial,
+            media: parsed.media ?? "unknown",
+            bus: parsed.bus,
+            removable: parsed.removable,
+            ejectable: parsed.ejectable,
+            blockSize: parsed.blockSize,
+            internalDisk: parsed.internalDisk,
+            virtualOrPhysical: nil
+        )
+        return DeviceCollection(
+            status: .ok,
+            identity: identity,
+            reason: reason,
+            source: .ioreg,
+            diskutilTimeoutMs: diskutilTimeoutMs
+        )
     }
 
     /// Parses one `diskutil info -plist` recording.
@@ -174,6 +325,7 @@ public struct DeviceCollector: Sendable {
             bsd: bsd,
             sizeBytes: integer(plist["TotalSize"]) ?? integer(plist["Size"]) ?? integer(plist["IOKitSize"]),
             model: plist["MediaName"] as? String ?? plist["IORegistryEntryName"] as? String,
+            vendor: nil,
             serial: plist["Serial"] as? String
                 ?? plist["SerialNumber"] as? String
                 ?? plist["DeviceSerialNumber"] as? String,
@@ -182,6 +334,7 @@ public struct DeviceCollector: Sendable {
             removable: plist["Removable"] as? Bool
                 ?? plist["RemovableMedia"] as? Bool
                 ?? plist["Ejectable"] as? Bool,
+            ejectable: plist["Ejectable"] as? Bool,
             blockSize: integer(plist["DeviceBlockSize"]),
             internalDisk: plist["Internal"] as? Bool,
             virtualOrPhysical: plist["VirtualOrPhysical"] as? String
@@ -193,17 +346,7 @@ public struct DeviceCollector: Sendable {
 /// `BusProtocol`; the classifier's unsupported-media branch keys on `nvme`
 /// (diskdoctor.md §5 step [2]).
 private func busName(from protocolName: String?, isInternal: Bool?) -> String? {
-    guard let protocolName else { return nil }
-    let lowered = protocolName.lowercased()
-    if lowered == "apple fabric" && isInternal == true {
-        return "nvme"
-    }
-    switch lowered {
-    case "pci-express", "pci express":
-        return "pcie"
-    default:
-        return lowered
-    }
+    StorageBus.name(fromInterconnect: protocolName, isInternal: isInternal)
 }
 
 private func integer(_ value: Any?) -> Int64? {

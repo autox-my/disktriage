@@ -1,0 +1,18 @@
+# REQ-0161 — diskdoctor.md §8 the stopped-daemon identity path
+# Authored from the P0 phase C finding that diskutil hangs while diskarbitrationd is stopped.
+schema: req.claim/2
+claim_id: REQ-0161
+statement: "The device collector shall not run diskutil while diskarbitrationd is stopped."
+applicability: []
+relations: []
+rationale:
+  source: diskdoctor.md#L463
+  date: 2026-11-07
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.ImageIORegFallbackTests::REQ0161_imageNeverInvokesDiskutilWhenStopped()"
+  - "DiskTriageCollectorsTests.DeviceCollectorIORegTests::REQ0161_runningDiskArbitrationKeepsDiskutil()"
+  - "DiskTriageCollectorsTests.DeviceCollectorIORegTests::REQ0161_stoppedDiskArbitrationSkipsDiskutil()"
