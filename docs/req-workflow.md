@@ -206,13 +206,13 @@ only if that is impossible).
 
 ## Current state
 
-- 215 claims, all structured, 166 pins held, 0 lints (`req canon --fail-on-flag` → 0).
+- 232 claims, all structured, 185 pins held, 0 lints (`req canon --fail-on-flag` → 0).
 - The suite runs under Swift Testing and writes a JUnit report that `req` reads (measured above).
-  One hundred and seventy-five claims are linked to tests by a `REQ` tag in the test function name; P3c added
+  One hundred and ninety-two claims are linked to tests by a `REQ` tag in the test function name; P3c added
   `REQ-0111`–`REQ-0122` for `inspect`, `REQ-0123`–`REQ-0124` for the relative-path and
   damage-unknown fixes, and `REQ-0125`–`REQ-0142` for `copy` (0138 and 0141 are unused numbers,
   kept free by the split of the copy obligations), `REQ-0143`–`REQ-0149` for streaming `copy`
-  `REQ-0150`–`REQ-0160` for the history store, `REQ-0161`–`REQ-0164` for identity while DiskArbitration is stopped and `REQ-0165`–`REQ-0170` for the diskutil-free `image` path and `REQ-0171`–`REQ-0177` for failed-block accounting, the stop reason and `check` under a stopped DiskArbitration, `REQ-0178`–`REQ-0184` for `--min-read-rate`, `REQ-0185`–`REQ-0199` for the pure NTFS allocation domain and `REQ-0200`–`REQ-0217` for the staged allocation-aware `image`. The other 40 have no linked test — linking is a
+  `REQ-0150`–`REQ-0160` for the history store, `REQ-0161`–`REQ-0164` for identity while DiskArbitration is stopped and `REQ-0165`–`REQ-0170` for the diskutil-free `image` path and `REQ-0171`–`REQ-0177` for failed-block accounting, the stop reason and `check` under a stopped DiskArbitration, `REQ-0178`–`REQ-0184` for `--min-read-rate`, `REQ-0185`–`REQ-0199` for the pure NTFS allocation domain and `REQ-0200`–`REQ-0217` for the staged allocation-aware `image`, `REQ-0218`–`REQ-0227` for `--scope-report`, `REQ-0228`–`REQ-0232` for the test temp cleanup and its gate leak guard and `REQ-0233`–`REQ-0237` for the scope report's destination rule. The other 40 have no linked test — linking is a
   judgement about evidence, and only a test that demonstrably proves the obligation is linked.
   `req gate --test-report .build/test-results/junit-swift-testing.xml` is therefore still exit 3
   (*no linked test* on the 40), which is not a pass. `scripts/req-link.sh --check` reports 0 drift
