@@ -550,10 +550,14 @@ Deep link:
 
 ### Inspection
 
-- **APFS / HFS+ / exFAT / FAT:** *planned, not yet built: `inspect` and `copy` detect these and
-  refuse for now.* `diskutil image attach --noMount --readOnly` (or
-  `hdiutil attach -readonly -nomount`), then an explicit native read-only mount. Never a writable
-  third-party driver.
+- **APFS / HFS+ / exFAT / FAT (built, ADR 0026):** `diskutil image attach --noMount --readOnly
+  <image>`, then `diskutil mount readOnly nobrowse -mountPoint <dir> <dev>` (works without root; the
+  `mount(8)` route needs root and is not used), then `diskutil unmount` and `diskutil eject` of the
+  exact disk this run attached, on every exit path. Never a writable mount, never a third-party
+  driver. A locked encrypted volume is detected and refused; the tool never asks for a passphrase.
+  An APFS container lists each volume, and `copy` needs `--volume <name|index>` when there is more
+  than one (ADR 0027). Damage is reported at volume level only, with no per-file claim, because
+  `F_LOG2PHYS_EXT` on a native mount is still unmeasured (P0 row 4).
 - **NTFS:** no native mount exists on macOS 27.2. Inspect the image with the ntfs-3g userspace tools
   (`ntfsinfo`, `ntfsls`, `ntfscat`): read-only, no mount, no root, no FDA, tens of milliseconds on a
   64 MiB image (`docs/ntfs-spike.md`). Never a mount of the image through a third-party driver.
@@ -771,6 +775,12 @@ product, and awkward on Apple Silicon.
 ---
 
 ## 14. Revision history
+
+**v3.10 (2026-11-08), after native attach:**
+
+- §8 inspection: native read-only attach for APFS/HFS+/exFAT/FAT is built (ADR 0026); APFS multi-volume
+  representation and `copy --volume` (ADR 0027); the gate fails on a leaked attach or mountpoint
+  (ADR 0028); per-file attribution stays NTFS-only.
 
 **v3.9 (2026-11-07), after the requirement-corpus triage (plan catches up with the code):**
 
