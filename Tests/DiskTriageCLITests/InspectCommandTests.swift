@@ -427,36 +427,50 @@ struct InspectCommandTests {
         #expect(try sha256(path: image) == originalHash, "the source image was not written")
     }
 
-    @Test("a whole-disk image with no NTFS partition names the filesystem it found")
+    // A native filesystem partition is attached read-only, not refused. The
+    // old expectation ("not implemented yet") moved with the feature; the
+    // claim and the test changed in the same commit (docs/adr/0025).
+    @Test("a whole-disk image with an APFS partition is inspected through the native attach")
     func wholeDiskWithoutNTFSNamesTheFilesystem() throws {
         let image = try makeWholeDiskImage(filesystem: .apfs)
         defer { try? FileManager.default.removeItem(atPath: image) }
+        let runner = ScriptedNativeRunner(
+            attachResult: nativeAttachment(
+                wholeDisk: "/dev/disk8",
+                volumes: [("/dev/disk9s1", "DTAPFS", .apfs, false)]
+            )
+        )
 
         let result = runInspect(
             arguments: [image, "--json"],
-            dependencies: inspectDependencies(tools: ScriptedNTFSTools())
+            dependencies: inspectDependencies(tools: ScriptedNTFSTools(), native: runner)
         )
-        #expect(result.exitCode == 30)
+        #expect(result.exitCode == 0, "\(result.stdout) \(result.stderr)")
         let object = try jsonObject(result)
         #expect(object["filesystem"] as? String == "apfs")
-        #expect((object["message"] as? String)?.contains("native read-only attach not implemented yet") == true)
+        let layout = try #require(object["layout"] as? [String: Any])
+        #expect(layout["kind"] as? String == "whole-disk")
     }
 
-    // REQ-0120: a bare non-NTFS volume is named, not guessed at.
-    @Test("REQ0120 a bare APFS volume is reported as not implemented, exit 30")
+    // REQ-0120: a bare non-NTFS volume is named and attached read-only, not
+    // guessed at. The feature changed; the test and the claim moved together.
+    @Test("REQ0120 a bare APFS volume is attached read-only and inspected")
     func REQ0120_reportsBareAPFS() throws {
         var bytes = [UInt8](repeating: 0, count: 8192)
         bytes.replaceSubrange(32..<36, with: Array("NXSB".utf8))
         let image = try makeImage(bytes)
         defer { try? FileManager.default.removeItem(atPath: image) }
+        let runner = ScriptedNativeRunner(
+            attachResult: nativeAttachment(volumes: [("/dev/disk8", "DTAPFS", .apfs, false)])
+        )
 
         let result = runInspect(
             arguments: [image],
-            dependencies: inspectDependencies(tools: ScriptedNTFSTools())
+            dependencies: inspectDependencies(tools: ScriptedNTFSTools(), native: runner)
         )
-        #expect(result.exitCode == 30)
-        #expect(result.stderr.contains("apfs"))
-        #expect(result.stderr.contains("native read-only attach not implemented yet"))
+        #expect(result.exitCode == 0, "\(result.stdout) \(result.stderr)")
+        #expect(result.stdout.contains("APFS"))
+        #expect(result.stdout.contains("read-only"))
     }
 
     // REQ-0113: inspection is read-only; the source hash is unchanged.
@@ -670,12 +684,20 @@ struct InspectCommandTests {
 
     // MARK: - Support
 
-    private func inspectDependencies(tools: (any NTFSToolRunning)?) -> InspectDependencies {
+    private func inspectDependencies(
+        tools: (any NTFSToolRunning)?,
+        native: (any NativeAttachRunning)? = nil
+    ) -> InspectDependencies {
         InspectDependencies(
             fileSystem: LiveInspectFileSystem(),
             environment: [:],
             tools: tools,
-            resolveTools: false
+            resolveTools: false,
+            native: native,
+            mountReader: LiveMountedVolumeReader(),
+            resolveNative: false,
+            installSignalTrap: false,
+            mountPointRoot: temp.path
         )
     }
 

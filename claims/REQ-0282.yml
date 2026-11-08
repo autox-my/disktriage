@@ -1,0 +1,17 @@
+# REQ-0282 — docs/adr/0026-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0282
+statement: "The tool shall not claim per-file damage attribution for a native filesystem while F_LOG2PHYS_EXT is unresolved."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0281_REQ0293_REQ0282_damageAndManifest()"
+  - "DiskTriageCLITests.NativeInspectTests::REQ0282_saysAttributionIsUnavailable()"

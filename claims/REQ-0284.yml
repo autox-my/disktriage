@@ -1,0 +1,19 @@
+# REQ-0284 — docs/adr/0026-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0284
+statement: "The tool shall exit 30 when a native volume is locked."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+  value: "30"
+  unit: "none"
+tests:
+  - "DiskTriageCLITests.NativeInspectTests::REQ0283_REQ0284_lockedVolumeIsRefused()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0283_REQ0284_liveEncryptedIsRefused()"

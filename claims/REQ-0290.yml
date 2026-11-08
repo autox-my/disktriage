@@ -1,0 +1,17 @@
+# REQ-0290 — docs/adr/0027-apfs-multi-volume-representation.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0290
+statement: "The copy --volume option shall select a volume by its name."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0027-apfs-multi-volume-representation.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0290_selectsByName()"
+  - "DiskTriageCoreTests.NativeVolumeModelTests::REQ0290_selectsByName()"

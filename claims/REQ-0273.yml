@@ -1,0 +1,16 @@
+# REQ-0273 — docs/adr/0026-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0273
+statement: "The tool shall unmount and detach the attached disk when it receives SIGINT or SIGTERM."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeAttachTests::REQ0273_signalPathCleansUp()"

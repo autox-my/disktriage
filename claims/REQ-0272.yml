@@ -1,0 +1,17 @@
+# REQ-0272 — docs/adr/0026-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0272
+statement: "The tool shall unmount and then detach the exact disk it attached after a timeout."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeAttachTests::REQ0272_cleanupAfterAMountTimeout()"
+  - "DiskTriageCLITests.NativeInspectTests::REQ0295_REQ0272_mountTimeoutExitsThirty()"

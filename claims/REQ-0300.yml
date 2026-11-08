@@ -1,0 +1,17 @@
+# REQ-0300 — docs/adr/0026-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0300
+statement: "The tool shall not follow a symbolic link in a mounted native volume."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL-NOT"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0301_REQ0300_partialListing()"
+  - "DiskTriageCLITests.NativeInspectTests::REQ0300_REQ0312_symlinksAndUnicode()"

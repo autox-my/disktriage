@@ -1,0 +1,18 @@
+# REQ-0306 — docs/adr/0026-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0306
+statement: "The inspect command shall inspect an HFS+ image through the native read-only attach."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeAttachTests::REQ0286_REQ0306_bareVolumeIsAWholeDiskVolume()"
+  - "DiskTriageCLITests.NativeInspectTests::REQ0285_REQ0306_wholeDiskHFS()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0306_REQ0307_REQ0286_liveInspectsExfatAndHFS()"

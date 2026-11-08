@@ -1,0 +1,16 @@
+# REQ-0276 — docs/adr/0028-native-attach-leak-guard.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0276
+statement: "The gate shall fail when a native attach or mountpoint is left behind by the suite."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0028-native-attach-leak-guard.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeLeakGuardTests::REQ0276_REQ0277_REQ0278_nativeLeakGuardBites()"

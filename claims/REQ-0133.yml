@@ -1,16 +1,16 @@
-# REQ-0133 — diskdoctor.md §8 copy
+# REQ-0133 — docs/adr/0026-native-read-only-attach.md §Decision
 # Authored from the copy contract; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0133
-statement: "The copy command shall refuse a non-NTFS filesystem as not implemented."
+statement: "The copy command shall copy a non-NTFS APFS, HFS+, exFAT or FAT image through the native read-only attach."
 applicability: []
 relations: []
 rationale:
-  source: docs/adr/0004-inspect-ntfs-read-only.md#decision
+  source: docs/adr/0026-native-read-only-attach.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []
 pins:
   modality: "SHALL"
 tests:
-  - "DiskTriageCLITests.CopyCommandTests::REQ0133_nonNTFSIsRefused()"
+  - "DiskTriageCLITests.CopyCommandTests::REQ0133_nonNTFSIsCopiedNatively()"

@@ -40,5 +40,11 @@ devices. Required for imaging, not for diagnosis; never cached across launches.
 **Fixture** — a recorded `SignalSet` JSON replayed against the classifier in
 tests; a test input, not a schema and not a live capture.
 
+**Native attach** — attaching an image file read-only with `diskutil image
+attach --noMount --readOnly` and mounting one of its volumes with `diskutil
+mount readOnly nobrowse`. It covers APFS, HFS+, exFAT and FAT; NTFS has no
+native macOS mount and uses the ntfs-3g userspace tools instead. Never the
+source device, never a writable mount, never a third-party driver.
+
 **Mount guard** — the process that holds DiskArbitration mounts for a target
 device, so the OS cannot automount a failing disk before triage.

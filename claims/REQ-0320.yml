@@ -1,0 +1,18 @@
+# REQ-0320 — docs/adr/0026-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0320
+statement: "The fixture generator shall be the only code that attaches a native image read-write."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: docs/adr/0026-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives:
+    - "A writable attach in product code: it would violate the read-only invariant; the generator exists only for fixtures."
+  assumptions:
+    - "tools/native-fixture/generate.sh is not product code; it attaches only images it creates under the gitignored fixture directory and ejects each one. The product policy (REQ-0267/REQ-0268) has no writable shape."
+pins:
+  modality: "SHALL"

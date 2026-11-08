@@ -28,6 +28,8 @@ fi
 . "$ROOT/scripts/lib/junit-report.sh"
 # shellcheck source=lib/temp-leak.sh
 . "$ROOT/scripts/lib/temp-leak.sh"
+# shellcheck source=lib/native-leak.sh
+. "$ROOT/scripts/lib/native-leak.sh"
 
 TMP="$(mktemp -d)" || {
     echo "UNVERIFIABLE  cannot create a temporary directory"
@@ -186,6 +188,57 @@ else
     echo "ok   probe new temp directory -> 1: $(printf '%s' "$output" | tr '\n' ' ')"
 fi
 
+# The native attach leak guard: an empty scan passes, an attached image or a
+# leftover mountpoint fails and is named, and a scan that could not run is
+# UNVERIFIABLE (3), never a pass. The probe uses fake scan files, never a real
+# attached image.
+native_clean="$TMP/native-clean.txt"
+native_image="$TMP/native-image.txt"
+native_mount="$TMP/native-mount.txt"
+native_unverifiable="$TMP/native-unverifiable.txt"
+printf 'CLEAN\n' >"$native_clean"
+printf 'image /tmp/disktriage-tests-abc/leaked.img\n' >"$native_image"
+printf 'mount /dev/disk9s1 on /tmp/disktriage-mount-abc (exfat, read-only)\n' >"$native_mount"
+printf 'UNVERIFIABLE  hdiutil not found\n' >"$native_unverifiable"
+native_empty="$TMP/native-empty.txt"
+: >"$native_empty"
+
+output="$(native_leak_verdict "$native_clean")"
+got=$?
+if [ "$got" -eq 0 ] && [[ "$output" == *"PASS"* ]]; then
+    echo "ok   probe no native attach leftover -> 0"
+else
+    fail "no native attach leftover" "expected 0 PASS, got $got ($output)"
+fi
+output="$(native_leak_verdict "$native_image")"
+got=$?
+if [ "$got" -eq 1 ] && [[ "$output" == *"leaked.img"* ]]; then
+    echo "ok   probe a leaked attached image -> 1"
+else
+    fail "leaked attached image" "expected 1 naming the image, got $got ($output)"
+fi
+output="$(native_leak_verdict "$native_mount")"
+got=$?
+if [ "$got" -eq 1 ] && [[ "$output" == *"disktriage-mount-abc"* ]]; then
+    echo "ok   probe a leftover mountpoint -> 1"
+else
+    fail "leftover mountpoint" "expected 1 naming the mountpoint, got $got ($output)"
+fi
+output="$(native_leak_verdict "$native_unverifiable")"
+got=$?
+if [ "$got" -eq 3 ] && [[ "$output" == *"UNVERIFIABLE"* ]]; then
+    echo "ok   probe native leak scan without hdiutil -> 3"
+else
+    fail "native leak scan without hdiutil" "expected 3, got $got ($output)"
+fi
+output="$(native_leak_verdict "$native_empty")"
+got=$?
+if [ "$got" -eq 3 ] && [[ "$output" == *"empty or unwritten"* ]]; then
+    echo "ok   probe an unwritten native leak scan -> 3"
+else
+    fail "unwritten native leak scan" "expected 3, got $got ($output)"
+fi
+
 # The requirement steps: each probe runs the real script over a temporary
 # corpus, never the repository's claims/ or docs/.
 expect_rc() {
@@ -327,6 +380,12 @@ make_fake_fixtures() {
     : >"$1/disk.img"
     : >"$1/damaged-clip-part.img"
     : >"$1/damaged-clip-part.mapfile"
+    local name
+    for name in exfat-disk.img exfat-part.img fat-disk.img fat-part.img \
+                hfs-disk.dmg hfs-part.img apfs-disk.img encrypted-apfs.img \
+                damaged-exfat-part.img damaged-exfat-part.mapfile; do
+        : >"$1/$name"
+    done
 }
 
 fixture_root="$TMP/fixture-root"
@@ -337,6 +396,7 @@ expect_rc "fixtures preflight without bootstrap" 3 "$got" "$output" "scripts/boo
 
 make_fake_prefix "$fixture_root/.build/ntfs-prefix"
 make_fake_fixtures "$fixture_root/.build/fixtures/ntfs"
+make_fake_fixtures "$fixture_root/.build/fixtures/native"
 output="$(fixtures_preflight "$fixture_root")"
 got=$?
 expect_rc "fixtures preflight with the bootstrap output" 0 "$got" "$output"
@@ -346,6 +406,7 @@ captures_root="$TMP/captures-root"
 mkdir -p "$captures_root/captures/ntfs-spike"
 make_fake_prefix "$captures_root/captures/ntfs-spike/prefix"
 make_fake_fixtures "$captures_root/captures/ntfs-spike/img"
+make_fake_fixtures "$captures_root/captures/ntfs-spike/native"
 output="$(fixtures_preflight "$captures_root")"
 got=$?
 expect_rc "fixtures preflight never uses captures/" 3 "$got" "$output" "scripts/bootstrap.sh"
@@ -354,18 +415,25 @@ expect_rc "fixtures preflight never uses captures/" 3 "$got" "$output" "scripts/
 # than silently using the bootstrap output.
 env_prefix="$TMP/env-prefix"
 env_fixtures="$TMP/env-fixtures"
+env_native="$TMP/env-native"
 make_fake_prefix "$env_prefix"
 make_fake_fixtures "$env_fixtures"
+make_fake_fixtures "$env_native"
 env_root="$TMP/env-root"
 mkdir -p "$env_root"
 output="$(DISKTRIAGE_NTFS_PREFIX="$env_prefix" DISKTRIAGE_FIXTURE_DIR="$env_fixtures" \
-    fixtures_preflight "$env_root")"
+    DISKTRIAGE_NATIVE_FIXTURE_DIR="$env_native" fixtures_preflight "$env_root")"
 got=$?
 expect_rc "fixtures preflight honours the environment" 0 "$got" "$output"
 output="$(DISKTRIAGE_NTFS_PREFIX="$TMP/missing" DISKTRIAGE_FIXTURE_DIR="$env_fixtures" \
-    fixtures_preflight "$fixture_root")"
+    DISKTRIAGE_NATIVE_FIXTURE_DIR="$env_native" fixtures_preflight "$fixture_root")"
 got=$?
 expect_rc "fixtures preflight fails closed on an incomplete override" 3 "$got" "$output" \
+    "scripts/bootstrap.sh"
+output="$(DISKTRIAGE_NTFS_PREFIX="$env_prefix" DISKTRIAGE_FIXTURE_DIR="$env_fixtures" \
+    DISKTRIAGE_NATIVE_FIXTURE_DIR="$TMP/missing-native" fixtures_preflight "$fixture_root")"
+got=$?
+expect_rc "fixtures preflight fails closed on missing native fixtures" 3 "$got" "$output" \
     "scripts/bootstrap.sh"
 
 # (g) The shell recipe and the Homebrew formula pin the same ntfs-3g tarball.

@@ -1,0 +1,18 @@
+# REQ-0311 — docs/adr/0026-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0311
+statement: "The copy command shall reject --volume on an NTFS image with usage exit 2."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+  value: "2"
+  unit: "none"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0311_volumeOnNTFSIsUsage()"

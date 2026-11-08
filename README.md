@@ -25,8 +25,13 @@ not a general-purpose recovery suite.
   inventing a verdict.
 - **Imaging is slow on USB 2.** A generic USB 2 bridge measured about 37 MB/s
   on clean zones; a failing drive is slower still.
-- **v0.1 inspect/copy is NTFS only.** APFS, HFS+, exFAT and FAT inspection is
-  planned, not built.
+- **Inspect/copy cover NTFS and the native filesystems.** NTFS uses the
+  ntfs-3g userspace tools; APFS, HFS+, exFAT and FAT images are attached
+  read-only with `diskutil image attach --noMount --readOnly` and mounted
+  read-only with `diskutil mount readOnly nobrowse`. No root is needed. A
+  locked encrypted volume is refused rather than prompting for a passphrase.
+  Per-file damage attribution is NTFS-only; the native filesystems report
+  damage at volume level (see ADR 0026).
 
 Exit codes and their precedence are in
 [`diskdoctor.md` §5](diskdoctor.md#exit-codes). The short version: 0 no
@@ -56,7 +61,7 @@ runtime dependencies:
 brew install ddrescue smartmontools
 git clone https://github.com/autox-my/disktriage
 cd disktriage
-scripts/bootstrap.sh      # ntfs-3g prefix + synthetic NTFS test fixtures
+scripts/bootstrap.sh      # ntfs-3g prefix + synthetic NTFS and native fixtures
 swift build
 bash scripts/check.sh     # 0 PASS, 1 FAIL, 3 UNVERIFIABLE
 ```
@@ -68,8 +73,10 @@ tool, which is **not publicly available yet**. A missing tool is UNVERIFIABLE
 
 `scripts/bootstrap.sh` is the one documented setup command. It builds the
 pinned ntfs-3g tools and the live-test images under `.build/`, is idempotent,
-uses no `sudo`, mounts nothing and never touches `/dev`. Without it the gate
-answers **3** and names the script; it does not skip to green.
+uses no `sudo`, attaches only the synthetic images it just created (in the
+fixture generator, then unmounts and ejects them) and never names a physical
+device. Without it the gate answers **3** and names the script; it does not
+skip to green.
 
 ## Documentation
 

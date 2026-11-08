@@ -33,6 +33,12 @@ public struct CopyDependencies: Sendable {
     public var chunkObserver: (any CopyChunkObserving)?
     /// The running executable, resolved for the keg-relative libexec lookup.
     public var executablePath: String?
+    /// The native read-only attach (APFS/HFS+/exFAT/FAT). Injected in tests.
+    public var native: (any NativeAttachRunning)?
+    public var mountReader: (any MountedVolumeReading)?
+    public var resolveNative: Bool
+    public var installSignalTrap: Bool
+    public var mountPointRoot: String?
 
     public init(
         fileSystem: any CopyFileSystem = LiveCopyFileSystem(),
@@ -44,7 +50,12 @@ public struct CopyDependencies: Sendable {
         chunkSize: Int = CopyLimits.streamChunkBytes,
         maxBytesOverride: Int64? = nil,
         chunkObserver: (any CopyChunkObserving)? = nil,
-        executablePath: String? = Bundle.main.executablePath
+        executablePath: String? = Bundle.main.executablePath,
+        native: (any NativeAttachRunning)? = nil,
+        mountReader: (any MountedVolumeReading)? = nil,
+        resolveNative: Bool = true,
+        installSignalTrap: Bool = true,
+        mountPointRoot: String? = nil
     ) {
         self.fileSystem = fileSystem
         self.environment = environment
@@ -56,6 +67,11 @@ public struct CopyDependencies: Sendable {
         self.maxBytesOverride = maxBytesOverride
         self.chunkObserver = chunkObserver
         self.executablePath = executablePath
+        self.native = native
+        self.mountReader = mountReader
+        self.resolveNative = resolveNative
+        self.installSignalTrap = installSignalTrap
+        self.mountPointRoot = mountPointRoot
     }
 
     public static func live(
@@ -115,6 +131,12 @@ public func runCopy(arguments: [String], dependencies: CopyDependencies? = nil) 
         case "--hash-image":
             options.hashImage = true
             index += 1
+        case "--volume":
+            guard index + 1 < arguments.count else {
+                return usageError("--volume needs a volume name or 1-based index")
+            }
+            options.volume = arguments[index + 1]
+            index += 2
         case "--json":
             options.asJSON = true
             index += 1
@@ -184,10 +206,13 @@ public func runCopy(arguments: [String], dependencies: CopyDependencies? = nil) 
 
 // MARK: - Options
 
-private struct CopyOptions {
+struct CopyOptions {
     var image: String?
     var destination: String?
     var mapfile: String?
+    /// `--volume <name|index>`: required when a native attach produces more
+    /// than one volume. NTFS has no multi-volume representation.
+    var volume: String?
     /// The optional run-wide byte cap from `--max-bytes <GiB>`.
     var maxBytes: Int64?
     var hashImage = false
@@ -196,7 +221,7 @@ private struct CopyOptions {
 
 // MARK: - Report
 
-private enum CopyStatus: String {
+enum CopyStatus: String {
     case ok
     case damage
     case partial
@@ -207,18 +232,18 @@ private enum CopyStatus: String {
 /// Why a streaming read stopped before the child reached EOF. The copy records
 /// the reason on the entry; the thrown `CopyStreamStopError` only unwinds the
 /// sink and never reaches the report as an error string.
-private enum CopyStreamStop {
+enum CopyStreamStop {
     case runCap(limit: Int64)
     case fileCap(limit: Int64)
     case writeFailed(String)
 }
 
-private enum CopyStreamStopError: Error {
+enum CopyStreamStopError: Error {
     case cap
     case write(String)
 }
 
-private struct CopyReport {
+struct CopyReport {
     var status: CopyStatus
     var exitCode: Int32
     let image: String
@@ -243,6 +268,11 @@ private struct CopyReport {
     var createdAt = ""
     var imageSize: Int64 = 0
     var imageSHA256: String?
+    /// Set only for a native attach: the disk and the volume list, and the
+    /// volume the copy selected. `nil` for NTFS.
+    var attachment: NativeAttachSummary?
+    var volumes: [NativeVolume] = []
+    var selectedVolume: NativeVolume?
 }
 
 // MARK: - Copy
@@ -303,8 +333,23 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
         return fail(.unsupported, 30, message + (partition.map { " (partition \($0))" } ?? ""))
     case .volume(let layout, let detectedFilesystem):
         report.filesystem = detectedFilesystem
+        if let nativeFilesystem = NativeFilesystem(kind: detectedFilesystem) {
+            report.layout = layout
+            return copyNative(
+                image: image,
+                imageSize: imageSize,
+                layout: layout,
+                filesystem: nativeFilesystem,
+                options: options,
+                dependencies: dependencies,
+                report: &report
+            )
+        }
         guard detectedFilesystem == .ntfs || detectedFilesystem == .unknown else {
             return fail(.unsupported, 30, unsupportedMessage(detectedFilesystem))
+        }
+        if options.volume != nil {
+            return usageError("--volume selects a native filesystem volume; an NTFS image has one volume")
         }
         report.layout = layout
 
@@ -573,422 +618,198 @@ private func copy(image: String, options: CopyOptions, dependencies: CopyDepende
             return fail(.toolError, 30, "cannot create the destination tree: \(describe(error))")
         }
 
-        let started = Date()
-        var totalRead: Int64 = 0
-        var totalWritten: Int64 = 0
-        var failed = 0
-        var allHashesAgree = true
-        var entries: [CopyManifestEntry] = []
-        var budgetStopped = false
         let runByteCap = dependencies.maxBytesOverride ?? options.maxBytes
         let chunkSize = max(1, dependencies.chunkSize)
-
-        for (index, file) in files.enumerated() {
-            if Date().timeIntervalSince(started) > CopyLimits.totalTimeout {
-                report.notes.append(
-                    "stopped after \(Int(CopyLimits.totalTimeout)) s; the remaining "
-                        + "\(files.count - index) file(s) were not attempted"
-                )
-                budgetStopped = true
-                break
-            }
-            if let cap = runByteCap, totalRead >= cap {
-                report.notes.append(
-                    "stopped at the \(cap)-byte --max-bytes cap; the remaining "
-                        + "\(files.count - index) file(s) were not attempted"
-                )
-                budgetStopped = true
-                break
-            }
-            if let listedSize = file.listedSize, listedSize > CopyLimits.maxFileBytes {
-                report.notes.append(
-                    "\(file.path) is \(listedSize) bytes, above the "
-                        + "\(CopyLimits.maxFileBytes)-byte per-file cap; it was not copied"
-                )
-                failed += 1
-                allHashesAgree = false
-                entries.append(CopyManifestEntry(
-                    path: CopyPathRules.relative(file.path),
-                    sizeBytes: listedSize,
-                    sha256Read: nil,
-                    sha256Written: nil,
-                    integrity: nil,
-                    attribution: nil,
-                    status: "skipped",
-                    note: "above the per-file byte cap"
-                ))
-                continue
-            }
-            if let cap = runByteCap, let listedSize = file.listedSize, totalRead + listedSize > cap {
-                report.notes.append(
-                    "\(file.path) is \(listedSize) bytes and would exceed the \(cap)-byte "
-                        + "--max-bytes cap; it was not copied"
-                )
-                failed += 1
-                allHashesAgree = false
-                entries.append(CopyManifestEntry(
-                    path: CopyPathRules.relative(file.path),
-                    sizeBytes: listedSize,
-                    sha256Read: nil,
-                    sha256Written: nil,
-                    integrity: nil,
-                    attribution: nil,
-                    status: "skipped",
-                    note: "would exceed the --max-bytes cap"
-                ))
-                continue
-            }
-
-            let target = destinationPath(destination, file.path)
-            let writer: any CopyFileWriter
-            do {
-                writer = try fs.makeWriter(to: target)
-            } catch {
-                failed += 1
-                allHashesAgree = false
-                entries.append(CopyManifestEntry(
-                    path: CopyPathRules.relative(file.path),
-                    sizeBytes: file.listedSize,
-                    sha256Read: nil,
-                    sha256Written: nil,
-                    integrity: nil,
-                    attribution: nil,
-                    status: "incomplete",
-                    note: "cannot create the destination file: \(describe(error))"
-                ))
-                report.notes.append("\(file.path) was not copied: \(describe(error))")
-                continue
-            }
-
-            var readHasher = SHA256()
-            var streamedBytes: Int64 = 0
-            var stop: CopyStreamStop?
-
-            let cat = tools.catFileStreaming(
-                image: sourceForTools,
-                path: file.path,
-                chunkSize: chunkSize
-            ) { chunk in
-                dependencies.chunkObserver?.chunkAcquired()
-                defer { dependencies.chunkObserver?.chunkReleased() }
-
-                if let cap = runByteCap,
-                   totalRead + streamedBytes + Int64(chunk.count) > cap {
-                    stop = .runCap(limit: cap)
-                    throw CopyStreamStopError.cap
-                }
-                if streamedBytes + Int64(chunk.count) > CopyLimits.maxFileBytes {
-                    stop = .fileCap(limit: CopyLimits.maxFileBytes)
-                    throw CopyStreamStopError.cap
-                }
-                do {
-                    try writer.write(chunk)
-                } catch {
-                    let message = describe(error)
-                    stop = .writeFailed(message)
-                    throw CopyStreamStopError.write(message)
-                }
-                // Hash only bytes that were written, and every byte including
-                // the last partial chunk (REQ-0145).
-                readHasher.update(data: chunk)
-                streamedBytes += Int64(chunk.count)
-            }
-
-            if let stop {
-                writer.abort()
-                failed += 1
-                allHashesAgree = false
-                let note: String
-                switch stop {
-                case .runCap(let limit):
-                    note = "the \(limit)-byte --max-bytes cap stopped the copy after "
-                        + "\(streamedBytes) bytes; the partial file was discarded"
-                    budgetStopped = true
-                    let remaining = files.count - index - 1
-                    if remaining > 0 {
-                        report.notes.append(
-                            "stopped at the \(limit)-byte --max-bytes cap; the remaining "
-                                + "\(remaining) file(s) were not attempted"
-                        )
-                    }
-                case .fileCap(let limit):
-                    note = "the \(limit)-byte per-file cap stopped the copy after "
-                        + "\(streamedBytes) bytes; the partial file was discarded"
-                case .writeFailed(let message):
-                    note = "the destination write failed after \(streamedBytes) bytes "
-                        + "(\(message)); the partial file was discarded"
-                }
-                entries.append(CopyManifestEntry(
-                    path: CopyPathRules.relative(file.path),
-                    sizeBytes: streamedBytes > 0 ? streamedBytes : file.listedSize,
-                    sha256Read: nil,
-                    sha256Written: nil,
-                    integrity: nil,
-                    attribution: nil,
-                    status: "incomplete",
-                    note: note
-                ))
-                report.notes.append("\(file.path) is incomplete: \(note)")
-                // A run cap stops the run; a per-file cap or a write failure
-                // only stops this file.
-                if case .runCap = stop { break }
-                continue
-            }
-
-            guard cat.outcome == .ok else {
-                writer.abort()
-                failed += 1
-                allHashesAgree = false
-                if cat.outcome == .timeout {
-                    let note = "ntfscat did not finish within its hard timeout; "
-                        + "\(streamedBytes) bytes were discarded and the file is incomplete"
-                    entries.append(CopyManifestEntry(
-                        path: CopyPathRules.relative(file.path),
-                        sizeBytes: streamedBytes > 0 ? streamedBytes : file.listedSize,
-                        sha256Read: nil,
-                        sha256Written: nil,
-                        integrity: nil,
-                        attribution: nil,
-                        status: "incomplete",
-                        note: note
-                    ))
-                    report.notes.append("\(file.path) is incomplete: \(note)")
-                } else {
-                    let note: String
-                    switch cat.outcome {
-                    case .denied:
-                        note = "ntfscat was denied: " + (firstLine(trimmed(cat.stderr)) ?? "no message")
-                    case .notFound:
-                        note = "ntfscat disappeared before exec"
-                    case .policyRejected:
-                        note = "the ntfscat command was rejected by the command policy"
-                    default:
-                        note = cat.consumerError
-                            ?? firstLine(trimmed(cat.stderr))
-                            ?? "ntfscat exited \(cat.exitCode.map(String.init) ?? "on a signal")"
-                    }
-                    entries.append(CopyManifestEntry(
-                        path: CopyPathRules.relative(file.path),
-                        sizeBytes: file.listedSize,
-                        sha256Read: nil,
-                        sha256Written: nil,
-                        integrity: nil,
-                        attribution: nil,
-                        status: "read-error",
-                        note: note
-                    ))
-                    report.notes.append("\(file.path) was not copied: \(note)")
-                }
-                continue
-            }
-
-            // The temporary file is read back before it is installed: this is
-            // what proves the write landed and catches a corrupting writer.
-            // A mismatch aborts the temporary file, so no bad final file
-            // exists (REQ-0144).
-            do {
-                try writer.sync()
-                var readBackHasher = SHA256()
-                let readBackBytes = try fs.readChunks(
-                    writer.temporaryPath,
-                    chunkSize: chunkSize
-                ) { data in
-                    readBackHasher.update(data: data)
-                }
-                let readHash = readHasher.finalize().map { String(format: "%02x", $0) }.joined()
-                let writtenHash = readBackHasher.finalize()
-                    .map { String(format: "%02x", $0) }
-                    .joined()
-                let agree = readBackBytes == streamedBytes && writtenHash == readHash
-
-                let integrity: CopyFileIntegrity? = report.attribution.kind == "ntfscluster"
-                    ? (report.attribution.integrity[file.path] ?? .intact)
-                    : nil
-
-                if agree {
-                    try writer.commit()
-                    totalRead += streamedBytes
-                    totalWritten += readBackBytes
-                    entries.append(CopyManifestEntry(
-                        path: CopyPathRules.relative(file.path),
-                        sizeBytes: streamedBytes,
-                        sha256Read: readHash,
-                        sha256Written: writtenHash,
-                        integrity: integrity,
-                        attribution: integrity == nil ? nil : "ntfscluster",
-                        status: "ok",
-                        note: nil
-                    ))
-                } else {
-                    writer.abort()
-                    failed += 1
-                    allHashesAgree = false
-                    entries.append(CopyManifestEntry(
-                        path: CopyPathRules.relative(file.path),
-                        sizeBytes: streamedBytes,
-                        sha256Read: readHash,
-                        sha256Written: writtenHash,
-                        integrity: integrity,
-                        attribution: integrity == nil ? nil : "ntfscluster",
-                        status: "hash-mismatch",
-                        note: "the bytes read back differ from the bytes written"
-                    ))
-                    report.notes.append(
-                        "\(file.path): written hash \(writtenHash) does not match read hash \(readHash)"
+        let loop = runCopyLoop(
+            CopyLoopInput(
+                files: files.map { CopyLoopFile(path: $0.path, listedSize: $0.listedSize) },
+                destination: destination,
+                streamer: { path, chunk, consume in
+                    tools.catFileStreaming(
+                        image: sourceForTools,
+                        path: path,
+                        chunkSize: chunk,
+                        consume: consume
                     )
-                }
-            } catch {
-                writer.abort()
-                failed += 1
-                allHashesAgree = false
-                entries.append(CopyManifestEntry(
-                    path: CopyPathRules.relative(file.path),
-                    sizeBytes: streamedBytes > 0 ? streamedBytes : file.listedSize,
-                    sha256Read: nil,
-                    sha256Written: nil,
-                    integrity: nil,
-                    attribution: nil,
-                    status: "incomplete",
-                    note: "the destination write failed after \(streamedBytes) bytes "
-                        + "(\(describe(error))); the partial file was discarded"
-                ))
-                report.notes.append(
-                    "\(file.path) is incomplete: \(describe(error)); the partial file was discarded"
-                )
-            }
-        }
-
-        report.entries = entries
-        report.bytesRead = totalRead
-        report.bytesWritten = totalWritten
-        report.maxBytes = runByteCap
-        report.hashesAgree = allHashesAgree
-        report.copyStatus = (failed == 0 && !budgetStopped && !listingPartial) ? "ok" : "partial"
-        report.manifestSHA256 = sha256Hex(Data(CopyManifest.digestText(entries: entries).utf8))
-        report.createdAt = iso8601(dependencies.now())
-        report.manifestPath = destination + "/MANIFEST.json"
-        report.summaryPath = destination + "/SUMMARY.txt"
-
-        if listingPartial {
-            report.notes.append("the listing was partial, so this copy is not a complete file tree")
-        }
-        report.notes.append(
-            "hash equality proves the copy matches the IMAGE, not that the image matches the platter: "
-                + "unreadable regions are zero-filled"
+                },
+                attribution: report.attribution,
+                runByteCap: runByteCap,
+                chunkSize: chunkSize,
+                chunkObserver: dependencies.chunkObserver
+            ),
+            fs: fs
         )
-        if report.attribution.kind == "none" {
-            report.notes.append(
-                "no per-file integrity claim: \(report.attribution.reason ?? "attribution is unavailable")"
-            )
-        } else {
-            if !report.attribution.metadataPaths.isEmpty {
-                report.notes.append(
-                    "metadata damage named by ntfscluster: "
-                        + report.attribution.metadataPaths.joined(separator: ", ")
-                        + "; only the affected directories' immediate children are metadata-damaged"
-                )
-            }
-            if !report.attribution.unattributedRanges.isEmpty {
-                report.notes.append(
-                    "\(report.attribution.unattributedRanges.count) unreadable cluster range(s) belong "
-                        + "to no inode (a gap or unallocated clusters); reported at volume level"
-                )
-            }
-        }
-
-        let copied = entries.filter { $0.status == "ok" }.count
-        let manifest = CopyManifest(
-            createdAt: report.createdAt,
-            image: .init(
-                path: image,
-                sizeBytes: imageSize,
-                sha256: report.imageSHA256,
-                sha256Note: options.hashImage
-                    ? (report.imageSHA256 == nil
-                        ? "hashing was requested but did not finish"
-                        : "computed because --hash-image was passed")
-                    : "not computed: pass --hash-image (hashing a multi-GB image is expensive)"
-            ),
-            source: .init(
-                mapfile: damage.mapfile,
-                unreadableExtents: damage.unreadableExtents,
-                unreadableBytes: damage.unreadableBytes,
-                limitBytes: damage.limitBytes,
-                remainingBytes: damage.remainingBytes
-            ),
-            damage: .init(
-                status: damage.status,
-                unreadableExtents: damage.unreadableExtents,
-                unreadableBytes: damage.unreadableBytes,
-                limitBytes: damage.limitBytes,
-                note: damage.note,
-                failedExtents: damage.failedExtents,
-                failedBytes: damage.failedBytes,
-                badExtents: damage.badExtents,
-                badBytes: damage.badBytes
-            ),
-            attribution: report.attribution,
-            copy: .init(
-                status: report.copyStatus,
-                filesCopied: copied,
-                filesFailed: failed,
-                bytesRead: totalRead,
-                bytesWritten: totalWritten,
-                hashesAgree: report.hashesAgree,
-                manifestSHA256: report.manifestSHA256,
-                maxBytes: runByteCap
-            ),
-            entries: entries,
-            notes: report.notes
+        return completeCopy(
+            report: &report,
+            options: options,
+            fs: fs,
+            damage: damage,
+            loop: loop,
+            listingPartial: listingPartial,
+            runByteCap: runByteCap,
+            image: image,
+            imageSize: imageSize,
+            now: dependencies.now()
         )
+    }
+}
 
-        do {
-            try fs.writeFile(try manifest.jsonData(), to: report.manifestPath ?? "")
-        } catch {
-            return fail(
-                .toolError,
-                30,
-                "the copy finished but MANIFEST.json could not be written: \(describe(error))"
-            )
-        }
 
-        // Exit-code precedence inside copy: a tool error is 30 (handled above);
-        // a partial copy or a mapfile damage/unknown note is 1; a clean copy is 0.
-        var code: Int32 = 0
-        var status = CopyStatus.ok
-        if report.copyStatus != "ok" {
-            code = 1
-            status = .partial
-            report.message = report.notes.first ?? "the copy is partial"
-        } else if damage.status == "ok",
-                  (damage.unreadableExtents ?? 0) > 0 || (damage.remainingBytes ?? 0) > 0 {
-            code = 1
-            status = .damage
-            report.message = "the mapfile reports damage or unrescued bytes"
-        } else if report.attribution.kind == "none",
-                  damage.status == "ok",
-                  (damage.unreadableExtents ?? 0) > 0 {
-            code = 1
-            status = .damage
-            report.message = "damage is present but per-file attribution is unavailable"
-        }
+/// The shared tail of `copy`: the manifest, the summary, and the 0/1/30
+/// verdict. Both the NTFS and the native branch reach it with the same
+/// damage report and the same per-file entries.
+func completeCopy(
+    report: inout CopyReport,
+    options: CopyOptions,
+    fs: any CopyFileSystem,
+    damage: DamageReport,
+    loop: CopyLoopOutput,
+    listingPartial: Bool,
+    runByteCap: Int64?,
+    image: String,
+    imageSize: Int64,
+    now: Date
+) -> CLIResult {
+    func fail(_ status: CopyStatus, _ code: Int32, _ message: String) -> CLIResult {
         report.status = status
         report.exitCode = code
-
-        // The human summary is written next to the manifest for a reader who
-        // does not parse JSON.
-        let summary = renderTTY(report)
-        do {
-            try fs.writeFile(Data(summary.utf8), to: report.summaryPath ?? "")
-        } catch {
-            return fail(
-                .toolError,
-                30,
-                "the copy finished but SUMMARY.txt could not be written: \(describe(error))"
-            )
-        }
+        report.message = message
         return finish(report, options: options)
     }
+
+    report.entries = loop.entries
+    report.bytesRead = loop.bytesRead
+    report.bytesWritten = loop.bytesWritten
+    report.maxBytes = runByteCap
+    report.hashesAgree = loop.hashesAgree
+    report.copyStatus = (loop.failed == 0 && !loop.budgetStopped && !listingPartial)
+        ? "ok" : "partial"
+    report.notes.append(contentsOf: loop.notes)
+
+    report.manifestSHA256 = sha256Hex(Data(CopyManifest.digestText(entries: report.entries).utf8))
+    report.createdAt = iso8601(now)
+    report.manifestPath = report.destination + "/MANIFEST.json"
+    report.summaryPath = report.destination + "/SUMMARY.txt"
+
+    if listingPartial {
+        report.notes.append("the listing was partial, so this copy is not a complete file tree")
+    }
+    report.notes.append(
+        "hash equality proves the copy matches the IMAGE, not that the image matches the platter: "
+            + "unreadable regions are zero-filled"
+    )
+    if report.attribution.kind == "none" {
+        report.notes.append(
+            "no per-file integrity claim: \(report.attribution.reason ?? "attribution is unavailable")"
+        )
+    } else {
+        if !report.attribution.metadataPaths.isEmpty {
+            report.notes.append(
+                "metadata damage named by ntfscluster: "
+                    + report.attribution.metadataPaths.joined(separator: ", ")
+                    + "; only the affected directories' immediate children are metadata-damaged"
+            )
+        }
+        if !report.attribution.unattributedRanges.isEmpty {
+            report.notes.append(
+                "\(report.attribution.unattributedRanges.count) unreadable cluster range(s) belong "
+                    + "to no inode (a gap or unallocated clusters); reported at volume level"
+            )
+        }
+    }
+
+    let copied = report.entries.filter { $0.status == "ok" }.count
+    let manifest = CopyManifest(
+        createdAt: report.createdAt,
+        image: .init(
+            path: image,
+            sizeBytes: imageSize,
+            sha256: report.imageSHA256,
+            sha256Note: options.hashImage
+                ? (report.imageSHA256 == nil
+                    ? "hashing was requested but did not finish"
+                    : "computed because --hash-image was passed")
+                : "not computed: pass --hash-image (hashing a multi-GB image is expensive)"
+        ),
+        source: .init(
+            mapfile: damage.mapfile,
+            unreadableExtents: damage.unreadableExtents,
+            unreadableBytes: damage.unreadableBytes,
+            limitBytes: damage.limitBytes,
+            remainingBytes: damage.remainingBytes
+        ),
+        damage: .init(
+            status: damage.status,
+            unreadableExtents: damage.unreadableExtents,
+            unreadableBytes: damage.unreadableBytes,
+            limitBytes: damage.limitBytes,
+            note: damage.note,
+            failedExtents: damage.failedExtents,
+            failedBytes: damage.failedBytes,
+            badExtents: damage.badExtents,
+            badBytes: damage.badBytes
+        ),
+        attribution: report.attribution,
+        copy: .init(
+            status: report.copyStatus,
+            filesCopied: copied,
+            filesFailed: loop.failed,
+            bytesRead: loop.bytesRead,
+            bytesWritten: loop.bytesWritten,
+            hashesAgree: report.hashesAgree,
+            manifestSHA256: report.manifestSHA256,
+            maxBytes: runByteCap
+        ),
+        entries: report.entries,
+        notes: report.notes
+    )
+
+    do {
+        try fs.writeFile(try manifest.jsonData(), to: report.manifestPath ?? "")
+    } catch {
+        return fail(
+            .toolError,
+            30,
+            "the copy finished but MANIFEST.json could not be written: \(describe(error))"
+        )
+    }
+
+    // Exit-code precedence inside copy: a tool error is 30 (handled above);
+    // a partial copy or a mapfile damage/unknown note is 1; a clean copy is 0.
+    var code: Int32 = 0
+    var status = CopyStatus.ok
+    if report.copyStatus != "ok" {
+        code = 1
+        status = .partial
+        report.message = report.notes.first ?? "the copy is partial"
+    } else if damage.status == "ok",
+              (damage.unreadableExtents ?? 0) > 0 || (damage.remainingBytes ?? 0) > 0 {
+        code = 1
+        status = .damage
+        report.message = "the mapfile reports damage or unrescued bytes"
+    } else if report.attribution.kind == "none",
+              damage.status == "ok",
+              (damage.unreadableExtents ?? 0) > 0 {
+        code = 1
+        status = .damage
+        report.message = "damage is present but per-file attribution is unavailable"
+    }
+    report.status = status
+    report.exitCode = code
+
+    // The human summary is written next to the manifest for a reader who
+    // does not parse JSON.
+    let summary = renderTTY(report)
+    do {
+        try fs.writeFile(Data(summary.utf8), to: report.summaryPath ?? "")
+    } catch {
+        return fail(
+            .toolError,
+            30,
+            "the copy finished but SUMMARY.txt could not be written: \(describe(error))"
+        )
+    }
+    return finish(report, options: options)
 }
 
 // MARK: - Attribution
@@ -1072,7 +893,7 @@ private func resolveCopyTools(
     return (live, (chain.ntfsinfo, chain.ntfsls, chain.ntfscat, chain.ntfscluster))
 }
 
-private func destinationPath(_ destination: String, _ volumePath: String) -> String {
+func destinationPath(_ destination: String, _ volumePath: String) -> String {
     let relative = CopyPathRules.relative(volumePath)
     return destination.hasSuffix("/") ? destination + relative : destination + "/" + relative
 }
@@ -1083,7 +904,7 @@ private func sha256Hex(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
 
-private func sha256File(path: String, size: Int64, fs: any CopyFileSystem) throws -> String {
+func sha256File(path: String, size: Int64, fs: any CopyFileSystem) throws -> String {
     var hasher = SHA256()
     var offset: Int64 = 0
     let chunk = 1_048_576
@@ -1105,7 +926,7 @@ private func iso8601(_ date: Date) -> String {
 
 // MARK: - Rendering
 
-private func finish(_ report: CopyReport, options: CopyOptions) -> CLIResult {
+func finish(_ report: CopyReport, options: CopyOptions) -> CLIResult {
     let stdout: String
     let stderr: String
 
@@ -1142,6 +963,14 @@ private func renderTTY(_ report: CopyReport) -> String {
     if let paths = report.toolPaths {
         lines.append(pad("TOOLS", 11) + "ntfsinfo \(paths.info) · ntfsls \(paths.ls) · "
             + "ntfscat \(paths.cat) · ntfscluster \(paths.cluster)")
+    }
+    if let attachment = report.attachment {
+        lines.append(pad("ATTACH", 11) + "read-only · diskutil image attach --noMount "
+            + "--readOnly · \(attachment.wholeDisk)")
+        if let selected = report.selectedVolume {
+            lines.append(pad("VOLUME", 11) + "\(selected.index) · \(selected.selectorName) · "
+                + "\(selected.device) · " + selected.filesystem.displayName)
+        }
     }
 
     let copied = report.entries.filter { $0.status == "ok" }.count
@@ -1279,6 +1108,34 @@ private func renderJSON(_ report: CopyReport) -> String {
         object["tools"] = NSNull()
     }
 
+    if let attachment = report.attachment {
+        object["attach"] = [
+            "mode": "read-only",
+            "whole_disk": attachment.wholeDisk,
+            "no_mount": true,
+        ]
+        object["volumes"] = report.volumes.map { volume in
+            [
+                "index": volume.index,
+                "device": volume.device,
+                "name": volume.name ?? NSNull(),
+                "filesystem": volume.filesystem.rawValue,
+                "encrypted": volume.encrypted,
+                "locked": volume.locked,
+            ] as [String: Any]
+        }
+    }
+    if let selected = report.selectedVolume {
+        object["volume"] = [
+            "index": selected.index,
+            "device": selected.device,
+            "name": selected.name ?? NSNull(),
+            "filesystem": selected.filesystem.rawValue,
+            "encrypted": selected.encrypted,
+            "locked": selected.locked,
+        ]
+    }
+
     let copied = report.entries.filter { $0.status == "ok" }.count
     object["copy"] = [
         "status": report.copyStatus,
@@ -1343,15 +1200,20 @@ private func pad(_ value: String, _ width: Int) -> String {
 
 private let copyUsage = "usage: disktriage copy <image> --to <dir> [options]\n"
     + "\n"
-    + "Copies the NTFS file tree out of an image read-only with the ntfs-3g\n"
-    + "userspace tools, hashing every byte read and written. Nothing is\n"
-    + "mounted and the image is never written. A partial copy or a damaged\n"
-    + "image exits 1; a precondition/tool error exits 30.\n"
+    + "Copies a volume's file tree out of an image read-only, hashing every\n"
+    + "byte read and written. NTFS is read with the ntfs-3g userspace tools;\n"
+    + "APFS, HFS+, exFAT and FAT are attached with diskutil image attach\n"
+    + "--noMount --readOnly and mounted readOnly nobrowse. The image is never\n"
+    + "written. A partial copy or a damaged image exits 1; a precondition or\n"
+    + "tool error exits 30.\n"
     + "\n"
     + "  --to <dir>          destination directory (created if missing;\n"
     + "                      existing files are never overwritten)\n"
-    + "  --mapfile <path>    damage notes and per-file attribution from this\n"
-    + "                      ddrescue mapfile (default: <image>.mapfile)\n"
+    + "  --mapfile <path>    damage notes from this ddrescue mapfile\n"
+    + "                      (default: <image>.mapfile when it exists)\n"
+    + "  --volume <name|index>\n"
+    + "                      choose one volume when the image has more than\n"
+    + "                      one (required for a multi-volume APFS container)\n"
     + "  --max-bytes <GiB>   stop after this many GiB (a positive whole\n"
     + "                      number; default: no byte cap, a 1,800 s time\n"
     + "                      budget still applies)\n"
@@ -1359,5 +1221,6 @@ private let copyUsage = "usage: disktriage copy <image> --to <dir> [options]\n"
     + "                      multi-GB image is expensive)\n"
     + "  --json              print the report as JSON\n"
     + "\n"
-    + "A device node (/dev/*) is refused with a usage error (2). NTFS only in\n"
-    + "v1; other filesystems are named and refused with exit 30.\n"
+    + "A device node (/dev/*) is refused with a usage error (2). Per-file\n"
+    + "damage attribution is NTFS-only; native filesystems report volume-level\n"
+    + "damage and say so.\n"

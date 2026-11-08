@@ -1,0 +1,16 @@
+# REQ-0277 — docs/adr/0028-native-attach-leak-guard.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0277
+statement: "The gate shall detect an attached image whose backing path is under a test temporary directory."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0028-native-attach-leak-guard.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeLeakGuardTests::REQ0276_REQ0277_REQ0278_nativeLeakGuardBites()"

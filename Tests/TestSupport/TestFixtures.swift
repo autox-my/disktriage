@@ -69,6 +69,41 @@ public enum TestFixtures {
         return (image, mapfile)
     }
 
+    /// The native (APFS/HFS+/exFAT/FAT) live-test images.
+    public static func nativeFixtureDirectory(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        root: String = repositoryRoot
+    ) -> String? {
+        if let override = environment["DISKTRIAGE_NATIVE_FIXTURE_DIR"], !override.isEmpty {
+            return hasNativeFixtures(override) ? override : nil
+        }
+        let bootstrap = root + "/.build/fixtures/native"
+        return hasNativeFixtures(bootstrap) ? bootstrap : nil
+    }
+
+    public static func nativeFixture(
+        _ name: String,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        root: String = repositoryRoot
+    ) -> String? {
+        guard let directory = nativeFixtureDirectory(environment: environment, root: root) else {
+            return nil
+        }
+        let path = directory + "/" + name
+        return FileManager.default.fileExists(atPath: path) ? path : nil
+    }
+
+    /// Whether a directory carries every native image the live tests read.
+    public static func hasNativeFixtures(_ directory: String) -> Bool {
+        [
+            "exfat-disk.img", "exfat-part.img",
+            "fat-disk.img", "fat-part.img",
+            "hfs-disk.dmg", "hfs-part.img",
+            "apfs-disk.img", "encrypted-apfs.img",
+            "damaged-exfat-part.img", "damaged-exfat-part.mapfile",
+        ].allSatisfy { FileManager.default.fileExists(atPath: directory + "/" + $0) }
+    }
+
     /// `ddrescue` from the host, for the live tests that spawn it.
     public static func ddrescueExecutable(
         environment: [String: String] = ProcessInfo.processInfo.environment

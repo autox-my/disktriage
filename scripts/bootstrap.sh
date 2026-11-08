@@ -8,7 +8,9 @@
 #      downloading only the sha256-verified tarball (cached under .build/);
 #   2. builds the tracked fixture helper with the system clang and generates
 #      the synthetic NTFS images under .build/fixtures/ntfs;
-#   3. checks that the Homebrew dependencies ddrescue and smartctl exist.
+#   3. generates the native (APFS/HFS+/exFAT/FAT) live-test images under
+#      .build/fixtures/native with the tracked tools/native-fixture generator;
+#   4. checks that the Homebrew dependencies ddrescue and smartctl exist.
 #
 # It is idempotent: a second run reuses the prefix and the generated images.
 # It never uses sudo, never mounts anything and never touches /dev.
@@ -16,6 +18,9 @@
 # Environment:
 #   DISKTRIAGE_NTFS_PREFIX   build/use this prefix instead of .build/ntfs-prefix
 #   DISKTRIAGE_FIXTURE_DIR   generate/use images here instead of .build/fixtures/ntfs
+#   DISKTRIAGE_NATIVE_FIXTURE_DIR
+#                            generate/use native images here instead of
+#                            .build/fixtures/native
 #
 # Exit: 0 PASS, 1 FAIL (a required tool is missing or a build failed).
 set -uo pipefail
@@ -30,11 +35,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || {
 
 PREFIX="${DISKTRIAGE_NTFS_PREFIX:-$ROOT/.build/ntfs-prefix}"
 FIXTURE_DIR="${DISKTRIAGE_FIXTURE_DIR:-$ROOT/.build/fixtures/ntfs}"
+NATIVE_FIXTURE_DIR="${DISKTRIAGE_NATIVE_FIXTURE_DIR:-$ROOT/.build/fixtures/native}"
 CACHE_DIR="$ROOT/.build/ntfs-cache"
 BUILD_DIR="$ROOT/.build/ntfs-build"
 HELPER_DIR="$ROOT/.build/ntfs-fixture"
 HELPER="$HELPER_DIR/nfixture"
 GENERATOR="$ROOT/tools/ntfs-fixture/generate.sh"
+NATIVE_GENERATOR="$ROOT/tools/native-fixture/generate.sh"
 NFIXTURE_C="$ROOT/tools/ntfs-fixture/nfixture.c"
 
 note() { printf '%s\n' "$*"; }
@@ -87,12 +94,18 @@ if [ ! -x "$HELPER" ] || [ "$NFIXTURE_C" -nt "$HELPER" ]; then
 fi
 note "PASS          fixture helper $HELPER"
 
-# 3. The synthetic images.
-note "== fixtures =="
+# 3. The synthetic NTFS images.
+note "== NTFS fixtures =="
 "$GENERATOR" "$PREFIX" "$FIXTURE_DIR" "$HELPER" || die "fixture generation failed"
+
+# 4. The native filesystem images. The generator is the only code that ever
+#    attaches one of these images read-write; it ejects every one it attaches.
+note "== native fixtures =="
+"$NATIVE_GENERATOR" "$NATIVE_FIXTURE_DIR" || die "native fixture generation failed"
 
 note "PASS          bootstrap complete"
 note "              DISKTRIAGE_NTFS_PREFIX=$PREFIX"
 note "              DISKTRIAGE_FIXTURE_DIR=$FIXTURE_DIR"
+note "              DISKTRIAGE_NATIVE_FIXTURE_DIR=$NATIVE_FIXTURE_DIR"
 note "              next: bash scripts/check.sh"
 exit 0

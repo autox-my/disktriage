@@ -9,7 +9,7 @@ rationale:
   source: diskdoctor.md#8-imaging--inspection
   date: 2026-11-06
   rejected_alternatives:
-    - "native read-only attach for APFS/HFS+/exFAT/FAT (plan §8): not implemented; those filesystems are detected and refused (docs/sdlc.md)."
+    - "native read-only attach for APFS/HFS+/exFAT/FAT: implemented as a separate route (docs/adr/0026-native-read-only-attach.md); NTFS stays on ntfs-3g because macOS 27.2 has no native NTFS mount."
     - "native mount_ntfs: absent on macOS 27.2 (P0 A2)"
     - "macFUSE with ntfs-3g mount: kernel extension or FSKit, heavy install, and a mount again"
   assumptions:

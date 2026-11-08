@@ -60,6 +60,7 @@ if [ "$PREFLIGHT_RC" -ne 0 ]; then
 fi
 export DISKTRIAGE_NTFS_PREFIX="$(fixtures_ntfs_prefix "$ROOT")"
 export DISKTRIAGE_FIXTURE_DIR="$(fixtures_ntfs_dir "$ROOT")"
+export DISKTRIAGE_NATIVE_FIXTURE_DIR="$(fixtures_native_dir "$ROOT")"
 
 LOG_DIR="$(mktemp -d)" || {
     echo "UNVERIFIABLE  cannot create a temporary directory"
@@ -96,6 +97,8 @@ run_build() {
 # suite. Shared with scripts/check-gate-probe.sh, which proves the leak rule
 # bites without touching a real leftover.
 . "$ROOT/scripts/lib/temp-leak.sh"
+# shellcheck source=lib/native-leak.sh
+. "$ROOT/scripts/lib/native-leak.sh"
 TEMP_BEFORE="$LOG_DIR/temp-before.txt"
 TEMP_AFTER="$LOG_DIR/temp-after.txt"
 
@@ -121,6 +124,21 @@ run_tests() {
     leak_output="$(temp_leak_verdict "$TEMP_BEFORE" "$TEMP_AFTER")"
     leak_rc=$?
     echo "$leak_output"
+
+    # A native attach or mount the suite leaked is a failure, like a leaked
+    # temp directory. A scan that cannot run is UNVERIFIABLE, never a pass.
+    local native_scan="$LOG_DIR/native-leak.txt" native_rc=0 native_output
+    native_leak_scan >"$native_scan"
+    native_output="$(native_leak_verdict "$native_scan")"
+    native_rc=$?
+    case "$native_rc" in
+        0|1|3) ;;
+        *)
+            echo "UNVERIFIABLE  the native attach leak scan could not run (exit $native_rc)"
+            native_rc=3
+            ;;
+    esac
+    echo "$native_output"
 
     local report total=0 failed=0 skipped=0 seen=0 counts written=""
     local report_total report_failed report_skipped
@@ -167,9 +185,13 @@ run_tests() {
         done
     fi
 
-    # A leaked temp directory is a real failure, even beside a skip.
-    if [ "$leak_rc" -ne 0 ]; then
+    # A leaked temp directory or a leaked native attach is a real failure,
+    # even beside a skip. A scan that could not run is UNVERIFIABLE.
+    if [ "$leak_rc" -ne 0 ] || [ "$native_rc" -eq 1 ]; then
         return 1
+    fi
+    if [ "$native_rc" -eq 3 ] && [ "$verdict_rc" -ne 1 ]; then
+        return 3
     fi
     return "$verdict_rc"
 }
