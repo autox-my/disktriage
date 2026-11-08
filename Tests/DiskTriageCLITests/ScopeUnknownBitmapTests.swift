@@ -10,7 +10,7 @@ import DiskTriageCollectors
 /// allocation, never free. The real expectations come from
 /// `Tests/Fixtures/minah-scope-mapfile.txt` (redacted, with the arithmetic in
 /// `minah-scope-notes.md`); the synthetic end-to-end runs use
-/// `captures/ntfs-spike/img/disk.img`, whose bitmap data is the recorded
+/// the bootstrap-generated `disk.img`, whose bitmap data is the recorded
 /// `$Bitmap` at LCN 2055 (one 4096-byte cluster, 2048 bytes of data).
 struct ScopeUnknownBitmapTests {
 
@@ -51,7 +51,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0239 / REQ-0240
     @Test(
         "REQ0239_REQ0240 unknown bitmap clusters are read in stage 1 and never in stage 2",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0239_REQ0240_unknownBitmapClustersAreStageOneNotStageTwo() throws {
         let harness = try UnknownBitmapHarness()
@@ -81,7 +81,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0240 / REQ-0241
     @Test(
         "REQ0241 --used-only images the unknown clusters and the report counts them separately",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0241_usedOnlyImagesUnknownClustersAndTheReportIsSeparate() throws {
         let harness = try UnknownBitmapHarness()
@@ -103,7 +103,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0241
     @Test(
         "REQ0241 the scope report keeps used/free and reports unknown beside them",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0241_scopeReportSeparatesUsedFreeAndUnknown() throws {
         let harness = try UnknownBitmapHarness()
@@ -144,7 +144,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0242
     @Test(
         "REQ0242 more than ten percent unreadable $Bitmap falls back to whole-device passes",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0242_moreThanTenPercentUnreadableBitmapFallsBack() throws {
         let harness = try UnknownBitmapHarness()
@@ -167,7 +167,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0243
     @Test(
         "REQ0243 an unfinished primary boot sector is not used; the backup supplies the geometry",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0243_unfinishedPrimaryBootSectorFallsBackToTheBackup() throws {
         let harness = try UnknownBitmapHarness()
@@ -182,7 +182,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0243
     @Test(
         "REQ0243 when neither boot sector is finished the scope report fails and names it",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0243_unfinishedBothBootSectorsIsATypedFailure() throws {
         let harness = try UnknownBitmapHarness()
@@ -203,7 +203,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0244
     @Test(
         "REQ0244 an unfinished $MFT record 0 falls back to whole-device passes and names it",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0244_unfinishedMFTRecordZeroFallsBack() throws {
         let harness = try UnknownBitmapHarness()
@@ -222,7 +222,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0244
     @Test(
         "REQ0244 an unfinished $Bitmap record 6 is a typed stage-0 failure",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0244_unfinishedBitmapRecordFails() throws {
         let harness = try UnknownBitmapHarness()
@@ -237,7 +237,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0245
     @Test(
         "REQ0245 other unfinished MFT records are reported as unreadable, not fatal",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0245_otherUnfinishedMFTRecordsAreReported() throws {
         let harness = try UnknownBitmapHarness()
@@ -252,7 +252,7 @@ struct ScopeUnknownBitmapTests {
     // REQ-0247
     @Test(
         "REQ0247 the JSON and the sidecar carry the unknown-bitmap keys",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0247_jsonAndSidecarCarryTheUnknownBitmapKeys() throws {
         let harness = try UnknownBitmapHarness()
@@ -294,7 +294,7 @@ private final class UnknownBitmapHarness {
     var mapfile: String { image + ".mapfile" }
 
     init() throws {
-        let capture = try #require(ntfsDiskImagePath(), "captures/ntfs-spike/img/disk.img")
+        let capture = try #require(ntfsDiskImagePath(), "run scripts/bootstrap.sh to build the NTFS fixtures")
         directory = temp.path
         source = directory + "/device.bin"
         image = directory + "/disk.img"

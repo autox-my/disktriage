@@ -127,18 +127,11 @@ struct CopyLiveTests {
 
 // MARK: - Availability
 
-/// The spike's damaged image is gitignored, so it is looked up in the checkout
-/// or the main repository beside a linked worktree, exactly like the prefix.
+/// The damaged image and its mapfile are built by `scripts/bootstrap.sh`;
+/// `TestFixtures` finds them through the environment or `.build/`.
 func liveCopyFixture() -> (prefix: String, image: String, mapfile: String)? {
-    guard let prefix = liveNTFSPrefix() else { return nil }
-    for root in candidateRepositoryRoots() {
-        let directory = root + "/captures/ntfs-spike/img"
-        let image = directory + "/damaged-clip-part.img"
-        let mapfile = directory + "/damaged-clip-part.mapfile"
-        if FileManager.default.fileExists(atPath: image),
-           FileManager.default.fileExists(atPath: mapfile) {
-            return (prefix, image, mapfile)
-        }
-    }
-    return nil
+    guard let prefix = TestFixtures.ntfsPrefix(),
+          let fixture = TestFixtures.damagedClipFixture()
+    else { return nil }
+    return (prefix, fixture.image, fixture.mapfile)
 }

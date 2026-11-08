@@ -1,0 +1,20 @@
+# REQ-0258 — docs/adr/0024-test-fixture-bootstrap.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0258
+statement: "The gate shall answer UNVERIFIABLE with exit code 3 and name scripts/bootstrap.sh when the bootstrap output is absent."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: docs/adr/0024-test-fixture-bootstrap.md#decision
+  date: 2026-11-08
+  rejected_alternatives:
+    - "Let the suite skip and fold that into 3 after running: the gate would still be grey, but the user would not be told the one command that fixes it before the expensive build."
+    - "Treat a missing fixture as a failure: a fresh clone would answer 1 for a setup step, which is not a code defect."
+  assumptions:
+    - "scripts/check.sh runs scripts/lib/fixtures.sh as a preflight and exits 3 before building; scripts/check-gate-probe.sh exercises the same function with an absent, a complete, a captures-only and an env-overridden root."
+pins:
+  value: "3"
+  unit: "none"

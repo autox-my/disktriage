@@ -1,0 +1,19 @@
+# REQ-0260 — docs/adr/0024-test-fixture-bootstrap.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0260
+statement: "The NTFS fixture generator shall produce the recorded disk layout deterministically from a fixed file set."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: docs/adr/0024-test-fixture-bootstrap.md#decision
+  date: 2026-11-08
+  rejected_alternatives:
+    - "Commit the images: 64-80 MiB of incompressible data per image is not repository material."
+    - "Recompute the expected layout from the generated image in the test: that would test the code against itself."
+  assumptions:
+    - "tools/ntfs-fixture/generate.sh is the generator. Two independent generations were compared on the facts the tests assert (used runs, used/free cluster counts, MFT and bitmap locations, file sizes); the live tests run on the generated image and compare it with the recorded Tests/Fixtures/ntfs-disk-* facts."
+pins:
+  modality: "SHALL"

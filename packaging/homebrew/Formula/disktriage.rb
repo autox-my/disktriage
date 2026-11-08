@@ -3,14 +3,8 @@
 # disktriage's Homebrew formula. The tap is the v1 distribution route; a
 # signed .app is P4 and needs a Developer ID, which is out of scope here.
 #
-# Licence: the repository has no LICENSE file yet. `:cannot_represent` is a
-# deliberate placeholder, not a guess; the human must choose a licence before
-# the tap is published. See docs/packaging.md and
-# docs/adr/0022-homebrew-packaging.md.
-#
-# GPL: ntfs-3g's userspace tools are a separate GPL subprocess, built from the
-# upstream tarball by the user's machine. They are not bundled into and not
-# linked with the disktriage binary.
+# Licence: Apache-2.0 (LICENSE; ADR 0023). The GPL tools are separate
+# subprocesses, not linked into or bundled with disktriage.
 #
 # The source url and sha256 below are placeholders that
 # `scripts/package.sh formula` replaces with the local tarball for

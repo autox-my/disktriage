@@ -9,8 +9,8 @@ import DiskTriageCore
 /// copies only the domain extents, and the real spike image's `$Bitmap`
 /// agrees with the recorded `ntfscluster` output.
 ///
-/// Each live test is reported as **skipped** when its tool or the gitignored
-/// capture is absent, never as a pass; `scripts/check.sh` answers 3 for a
+/// Each live test is reported as **skipped** when its tool or the bootstrap
+/// fixture is absent, never as a pass; `scripts/check.sh` answers 3 for a
 /// `<skipped>` case. The pure tests for the same rules are in
 /// `DiskTriageCoreTests.NTFSAllocationTests`.
 struct NTFSAllocationLiveTests {
@@ -136,7 +136,7 @@ struct NTFSAllocationLiveTests {
     // REQ-0198
     @Test(
         "REQ0198 the real disk image's bitmap runs equal the recorded ntfscluster used runs",
-        .enabled(if: diskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: diskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0198_realImageBitmapMatchesNtfscluster() throws {
         let parsed = try RealDisk.parse()
@@ -156,7 +156,7 @@ struct NTFSAllocationLiveTests {
     // REQ-0199
     @Test(
         "REQ0199 the allocation domain covers every file data run ntfscluster reports",
-        .enabled(if: diskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: diskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0199_realImageDomainCoversEveryFileDataRun() throws {
         let parsed = try RealDisk.parse()
@@ -315,23 +315,11 @@ private enum RealDisk {
 // MARK: - Availability
 
 private func diskImagePath() -> String? {
-    for root in candidateRepositoryRoots() {
-        let path = root + "/captures/ntfs-spike/img/disk.img"
-        if FileManager.default.fileExists(atPath: path) { return path }
-    }
-    return nil
+    TestFixtures.ntfsDiskImage()
 }
 
 private func ddrescueExecutable() -> String? {
-    var candidates = [
-        "/opt/homebrew/bin/ddrescue",
-        "/usr/local/bin/ddrescue",
-        "/usr/bin/ddrescue",
-    ]
-    if let path = ProcessInfo.processInfo.environment["PATH"] {
-        candidates += path.split(separator: ":").map { String($0) + "/ddrescue" }
-    }
-    return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    TestFixtures.ddrescueExecutable()
 }
 
 private func fixtureDataCLI(_ name: String) throws -> Data {

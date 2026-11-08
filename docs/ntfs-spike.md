@@ -3,7 +3,9 @@
 Status: spike result, 2026-11-06. Everything below was run on this host unless
 marked **UNVERIFIED**. Scratch artifacts (images, prefixes, logs, the fixture
 helper) live in `captures/ntfs-spike/`, which is gitignored; nothing here is
-shipped code.
+shipped code. The fixture recipe was later moved into the tracked
+`tools/ntfs-fixture/` generator and `scripts/bootstrap.sh`; see ADR
+[0024](./adr/0024-test-fixture-bootstrap.md).
 
 Host: macOS 27.2 (build 26B123), arm64 (M1), Xcode 27.2 (27B52), Apple clang
 21.0.0 (clang-2100.4.1.1). No `sudo` was used. No mount was performed. No

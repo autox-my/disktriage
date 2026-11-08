@@ -1,0 +1,18 @@
+# REQ-0259 — docs/adr/0024-test-fixture-bootstrap.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0259
+statement: "The bootstrap script shall build the ntfs-3g userspace tools from the pinned tarball only after verifying its SHA-256."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: docs/adr/0024-test-fixture-bootstrap.md#decision
+  date: 2026-11-08
+  rejected_alternatives:
+    - "Use a Homebrew ntfs-3g formula: the core formula is Linux-only and the tap variant forces macFUSE."
+  assumptions:
+    - "scripts/lib/ntfs-3g.sh carries the version and sha256; scripts/bootstrap.sh calls it. The same pin is in packaging/homebrew/Formula/disktriage.rb's resource block, and the build logs under .build/ntfs-build/ record configure, make and install."
+pins:
+  modality: "SHALL"

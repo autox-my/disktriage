@@ -1,0 +1,17 @@
+# REQ-0257 — docs/adr/0024-test-fixture-bootstrap.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0257
+statement: "The test support shall locate the ntfs-3g prefix and the NTFS fixture images from the environment override or the bootstrap output under .build, never from captures/."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0024-test-fixture-bootstrap.md#decision
+  date: 2026-11-08
+  rejected_alternatives:
+    - "Keep looking in captures/ beside a linked worktree: a fresh clone has no captures/, so the live tests would be skipped or fail."
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.FixtureLocatorTests::REQ0257_locatorUsesEnvThenBootstrapNeverCaptures()"

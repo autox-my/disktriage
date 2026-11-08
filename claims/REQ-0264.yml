@@ -1,0 +1,18 @@
+# REQ-0264 — docs/adr/0023-apache-2-0-licence.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0264
+statement: "The distribution shall invoke the GPL tools ddrescue, smartmontools and ntfs-3g as separate processes, not link or bundle them."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: docs/adr/0023-apache-2-0-licence.md#decision
+  date: 2026-11-08
+  rejected_alternatives:
+    - "Bundle the GPL binaries: that would trigger GPL compliance (source offer and notices) and is not a v0.1 decision."
+  assumptions:
+    - "NOTICE states the tools are invoked as separate processes; the formula builds ntfs-3g into libexec and the binary links no ntfs-3g or FUSE library (the formula test runs otool -L)."
+pins:
+  modality: "SHALL"

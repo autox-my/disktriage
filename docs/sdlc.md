@@ -35,6 +35,7 @@ prints both logs in full, and chooses one outcome from the JUnit report it count
 
 | What | Command |
 |---|---|
+| Test fixtures (one command) | `scripts/bootstrap.sh` |
 | The gate | `bash scripts/check.sh` |
 | Build | `swift build` |
 | Tests | `swift test` |
@@ -120,6 +121,16 @@ not one giant commit at the end.
 
 Golden `SignalSet` JSON lives in `Tests/Fixtures/` and is replayed against the
 core. A fixture is code: it is reviewed like code.
+
+The live NTFS tests need a built ntfs-3g prefix and synthetic images, which are
+64–80 MiB each and cannot be committed. `scripts/bootstrap.sh` is the one
+documented setup command: it builds the pinned ntfs-3g tools into
+`.build/ntfs-prefix` and generates the images under `.build/fixtures/ntfs` from
+the tracked generator in `tools/ntfs-fixture/`. `Tests/TestSupport` locates them
+through `DISKTRIAGE_NTFS_PREFIX` / `DISKTRIAGE_FIXTURE_DIR`, then `.build/`;
+`captures/` is never a test input. When the bootstrap output is absent the gate
+is **3** and names the command (ADR
+[0024](./adr/0024-test-fixture-bootstrap.md)).
 
 - Every collected section carries a `status`; include `denied`, `timeout` and
   `unsupported` fixtures, not only happy values.

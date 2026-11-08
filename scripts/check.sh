@@ -45,6 +45,22 @@ fi
 # says so itself, so one missing tool does not hide the other steps' outcomes.
 REQ_BIN="${REQ_BIN:-$(command -v req 2>/dev/null || true)}"
 
+# The live NTFS tests need the prefix and images scripts/bootstrap.sh builds.
+# Without them the suite cannot run the same tests as a prepared checkout, so
+# the gate is UNVERIFIABLE (3) and names the one command that fixes it. It is
+# never 0 (a silent skip) and never 1 (a missing fixture is not a failure).
+# shellcheck source=lib/fixtures.sh
+. "$ROOT/scripts/lib/fixtures.sh"
+PREFLIGHT_OUTPUT="$(fixtures_preflight "$ROOT")"
+PREFLIGHT_RC=$?
+if [ "$PREFLIGHT_RC" -ne 0 ]; then
+    echo "$PREFLIGHT_OUTPUT"
+    echo "UNVERIFIABLE"
+    exit 3
+fi
+export DISKTRIAGE_NTFS_PREFIX="$(fixtures_ntfs_prefix "$ROOT")"
+export DISKTRIAGE_FIXTURE_DIR="$(fixtures_ntfs_dir "$ROOT")"
+
 LOG_DIR="$(mktemp -d)" || {
     echo "UNVERIFIABLE  cannot create a temporary directory"
     exit 3

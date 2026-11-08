@@ -8,11 +8,12 @@ import DiskTriageCollectors
 /// The allocation-aware NTFS order in `disktriage image` (diskdoctor.md §8,
 /// "Allocation-aware order for NTFS (default)"), driven end-to-end through the
 /// injected ddrescue launcher. The "device" is a copy of the synthetic
-/// whole-disk NTFS image in `captures/ntfs-spike/img/disk.img`; the fake
-/// launcher copies exactly the domain mapfile's `+` extents from that source
-/// into the image, as ddrescue `-m` does, and rewrites the main mapfile.
+/// whole-disk NTFS image `scripts/bootstrap.sh` generates under
+/// `.build/fixtures/ntfs`; the fake launcher copies exactly the domain
+/// mapfile's `+` extents from that source into the image, as ddrescue `-m`
+/// does, and rewrites the main mapfile.
 ///
-/// Every test is `<skipped>` when the gitignored capture is absent, never a
+/// Every test is `<skipped>` when the bootstrap fixture is absent, never a
 /// pass. The pure expectations come from `Tests/Fixtures/ntfs-disk-*`.
 struct NTFSAllocationImageTests {
 
@@ -21,7 +22,7 @@ struct NTFSAllocationImageTests {
     // REQ-0200
     @Test(
         "REQ0200 the default order is stage 0 metadata, stage 1 used clusters, stage 2 the rest",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0200_defaultStagingOrder() throws {
         let harness = try NTFSImageHarness()
@@ -52,7 +53,7 @@ struct NTFSAllocationImageTests {
     // REQ-0201
     @Test(
         "REQ0201 stage 0 reads partition table, boot sectors, MFT and bitmap through one main mapfile",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0201_stageZeroReadsMetadataBeforeUsedClusters() throws {
         let harness = try NTFSImageHarness()
@@ -86,7 +87,7 @@ struct NTFSAllocationImageTests {
     // REQ-0202
     @Test(
         "REQ0202 an invalid primary boot sector uses the backup and reports that source",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0202_backupBootSectorSuppliesGeometry() throws {
         let harness = try NTFSImageHarness()
@@ -114,7 +115,7 @@ struct NTFSAllocationImageTests {
     // REQ-0203
     @Test(
         "REQ0203 a non-NTFS source falls back to plain whole-device passes with a reason",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0203_nonNTFSFallsBack() throws {
         let harness = try NTFSImageHarness(sourceBytes: Data(repeating: 0x41, count: 4 * 1_048_576))
@@ -138,7 +139,7 @@ struct NTFSAllocationImageTests {
     // REQ-0203 / REQ-0210
     @Test(
         "REQ0203_REQ0210 a zeroed $Bitmap falls back and never skips free space",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0203_REQ0210_zeroedBitmapFallsBackAndSkipsNothing() throws {
         let harness = try NTFSImageHarness()
@@ -167,7 +168,7 @@ struct NTFSAllocationImageTests {
     // REQ-0204
     @Test(
         "REQ0204 --used-only stops after stage 1, says so, and exits 0",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0204_usedOnlySkipsStageTwo() throws {
         let harness = try NTFSImageHarness()
@@ -188,7 +189,7 @@ struct NTFSAllocationImageTests {
     // REQ-0205
     @Test(
         "REQ0205 each stage runs -n then -r3, and -a is only in pass 1",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0205_eachStageRunsTwoPassesWithMinRateInPassOne() throws {
         let harness = try NTFSImageHarness()
@@ -214,7 +215,7 @@ struct NTFSAllocationImageTests {
     // REQ-0206
     @Test(
         "REQ0206 every stage domain is clipped to --limit",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0206_domainsAreClippedToTheLimit() throws {
         let harness = try NTFSImageHarness()
@@ -243,7 +244,7 @@ struct NTFSAllocationImageTests {
     // REQ-0207 / REQ-0216
     @Test(
         "REQ0207_REQ0216 the sidecar records every stage and --used-only is not resume identity",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0207_REQ0216_sidecarRecordsStageStateAndUsedOnlyIsNotIdentity() throws {
         let harness = try NTFSImageHarness()
@@ -277,7 +278,7 @@ struct NTFSAllocationImageTests {
     // REQ-0211
     @Test(
         "REQ0211 a resume after an interruption at each stage continues at that stage",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0211_resumeContinuesAfterAnInterruptedStage() throws {
         for interruptedStage in [0, 1, 2] {
@@ -327,7 +328,7 @@ struct NTFSAllocationImageTests {
     // REQ-0208 / REQ-0217
     @Test(
         "REQ0208_REQ0217 the summary names the scope and never calls a used-only image complete",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0208_REQ0217_summaryScopeNeverClaimsAWholeDevice() throws {
         let harness = try NTFSImageHarness()
@@ -468,7 +469,7 @@ private final class NTFSImageHarness {
     let launcher: StageFakeDdrescueLauncher
 
     init(sourceBytes: Data? = nil) throws {
-        let capture = try #require(ntfsDiskImagePath(), "captures/ntfs-spike/img/disk.img")
+        let capture = try #require(ntfsDiskImagePath(), "run scripts/bootstrap.sh to build the NTFS fixtures")
         directory = temp.path
         source = directory + "/device.bin"
         image = directory + "/disk.img"
@@ -744,11 +745,7 @@ private func fixtureDataFile(_ name: String) throws -> Data {
 // MARK: - Availability
 
 func ntfsDiskImagePath() -> String? {
-    for root in candidateRepositoryRoots() {
-        let path = root + "/captures/ntfs-spike/img/disk.img"
-        if FileManager.default.fileExists(atPath: path) { return path }
-    }
-    return nil
+    TestFixtures.ntfsDiskImage()
 }
 
 func imagingExecutor() -> CLIExecutor {

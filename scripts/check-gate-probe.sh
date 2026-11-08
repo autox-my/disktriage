@@ -308,6 +308,77 @@ output="$(REQ_BIN=/nonexistent "$ROOT/scripts/req-counts.sh" --root "$counts_roo
 got=$?
 expect_rc "req-counts is UNVERIFIABLE without req" 3 "$got" "$output" "UNVERIFIABLE"
 
+# (f) The fixture preflight: an absent bootstrap output is UNVERIFIABLE (3)
+# naming scripts/bootstrap.sh, never PASS and never FAIL; the environment
+# override wins; and `captures/` is never consulted.
+# shellcheck source=lib/fixtures.sh
+. "$ROOT/scripts/lib/fixtures.sh"
+
+make_fake_prefix() {
+    mkdir -p "$1/bin" "$1/sbin"
+    local tool
+    for tool in bin/ntfsinfo bin/ntfsls sbin/mkntfs; do
+        printf '#!/bin/sh\nexit 0\n' >"$1/$tool"
+        chmod +x "$1/$tool"
+    done
+}
+make_fake_fixtures() {
+    mkdir -p "$1"
+    : >"$1/disk.img"
+    : >"$1/damaged-clip-part.img"
+    : >"$1/damaged-clip-part.mapfile"
+}
+
+fixture_root="$TMP/fixture-root"
+mkdir -p "$fixture_root"
+output="$(fixtures_preflight "$fixture_root")"
+got=$?
+expect_rc "fixtures preflight without bootstrap" 3 "$got" "$output" "scripts/bootstrap.sh"
+
+make_fake_prefix "$fixture_root/.build/ntfs-prefix"
+make_fake_fixtures "$fixture_root/.build/fixtures/ntfs"
+output="$(fixtures_preflight "$fixture_root")"
+got=$?
+expect_rc "fixtures preflight with the bootstrap output" 0 "$got" "$output"
+
+# captures/ alone is never enough, even when it is complete.
+captures_root="$TMP/captures-root"
+mkdir -p "$captures_root/captures/ntfs-spike"
+make_fake_prefix "$captures_root/captures/ntfs-spike/prefix"
+make_fake_fixtures "$captures_root/captures/ntfs-spike/img"
+output="$(fixtures_preflight "$captures_root")"
+got=$?
+expect_rc "fixtures preflight never uses captures/" 3 "$got" "$output" "scripts/bootstrap.sh"
+
+# The environment override wins; an incomplete override fails closed rather
+# than silently using the bootstrap output.
+env_prefix="$TMP/env-prefix"
+env_fixtures="$TMP/env-fixtures"
+make_fake_prefix "$env_prefix"
+make_fake_fixtures "$env_fixtures"
+env_root="$TMP/env-root"
+mkdir -p "$env_root"
+output="$(DISKTRIAGE_NTFS_PREFIX="$env_prefix" DISKTRIAGE_FIXTURE_DIR="$env_fixtures" \
+    fixtures_preflight "$env_root")"
+got=$?
+expect_rc "fixtures preflight honours the environment" 0 "$got" "$output"
+output="$(DISKTRIAGE_NTFS_PREFIX="$TMP/missing" DISKTRIAGE_FIXTURE_DIR="$env_fixtures" \
+    fixtures_preflight "$fixture_root")"
+got=$?
+expect_rc "fixtures preflight fails closed on an incomplete override" 3 "$got" "$output" \
+    "scripts/bootstrap.sh"
+
+# (g) The shell recipe and the Homebrew formula pin the same ntfs-3g tarball.
+formula_pin="$(sed -n 's/.*sha256 "\([0-9a-f]\{64\}\)".*/\1/p' \
+    "$ROOT/packaging/homebrew/Formula/disktriage.rb" | head -1)"
+shell_pin="$(sed -n 's/^NTFS3G_SHA256="\([0-9a-f]\{64\}\)"/\1/p' \
+    "$ROOT/scripts/lib/ntfs-3g.sh")"
+if [ -n "$formula_pin" ] && [ "$formula_pin" = "$shell_pin" ]; then
+    echo "ok   probe ntfs-3g pin matches the formula -> $shell_pin"
+else
+    fail "ntfs-3g pin" "formula '$formula_pin' != shell '$shell_pin'"
+fi
+
 if [ "$failures" -ne 0 ]; then
     echo "FAIL          $failures probe(s) failed"
     exit 1

@@ -6,9 +6,9 @@ import DiskTriageCLI
 import DiskTriageCollectors
 
 /// One live integration test: a tiny NTFS image built with `mkntfs`, inspected
-/// through the shipped ntfs-3g runner. It runs only when a built prefix with
-/// `bin/ntfsinfo`, `bin/ntfsls` and `sbin/mkntfs` is available — the spike tree
-/// beside the checkout, or `DISKTRIAGE_NTFS_PREFIX`.
+/// through the shipped ntfs-3g runner. It runs only when `scripts/bootstrap.sh`
+/// has built a prefix with `bin/ntfsinfo`, `bin/ntfsls` and `sbin/mkntfs`, or
+/// when `DISKTRIAGE_NTFS_PREFIX` names one.
 ///
 /// When the tools are absent the test is reported as **skipped**, never as a
 /// pass. `scripts/check.sh` answers 3 (UNVERIFIABLE) for a JUnit `<skipped>`
@@ -130,52 +130,9 @@ struct InspectLiveTests {
 
 // MARK: - Availability
 
-/// A built ntfs-3g prefix with the two read tools and `mkntfs`.
+/// A built ntfs-3g prefix with the two read tools and `mkntfs`. Resolution is
+/// `TestFixtures`: the environment override, then `.build/ntfs-prefix`.
 func liveNTFSPrefix() -> String? {
-    let environment = ProcessInfo.processInfo.environment
-    if let prefix = environment["DISKTRIAGE_NTFS_PREFIX"], hasLiveTools(prefix) {
-        return prefix
-    }
-    if let info = NTFSToolLocator.resolve("ntfsinfo", environment: environment) {
-        let prefix = URL(fileURLWithPath: info)
-            .deletingLastPathComponent()   // bin
-            .deletingLastPathComponent()   // prefix
-            .path
-        if hasLiveTools(prefix) { return prefix }
-    }
-    for root in candidateRepositoryRoots() {
-        let prefix = root + "/captures/ntfs-spike/prefix"
-        if hasLiveTools(prefix) { return prefix }
-    }
-    return nil
+    TestFixtures.ntfsPrefix()
 }
 
-private func hasLiveTools(_ prefix: String) -> Bool {
-    ["bin/ntfsinfo", "bin/ntfsls", "sbin/mkntfs"].allSatisfy {
-        FileManager.default.isExecutableFile(atPath: prefix + "/" + $0)
-    }
-}
-
-/// The checkout and, when this is a linked worktree, the main repository whose
-/// gitignored `captures/` holds the spike build.
-func candidateRepositoryRoots() -> [String] {
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()   // DiskTriageCLITests
-        .deletingLastPathComponent()   // Tests
-        .deletingLastPathComponent()   // repository root
-        .path
-    var roots = [root]
-
-    // A worktree's `.git` is a file: `gitdir: <main>/.git/worktrees/<name>`.
-    if let git = try? String(contentsOfFile: root + "/.git", encoding: .utf8),
-       git.hasPrefix("gitdir: ") {
-        let gitdir = git.dropFirst("gitdir: ".count).trimmingCharacters(in: .whitespacesAndNewlines)
-        let main = URL(fileURLWithPath: gitdir)
-            .deletingLastPathComponent()   // worktrees
-            .deletingLastPathComponent()   // .git
-            .deletingLastPathComponent()   // main repository
-            .path
-        if main != root { roots.append(main) }
-    }
-    return roots
-}

@@ -7,14 +7,14 @@ import DiskTriageCollectors
 @testable import DiskTriageCLI
 
 /// The real ddrescue 1.30 half of the allocation-aware `image` work. Each test
-/// is `<skipped>` when ddrescue or the gitignored spike image is absent — never
-/// a pass; `scripts/check.sh` answers 3 for a skipped case.
+/// is `<skipped>` when ddrescue or the bootstrap fixture is absent — never a
+/// pass; `scripts/check.sh` answers 3 for a skipped case.
 struct NTFSAllocationImageLiveTests {
 
     // REQ-0213
     @Test(
         "REQ0213 default staging images the whole device byte for byte",
-        .enabled(if: liveAllocationAvailable(), "ddrescue or captures/ntfs-spike/img/disk.img absent")
+        .enabled(if: liveAllocationAvailable(), "ddrescue or the bootstrap NTFS fixture absent")
     )
     func REQ0213_defaultStagingReproducesTheDevice() throws {
         let harness = try RealAllocationHarness()
@@ -29,7 +29,7 @@ struct NTFSAllocationImageLiveTests {
     // REQ-0214
     @Test(
         "REQ0214 --used-only copies every used cluster and leaves free clusters zero",
-        .enabled(if: liveAllocationAvailable(), "ddrescue or captures/ntfs-spike/img/disk.img absent")
+        .enabled(if: liveAllocationAvailable(), "ddrescue or the bootstrap NTFS fixture absent")
     )
     func REQ0214_usedOnlyCopiesUsedClustersAndNoFreeSpace() throws {
         let harness = try RealAllocationHarness()
@@ -59,7 +59,7 @@ struct NTFSAllocationImageLiveTests {
     // REQ-0215
     @Test(
         "REQ0215 a zeroed primary boot sector uses the backup and keeps every used cluster",
-        .enabled(if: liveAllocationAvailable(), "ddrescue or captures/ntfs-spike/img/disk.img absent")
+        .enabled(if: liveAllocationAvailable(), "ddrescue or the bootstrap NTFS fixture absent")
     )
     func REQ0215_backupBootSectorLive() throws {
         let harness = try RealAllocationHarness()
@@ -208,13 +208,5 @@ private func liveAllocationAvailable() -> Bool {
 }
 
 private func ddrescueExecutablePath() -> String? {
-    var candidates = [
-        "/opt/homebrew/bin/ddrescue",
-        "/usr/local/bin/ddrescue",
-        "/usr/bin/ddrescue",
-    ]
-    if let path = ProcessInfo.processInfo.environment["PATH"] {
-        candidates += path.split(separator: ":").map { String($0) + "/ddrescue" }
-    }
-    return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    TestFixtures.ddrescueExecutable()
 }
