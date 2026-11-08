@@ -91,12 +91,10 @@ and install were removed.
 
 These are outward-facing and are deliberately not done by an agent:
 
-1. **Choose the homepage.** The formula uses the placeholder
-   `https://github.com/autox-my/disktriage`; replace it with the public
-   project home.
-2. **Publish the tap repository** (for example `OWNER/homebrew-tap`) and
-   put the formula at `Formula/disktriage.rb`. The tap is not published yet;
-   the README's tap URL is a placeholder.
+1. ~~Choose the homepage.~~ Done: `https://github.com/autox-my/disktriage`.
+2. **Publish the tap repository** `autox-my/homebrew-tap` (users run
+   `brew tap autox-my/tap`) and put the formula at `Formula/disktriage.rb`.
+   The tap is not published yet; the README says so.
 3. **Tag the release** and build the release archive. Replace the template's
    `__DISKTRIAGE_SOURCE_URL__` and `__DISKTRIAGE_SOURCE_SHA256__` with the
    published archive and its real sha256 (or let a release job run

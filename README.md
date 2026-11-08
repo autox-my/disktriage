@@ -36,10 +36,10 @@ verdict can be formed (usage errors are 2).
 ## Install
 
 The v1 distribution route is a Homebrew tap. It is **not published yet**, so
-the tap URL below is a placeholder:
+the commands below will work once `autox-my/homebrew-tap` exists:
 
 ```sh
-brew tap OWNER/homebrew-tap
+brew tap autox-my/tap
 brew install disktriage
 ```
 
