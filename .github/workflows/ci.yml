@@ -1,0 +1,269 @@
+name: CI
+
+# Build + test on GitHub-hosted macOS runners. The full gate (scripts/check.sh)
+# needs `req`, which is not published yet, so it is run only when `req` is
+# present and otherwise the job says plainly that it did not run. See
+# docs/ci.md and docs/adr/0025-continuous-integration.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch/PR cancels the older run: only the newest
+# tree matters, and macOS runners are the expensive part.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-test:
+    name: build + test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    # Informational entries must never fail the workflow; the stable entry is
+    # the one branch protection should require.
+    continue-on-error: ${{ matrix.experimental }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-26, newest stable Xcode
+            slug: stable
+            os: macos-26
+            mode: stable
+            experimental: false
+          - name: xcode-27 preview, newest Xcode
+            slug: preview
+            os: xcode-27
+            mode: newest
+            experimental: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Select by what the image actually installed, never by a hard-coded
+      # path: a runner-image refresh adds or removes Xcodes without notice.
+      - name: Select Xcode
+        id: xcode
+        run: |
+          app="$(.github/scripts/select-xcode.sh "${{ matrix.mode }}")"
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+          echo "DEVELOPER_DIR=$app/Contents/Developer" >> "$GITHUB_ENV"
+          {
+            echo "app=$app"
+            echo "version=$version"
+            echo "major=${version%%.*}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Selected $app ($version)"
+
+      - name: Toolchain
+        run: |
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR:-unset}"
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+          sw_vers
+
+      # The pin lives in scripts/lib/ntfs-3g.sh, which scripts/bootstrap.sh
+      # sources; read it here so the cache key follows the pin.
+      - name: Read the ntfs-3g pin
+        id: ntfs
+        run: |
+          . scripts/lib/ntfs-3g.sh
+          {
+            echo "version=$NTFS3G_VERSION"
+            echo "sha256=$NTFS3G_SHA256"
+          } >> "$GITHUB_OUTPUT"
+          echo "ntfs-3g $NTFS3G_VERSION ($NTFS3G_SHA256)"
+
+      # The tarball download and the built prefix are both rebuildable and
+      # sha256-verified on every use, so a stale entry can never be silently
+      # trusted. Bump `-v1` to bust a bad cache.
+      - name: Cache ntfs-3g download and prefix
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .build/ntfs-cache
+            .build/ntfs-prefix
+          key: ntfs3g-${{ runner.os }}-${{ runner.arch }}-xcode${{ steps.xcode.outputs.major }}-${{ steps.ntfs.outputs.sha256 }}-v1
+          restore-keys: |
+            ntfs3g-${{ runner.os }}-${{ runner.arch }}-xcode${{ steps.xcode.outputs.major }}-
+            ntfs3g-${{ runner.os }}-${{ runner.arch }}-
+
+      # Only what the image lacks. xmllint ships with macOS; libxml2 is keg-only
+      # and its bin directory is added to PATH only if the system one is absent.
+      - name: Runtime dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
+        run: |
+          missing=()
+          command -v ddrescue >/dev/null 2>&1 || missing+=(ddrescue)
+          command -v smartctl >/dev/null 2>&1 || missing+=(smartmontools)
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Installing: ${missing[*]}"
+            brew install "${missing[@]}"
+          else
+            echo "ddrescue and smartctl already installed"
+          fi
+
+          if command -v xmllint >/dev/null 2>&1; then
+            echo "xmllint: $(command -v xmllint)"
+          else
+            brew install libxml2
+            echo "$(brew --prefix libxml2)/bin" >> "$GITHUB_PATH"
+          fi
+
+      # Builds the pinned ntfs-3g prefix and the synthetic NTFS images under
+      # .build/. No sudo, no mount, no network except the sha256-verified
+      # tarball (cached above).
+      - name: Build test fixtures
+        timeout-minutes: 20
+        run: scripts/bootstrap.sh
+
+      # The same locator the gate uses, so CI and a local gate cannot disagree
+      # about where the fixtures are.
+      - name: Fixture environment
+        run: |
+          . scripts/lib/fixtures.sh
+          if ! prefix="$(fixtures_ntfs_prefix "$PWD")"; then
+            echo "::error::the NTFS prefix is missing after scripts/bootstrap.sh"
+            exit 1
+          fi
+          if ! dir="$(fixtures_ntfs_dir "$PWD")"; then
+            echo "::error::the NTFS fixture images are missing after scripts/bootstrap.sh"
+            exit 1
+          fi
+          {
+            echo "DISKTRIAGE_NTFS_PREFIX=$prefix"
+            echo "DISKTRIAGE_FIXTURE_DIR=$dir"
+          } >> "$GITHUB_ENV"
+          echo "DISKTRIAGE_NTFS_PREFIX=$prefix"
+          echo "DISKTRIAGE_FIXTURE_DIR=$dir"
+
+      - name: Build
+        timeout-minutes: 10
+        run: swift build
+
+      - name: Snapshot temp directories (before)
+        id: temp-before
+        run: |
+          . scripts/lib/temp-leak.sh
+          temp_leak_snapshot > "$RUNNER_TEMP/temp-before.txt"
+          echo "pre-existing disktriage-* entries: $(wc -l < "$RUNNER_TEMP/temp-before.txt" | tr -d ' ')"
+
+      # The gate's own report rule, reused rather than forked: zero test cases
+      # is not a pass, and a skipped test is UNVERIFIABLE — which an Actions job
+      # can only express as a failure. The message says which it was.
+      - name: Test
+        id: test
+        timeout-minutes: 25
+        run: |
+          mkdir -p .build/test-results
+          rm -f .build/test-results/junit.xml .build/test-results/junit-swift-testing.xml
+
+          rc=0
+          swift test --xunit-output .build/test-results/junit.xml || rc=$?
+
+          XMLLINT_BIN="$(command -v xmllint 2>/dev/null || true)"
+          if [ -z "$XMLLINT_BIN" ]; then
+            echo "::error::xmllint not found; the JUnit report cannot be counted"
+            exit 1
+          fi
+          export XMLLINT_BIN
+          # shellcheck source=../../scripts/lib/junit-report.sh
+          . scripts/lib/junit-report.sh
+
+          total=0
+          failed=0
+          skipped=0
+          seen=0
+          reports=()
+          for report in .build/test-results/junit.xml .build/test-results/junit-swift-testing.xml; do
+            [ -s "$report" ] || continue
+            crc=0
+            counts="$(count_report "$report")" || crc=$?
+            if [ "$crc" -ne 0 ]; then
+              echo "::error::$counts"
+              exit 1
+            fi
+            read -r t f s <<< "$counts"
+            total=$((total + t))
+            failed=$((failed + f))
+            skipped=$((skipped + s))
+            seen=$((seen + 1))
+            reports+=("$report")
+            echo "report $report: $t tests, $f failed, $s skipped"
+          done
+
+          if [ "$seen" -eq 0 ]; then
+            echo "::error::swift test wrote no JUnit report; a runner that executed nothing is not a pass"
+            exit 1
+          fi
+
+          vrc=0
+          verdict="$(junit_verdict "$total" "$failed" "$skipped" "$rc")" || vrc=$?
+          echo "$verdict"
+
+          if [ "$vrc" -eq 3 ] && [ "$skipped" -gt 0 ]; then
+            echo "skipped tests (not run, so not a pass):"
+            for report in "${reports[@]}"; do
+              skipped_names "$report" | sed 's/^/  /'
+            done
+          fi
+
+          if [ "$vrc" -ne 0 ]; then
+            if [ "$vrc" -eq 3 ]; then
+              echo "::error::UNVERIFIABLE — the run did not verify every test; CI encodes that as a failure"
+            else
+              echo "::error::$verdict"
+            fi
+            exit 1
+          fi
+          echo "PASS: $total tests, 0 failures, 0 skipped"
+
+      - name: Upload the JUnit report on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: junit-${{ matrix.slug }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .build/test-results/*.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Reuses scripts/lib/temp-leak.sh — the same comparison the gate makes.
+      # A GitHub-hosted runner starts clean, so anything new here was left by
+      # this run.
+      - name: Temp-directory leak check
+        if: always() && steps.temp-before.outcome == 'success' && steps.test.outcome != 'skipped'
+        run: |
+          . scripts/lib/temp-leak.sh
+          temp_leak_snapshot > "$RUNNER_TEMP/temp-after.txt"
+          temp_leak_verdict "$RUNNER_TEMP/temp-before.txt" "$RUNNER_TEMP/temp-after.txt"
+
+      # Honest by construction: without `req` the full gate cannot reach 0, so
+      # this job does not claim it. The notice is the finding.
+      - name: Gate (only when req is installed)
+        run: |
+          if ! command -v req >/dev/null 2>&1; then
+            echo "::notice title=Gate not run::The full gate (scripts/check.sh) needs 'req', the requirement-traceability tool, which is not published yet. This job therefore reports build + test only; it does not claim the gate passed. See docs/ci.md."
+            echo "NOT RUN: scripts/check.sh — req is not on PATH"
+            exit 0
+          fi
+
+          rc=0
+          bash scripts/check.sh || rc=$?
+          echo "scripts/check.sh exited $rc"
+          exit "$rc"
