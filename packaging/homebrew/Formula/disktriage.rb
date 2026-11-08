@@ -20,7 +20,7 @@ class Disktriage < Formula
   homepage "https://github.com/autox-my/disktriage"
   url "__DISKTRIAGE_SOURCE_URL__"
   sha256 "__DISKTRIAGE_SOURCE_SHA256__"
-  license :cannot_represent
+  license "Apache-2.0"
 
   depends_on xcode: ["16.0", :build]
   depends_on "ddrescue"

@@ -1,0 +1,5 @@
+disktriage
+Copyright 2026 fdx
+
+This product invokes, but does not link or bundle, the GPL-licensed tools
+ddrescue, smartmontools and ntfs-3g (ntfsprogs) as separate processes.
