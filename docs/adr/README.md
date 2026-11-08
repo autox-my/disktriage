@@ -92,3 +92,4 @@ what it adds.
 | [0022](0022-homebrew-packaging.md) | Homebrew tap packaging, keg-relative ntfs-3g, one version | accepted | 2026-11-08 |
 | [0023](0023-apache-2-0-licence.md) | Apache-2.0 licence, GPL tools as separate processes | accepted | 2026-11-08 |
 | [0024](0024-test-fixture-bootstrap.md) | Test fixtures are built by a tracked bootstrap | accepted | 2026-11-08 |
+| [0025](0025-continuous-integration.md) | CI runs on GitHub-hosted macOS, and never claims the gate | accepted | 2026-11-08 |

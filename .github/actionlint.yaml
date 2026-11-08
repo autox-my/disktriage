@@ -1,0 +1,6 @@
+# actionlint does not know GitHub's preview runner labels yet; `xcode-27` is a
+# GitHub-hosted image (macOS 27 / Xcode 27 preview) and is not a self-hosted
+# runner. Declaring it here only stops the linter's label check from guessing.
+self-hosted-runner:
+  labels:
+    - xcode-27

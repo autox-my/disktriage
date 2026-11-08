@@ -94,4 +94,6 @@ mandatory for code: write the failing test at the public seam first, then the
 implementation. New obligations are `claims/REQ-NNNN.yml` files, and a test
 carries the `REQNNNN` tag in its function name so the JUnit report can link it.
 See [`docs/sdlc.md`](docs/sdlc.md) and
-[`docs/req-workflow.md`](docs/req-workflow.md).
+[`docs/req-workflow.md`](docs/req-workflow.md). Every pull request also runs
+build + test in GitHub Actions; [`docs/ci.md`](docs/ci.md) says what CI covers
+and what it deliberately does not.
