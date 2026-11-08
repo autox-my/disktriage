@@ -1,0 +1,18 @@
+# REQ-0261 — docs/adr/0024-test-fixture-bootstrap.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0261
+statement: "The NTFS fixture images shall contain only synthetic data, never data from a real disk."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: docs/adr/0024-test-fixture-bootstrap.md#decision
+  date: 2026-11-08
+  rejected_alternatives:
+    - "Copy the author's spike images: they are untracked, machine-specific and must not be published."
+  assumptions:
+    - "The generator runs mkntfs on a new regular file and writes only a fixed, Python-seeded file set; no /dev node, capture or real image is an input. docs/ntfs-spike.md records that the spike images were synthetic."
+pins:
+  modality: "SHALL"

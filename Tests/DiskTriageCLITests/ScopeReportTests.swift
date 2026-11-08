@@ -8,9 +8,9 @@ import DiskTriageCollectors
 
 /// `disktriage image <disk> --to <file> --scope-report` (diskdoctor.md §8,
 /// "`--scope-report`"): stage 0 only, then the allocation. The "device" is a
-/// copy of the synthetic whole-disk NTFS image in
-/// `captures/ntfs-spike/img/disk.img`; the fake launcher copies exactly the
-/// domain mapfile's `+` extents, as ddrescue `-m` does.
+/// copy of the synthetic whole-disk NTFS image `scripts/bootstrap.sh`
+/// generates; the fake launcher copies exactly the domain mapfile's `+`
+/// extents, as ddrescue `-m` does.
 ///
 /// The expectations are the recorded `ntfscluster` cross-check in
 /// `Tests/Fixtures/ntfs-disk-notes.md`: 16383 clusters, 12308 used, 4075 free,
@@ -24,7 +24,7 @@ struct ScopeReportTests {
     // REQ-0221 / REQ-0222
     @Test(
         "REQ0221_REQ0222 a scope report runs stage 0 only and prints the allocation",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0221_REQ0222_scopeReportRunsStageZeroOnlyAndPrintsTheAllocation() throws {
         let harness = try ScopeReportHarness()
@@ -60,7 +60,7 @@ struct ScopeReportTests {
     // REQ-0221
     @Test(
         "REQ0221_REQ0224 a scope report that cannot read the bitmap exits 1 with the reason and no numbers",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0221_REQ0224_bitmapFailurePrintsTheReasonAndNoNumbers() throws {
         let harness = try ScopeReportHarness()
@@ -83,7 +83,7 @@ struct ScopeReportTests {
     // REQ-0221
     @Test(
         "REQ0221 a backup boot sector supplies the same allocation",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0221_backupBootSectorSuppliesTheSameAllocation() throws {
         let harness = try ScopeReportHarness()
@@ -103,7 +103,7 @@ struct ScopeReportTests {
     // REQ-0222 / REQ-0223
     @Test(
         "REQ0222_REQ0223 the JSON scope report has the stable keys and the recorded numbers",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0222_REQ0223_scopeReportJSONHasStableKeys() throws {
         let harness = try ScopeReportHarness()
@@ -155,20 +155,23 @@ struct ScopeReportTests {
     // REQ-0226
     @Test("REQ0226 a scope report needs the same consent and preconditions as a real run")
     func REQ0226_scopeReportNeedsTheSameGates() throws {
-        let noConsent = try ScopeReportHarness()
+        // The gates are checked before any read, so this test needs no real
+        // NTFS image and runs on every host.
+        let bytes = Data(repeating: 0, count: 4 * 1_048_576)
+        let noConsent = try ScopeReportHarness(sourceBytes: bytes)
         let refused = noConsent.run(acceptRisk: false)
         #expect(refused.exitCode == 2, "\(refused.stdout)\n\(refused.stderr)")
         #expect(refused.stderr.contains("--accept-risk"), "\(refused.stderr)")
         #expect(noConsent.launcher.launches.isEmpty, "no read before consent")
 
-        let notRoot = try ScopeReportHarness()
+        let notRoot = try ScopeReportHarness(sourceBytes: bytes)
         notRoot.environment.root = false
         let rootRefused = notRoot.run()
         #expect(rootRefused.exitCode == 30, "\(rootRefused.stdout)\n\(rootRefused.stderr)")
         #expect(rootRefused.stderr.contains("root"), "\(rootRefused.stderr)")
         #expect(notRoot.launcher.launches.isEmpty)
 
-        let noGuard = try ScopeReportHarness()
+        let noGuard = try ScopeReportHarness(sourceBytes: bytes)
         noGuard.environment.guardValue = .none
         let guardRefused = noGuard.run()
         #expect(guardRefused.exitCode == 30, "\(guardRefused.stdout)\n\(guardRefused.stderr)")
@@ -209,7 +212,7 @@ struct ScopeReportTests {
     // REQ-0222
     @Test(
         "REQ0222 --limit reports the used bytes inside the limit separately",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0222_limitReportsUsedBytesInsideTheLimit() throws {
         let harness = try ScopeReportHarness()
@@ -234,7 +237,7 @@ struct ScopeReportTests {
     // REQ-0227
     @Test(
         "REQ0227 the sidecar records the scope report and a later full run resumes",
-        .enabled(if: ntfsDiskImagePath() != nil, "captures/ntfs-spike/img/disk.img not present")
+        .enabled(if: ntfsDiskImagePath() != nil, "run scripts/bootstrap.sh to build the NTFS fixtures")
     )
     func REQ0227_sidecarRecordsTheReportAndAFullRunResumes() throws {
         let harness = try ScopeReportHarness()
@@ -281,11 +284,19 @@ private final class ScopeReportHarness {
     var mapfile: String { image + ".mapfile" }
 
     init(sourceBytes: Data? = nil) throws {
-        let capture = try #require(ntfsDiskImagePath(), "captures/ntfs-spike/img/disk.img")
         directory = temp.path
         source = directory + "/device.bin"
         image = directory + "/disk.img"
-        let bytes = try sourceBytes ?? Data(contentsOf: URL(fileURLWithPath: capture))
+        let bytes: Data
+        if let sourceBytes {
+            bytes = sourceBytes
+        } else {
+            let capture = try #require(
+                ntfsDiskImagePath(),
+                "run scripts/bootstrap.sh to build the NTFS fixtures"
+            )
+            bytes = try Data(contentsOf: URL(fileURLWithPath: capture))
+        }
         try bytes.write(to: URL(fileURLWithPath: source))
         deviceSize = Int64(bytes.count)
         launcher = StageFakeDdrescueLauncher(source: source, deviceSize: deviceSize)
@@ -394,7 +405,7 @@ struct ScopeReportLiveTests {
         "REQ0221_REQ0222 real ddrescue 1.30 stage 0 reports the recorded allocation",
         .enabled(
             if: ntfsDiskImagePath() != nil && scopeDdrescuePath() != nil,
-            "ddrescue or captures/ntfs-spike/img/disk.img absent"
+            "ddrescue or the bootstrap NTFS fixture absent"
         )
     )
     func REQ0221_REQ0222_realDdrescueStageZeroReportsTheRecordedAllocation() throws {
@@ -481,7 +492,7 @@ private final class ScopeLiveHarness {
     let log = LaunchLog()
 
     init() throws {
-        let capture = try #require(ntfsDiskImagePath(), "captures/ntfs-spike/img/disk.img")
+        let capture = try #require(ntfsDiskImagePath(), "run scripts/bootstrap.sh to build the NTFS fixtures")
         directory = temp.path
         source = directory + "/device.bin"
         image = directory + "/disk.img"
@@ -521,13 +532,5 @@ private final class ScopeLiveHarness {
 }
 
 private func scopeDdrescuePath() -> String? {
-    var candidates = [
-        "/opt/homebrew/bin/ddrescue",
-        "/usr/local/bin/ddrescue",
-        "/usr/bin/ddrescue",
-    ]
-    if let path = ProcessInfo.processInfo.environment["PATH"] {
-        candidates += path.split(separator: ":").map { String($0) + "/ddrescue" }
-    }
-    return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    TestFixtures.ddrescueExecutable()
 }

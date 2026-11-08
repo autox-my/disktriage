@@ -91,24 +91,25 @@ and install were removed.
 
 These are outward-facing and are deliberately not done by an agent:
 
-1. **Choose a licence.** The repository has no `LICENSE`; the formula uses
-   `license :cannot_represent` with a comment. Pick a licence, add the file,
-   then replace that line with the SPDX expression (for example `MIT`).
-2. **Choose the homepage.** The formula uses the placeholder
+1. **Choose the homepage.** The formula uses the placeholder
    `https://github.com/autox-my/disktriage`; replace it with the public
    project home.
-3. **Publish the tap repository** (for example `fdx/homebrew-disktriage`) and
-   put the formula at `Formula/disktriage.rb`.
-4. **Tag the release** and build the release archive. Replace the template's
+2. **Publish the tap repository** (for example `OWNER/homebrew-tap`) and
+   put the formula at `Formula/disktriage.rb`. The tap is not published yet;
+   the README's tap URL is a placeholder.
+3. **Tag the release** and build the release archive. Replace the template's
    `__DISKTRIAGE_SOURCE_URL__` and `__DISKTRIAGE_SOURCE_SHA256__` with the
    published archive and its real sha256 (or let a release job run
    `scripts/package.sh tarball` and substitute those two values).
-5. **Decide the bundle identifier** before the first signed build. It is
+4. **Decide the bundle identifier** before the first signed build. It is
    permanent for TCC and is not needed for the CLI-only tap.
-6. **P4 only:** sign and notarize the `.app` with a Developer ID, and decide
+5. **P4 only:** sign and notarize the `.app` with a Developer ID, and decide
    whether to ship a bottle. Neither is claimed by this change.
-7. `brew audit --strict --formula --online` once the real url exists, since
+6. `brew audit --strict --formula --online` once the real url exists, since
    the offline audit cannot check the published archive.
+
+The licence is no longer on this list: the project is Apache-2.0 (ADR
+[0023](adr/0023-apache-2-0-licence.md)), and the formula declares it.
 
 ## Troubleshooting
 

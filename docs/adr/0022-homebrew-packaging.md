@@ -18,8 +18,10 @@ the prefix. The ntfs-3g tools live under the keg's `libexec`, which is not on
 `PATH`; `sudo` also strips `DISKTRIAGE_NTFS_PREFIX`. A lookup that only used
 the environment would therefore report a working install as missing.
 
-The repository has no `LICENSE` file. That is a blocker for publication, not
-something a packaging change may invent.
+The repository had no `LICENSE` file when this record was written. That was a
+blocker for publication, not something a packaging change could invent; it is
+now resolved: the project is Apache-2.0 (ADR
+[0023](./0023-apache-2-0-licence.md)).
 
 ## Decision
 
@@ -77,9 +79,9 @@ archive. `homepage` is the placeholder
 `https://github.com/autox-my/disktriage` until the human decides the
 public home.
 
-**Licence.** With no `LICENSE`, the formula uses `license :cannot_represent`
-with a comment. Choosing a licence is a human decision before the tap is
-published.
+**Licence.** The project is Apache-2.0 (ADR
+[0023](./0023-apache-2-0-licence.md)); the formula declares
+`license "Apache-2.0"` and no longer uses `:cannot_represent`.
 
 **Script.** `scripts/package.sh` has `tarball`, `formula` and `verify`.
 `tarball` is `git archive HEAD` (never a dirty tree), `formula` substitutes
@@ -101,8 +103,8 @@ tap or sign anything.
   resolution were mutation-checked: moving the libexec block after `PATH`, or
   dropping `resolvingSymlinksInPath`, turns the locator test red.
 - No bottle is claimed and no tap is published. The signed `.app`, the
-  bundle identifier, the homepage and the licence remain human decisions, as
-  does filling the real url/sha256 and tagging a release.
+  bundle identifier and the homepage remain human decisions, as does filling
+  the real url/sha256 and tagging a release.
 - `scripts/package.sh verify` downloads the ntfs-3g tarball through Homebrew;
   its sha256 is the pinned value above. Homebrew itself may refresh metadata,
   which this repository does not control.

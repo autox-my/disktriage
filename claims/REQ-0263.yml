@@ -1,0 +1,18 @@
+# REQ-0263 — docs/adr/0023-apache-2-0-licence.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0263
+statement: "The project shall be licensed under Apache-2.0."
+applicability: []
+relations: []
+evidence: process
+tests: []
+rationale:
+  source: docs/adr/0023-apache-2-0-licence.md#decision
+  date: 2026-11-08
+  rejected_alternatives:
+    - "Leave the licence as :cannot_represent: a public repository without a licence is not distributable."
+  assumptions:
+    - "LICENSE is the Apache License 2.0 text, NOTICE names the copyright holder, and packaging/homebrew/Formula/disktriage.rb declares license \"Apache-2.0\"."
+pins:
+  modality: "SHALL"

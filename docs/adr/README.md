@@ -90,3 +90,5 @@ what it adds.
 | [0020](0020-requirement-checks-in-the-gate.md) | Requirement checks run in the gate (v3.9 follow-up) | accepted | 2026-11-07 |
 | [0021](0021-first-green-req-gate.md) | First green `req gate` — dispositions for the 40 unlinked claims | accepted | 2026-11-07 |
 | [0022](0022-homebrew-packaging.md) | Homebrew tap packaging, keg-relative ntfs-3g, one version | accepted | 2026-11-08 |
+| [0023](0023-apache-2-0-licence.md) | Apache-2.0 licence, GPL tools as separate processes | accepted | 2026-11-08 |
+| [0024](0024-test-fixture-bootstrap.md) | Test fixtures are built by a tracked bootstrap | accepted | 2026-11-08 |
