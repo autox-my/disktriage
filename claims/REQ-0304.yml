@@ -1,0 +1,17 @@
+# REQ-0304 — docs/adr/0025-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0304
+statement: "The copy command shall state that hash equality proves the copy matches the image, not the platter."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0025-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0303_REQ0304_REQ0314_REQ0312_hashesAndNames()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0303_REQ0304_REQ0298_liveCopiesExfat()"

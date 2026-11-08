@@ -1,0 +1,19 @@
+# REQ-0283 — docs/adr/0025-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0283
+statement: "The tool shall refuse a locked encrypted volume without requesting a passphrase."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0025-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeAttachTests::REQ0318_REQ0283_lockedVolumeIsDetected()"
+  - "DiskTriageCLITests.NativeCopyTests::REQ0283_refusesLockedVolume()"
+  - "DiskTriageCLITests.NativeInspectTests::REQ0283_REQ0284_lockedVolumeIsRefused()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0283_REQ0284_liveEncryptedIsRefused()"

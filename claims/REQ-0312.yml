@@ -1,0 +1,17 @@
+# REQ-0312 — docs/adr/0025-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0312
+statement: "The tool shall preserve a UTF-8 file name in a native copy."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0025-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0303_REQ0304_REQ0314_REQ0312_hashesAndNames()"
+  - "DiskTriageCLITests.NativeInspectTests::REQ0300_REQ0312_symlinksAndUnicode()"

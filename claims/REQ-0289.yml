@@ -1,0 +1,18 @@
+# REQ-0289 — docs/adr/0026-apfs-multi-volume-representation.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0289
+statement: "The copy --volume option shall select a volume by index."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-apfs-multi-volume-representation.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0289_selectsByIndex()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0288_REQ0289_liveAPFSCopySelectsVolume()"
+  - "DiskTriageCoreTests.NativeVolumeModelTests::REQ0289_selectsByOneBasedIndex()"

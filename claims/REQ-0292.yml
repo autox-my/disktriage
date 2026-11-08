@@ -1,0 +1,17 @@
+# REQ-0292 — docs/adr/0025-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0292
+statement: "The inspect and copy commands shall support --json for a native filesystem."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0025-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0292_jsonExitCodeAndVolume()"
+  - "DiskTriageCLITests.NativeInspectTests::REQ0292_REQ0307_REQ0298_REQ0319_bareExfat()"

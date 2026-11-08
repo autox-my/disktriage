@@ -1,0 +1,17 @@
+# REQ-0265 — docs/adr/0025-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0265
+statement: "The inspect and copy commands shall attach a native filesystem image with diskutil image attach --noMount --readOnly."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0025-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeAttachTests::REQ0265_REQ0266_REQ0319_buildsTheReadOnlyShapes()"
+  - "DiskTriageCollectorsTests.NativeCommandPolicyTests::REQ0265_REQ0266_REQ0316_REQ0319_allowsTheReadOnlyShapes()"

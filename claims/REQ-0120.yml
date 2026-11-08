@@ -1,12 +1,12 @@
-# REQ-0120 — diskdoctor.md §8 non-NTFS inspection
+# REQ-0120 — docs/adr/0025-native-read-only-attach.md §Decision
 # Authored from the plan; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0120
-statement: "The inspect command shall report a non-NTFS filesystem instead of inspecting it."
+statement: "The inspect command shall attach a non-NTFS APFS, HFS+, exFAT or FAT image read-only and list each volume."
 applicability: []
 relations: []
 rationale:
-  source: diskdoctor.md#imaging
+  source: docs/adr/0025-native-read-only-attach.md#decision
   date: 2026-11-07
   rejected_alternatives: []
   assumptions: []

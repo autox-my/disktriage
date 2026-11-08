@@ -1,0 +1,18 @@
+# REQ-0288 — docs/adr/0026-apfs-multi-volume-representation.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0288
+statement: "The copy command shall require --volume when the image has more than one volume."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-apfs-multi-volume-representation.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0288_requiresVolumeWhenMoreThanOne()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0288_REQ0289_liveAPFSCopySelectsVolume()"
+  - "DiskTriageCoreTests.NativeVolumeModelTests::REQ0287_REQ0288_singleNeedsNoSelectorAndSeveralRequireOne()"

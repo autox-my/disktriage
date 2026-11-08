@@ -1,0 +1,17 @@
+# REQ-0286 — docs/adr/0025-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0286
+statement: "The inspect and copy commands shall accept a bare-partition image."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0025-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeAttachTests::REQ0286_REQ0306_bareVolumeIsAWholeDiskVolume()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0306_REQ0307_REQ0286_liveInspectsExfatAndHFS()"

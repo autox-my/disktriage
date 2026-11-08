@@ -18,6 +18,21 @@ public struct InspectDependencies: Sendable {
     public var currentDirectory: String
     /// The running executable, resolved for the keg-relative libexec lookup.
     public var executablePath: String?
+    /// The native read-only attach (APFS/HFS+/exFAT/FAT). Injected in tests;
+    /// `nil` with `resolveNative == true` means the live runner when
+    /// `/usr/sbin/diskutil` exists.
+    public var native: (any NativeAttachRunning)?
+    /// The mounted-tree reader. Injected in tests; the live reader is the real
+    /// filesystem under the mountpoint.
+    public var mountReader: (any MountedVolumeReading)?
+    /// `false` with `native == nil` means "pretend the native runner is not
+    /// available", which is how the missing-tool precondition is tested.
+    public var resolveNative: Bool
+    /// Install the SIGINT/SIGTERM cleanup trap. Off in tests, on live.
+    public var installSignalTrap: Bool
+    /// Where mountpoint directories are created. `nil` is the system temp
+    /// directory; every mountpoint is removed before the command returns.
+    public var mountPointRoot: String?
 
     public init(
         fileSystem: any InspectFileSystem = LiveInspectFileSystem(),
@@ -25,7 +40,12 @@ public struct InspectDependencies: Sendable {
         tools: (any NTFSToolRunning)? = nil,
         resolveTools: Bool = true,
         currentDirectory: String = FileManager.default.currentDirectoryPath,
-        executablePath: String? = Bundle.main.executablePath
+        executablePath: String? = Bundle.main.executablePath,
+        native: (any NativeAttachRunning)? = nil,
+        mountReader: (any MountedVolumeReading)? = nil,
+        resolveNative: Bool = true,
+        installSignalTrap: Bool = true,
+        mountPointRoot: String? = nil
     ) {
         self.fileSystem = fileSystem
         self.environment = environment
@@ -33,6 +53,11 @@ public struct InspectDependencies: Sendable {
         self.resolveTools = resolveTools
         self.currentDirectory = currentDirectory
         self.executablePath = executablePath
+        self.native = native
+        self.mountReader = mountReader
+        self.resolveNative = resolveNative
+        self.installSignalTrap = installSignalTrap
+        self.mountPointRoot = mountPointRoot
     }
 
     public static func live(
@@ -185,7 +210,7 @@ func deviceNodeRefusal(
 
 // MARK: - Options
 
-private struct InspectOptions {
+struct InspectOptions {
     var image: String?
     var mapfile: String?
     var workingCopy: String?
@@ -195,7 +220,7 @@ private struct InspectOptions {
 
 // MARK: - Report
 
-private enum InspectStatus: String {
+enum InspectStatus: String {
     case ok
     case damage
     case partial
@@ -217,7 +242,7 @@ struct LayoutReport {
     var partial: Bool { availableBytes < lengthBytes }
 }
 
-private struct BootReport {
+struct BootReport {
     var status: String
     var reason: String?
     var workingCopy: String?
@@ -225,13 +250,13 @@ private struct BootReport {
     var sector: NTFSBootSector?
 }
 
-private struct VolumeReport {
+struct VolumeReport {
     var status: String
     var info: NTFSVolumeInfo?
     var reason: String?
 }
 
-private struct ListingReport {
+struct ListingReport {
     var status: String
     var rootEntries: Int?
     var recursiveEntries: Int?
@@ -269,7 +294,7 @@ enum DamageAudience {
     case copy
 }
 
-private struct InspectReport {
+struct InspectReport {
     var status: InspectStatus
     var exitCode: Int32
     let image: String
@@ -283,6 +308,11 @@ private struct InspectReport {
     var listing = ListingReport(status: "skipped")
     var damage = DamageReport(status: "unsupported")
     var notes: [String] = []
+    /// Set only for a native attach (APFS/HFS+/exFAT/FAT): the exact disk this
+    /// run attached and the volumes it reported. `nil` for the NTFS path.
+    var attachment: NativeAttachSummary?
+    var nativeVolumes: [NativeVolumeReport] = []
+    var mountPointRemoved = true
 }
 
 enum DetectedLayout {
@@ -336,6 +366,19 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
         return fail(.unsupported, 30, message + (partition.map { " (partition \($0))" } ?? ""))
     case .volume(let layout, let detectedFilesystem):
         report.filesystem = detectedFilesystem
+        // A native filesystem is attached read-only (docs/adr/0025); NTFS and
+        // an unknown boot sector stay on the ntfs-3g userspace path below.
+        if let nativeFilesystem = NativeFilesystem(kind: detectedFilesystem) {
+            report.layout = layout
+            return inspectNative(
+                image: image,
+                layout: layout,
+                filesystem: nativeFilesystem,
+                options: options,
+                dependencies: dependencies,
+                report: &report
+            )
+        }
         // A recognised non-NTFS filesystem is named and refused without asking
         // for the NTFS tools. "unknown" is kept as a candidate: an NTFS boot
         // sector can be missing (the MiNaH case), and the validation below is
@@ -630,7 +673,11 @@ private func inspect(image: String, options: InspectOptions, dependencies: Inspe
 
 func detectLayout(image: String, size: Int64, fs: any InspectFileSystem) throws -> DetectedLayout {
     let prefix = try fs.read(image, offset: 0, count: Int(min(2048, size)))
-    if FileSystemDetector.detect(prefix) == .ntfs {
+    let prefixKind = FileSystemDetector.detect(prefix)
+    if prefixKind != .unknown {
+        // A recognised volume boot sector at byte 0 is a bare volume. This
+        // check comes before the MBR parse because a FAT/exFAT boot sector also
+        // carries `55 AA` at offset 510 and would otherwise look like a table.
         return .volume(LayoutReport(
             kind: "bare-volume",
             scheme: nil,
@@ -639,7 +686,7 @@ func detectLayout(image: String, size: Int64, fs: any InspectFileSystem) throws 
             lengthBytes: size,
             availableBytes: size,
             extracted: false
-        ), .ntfs)
+        ), prefixKind)
     }
 
     let sector0 = try fs.read(image, offset: 0, count: 512)
@@ -655,7 +702,7 @@ func detectLayout(image: String, size: Int64, fs: any InspectFileSystem) throws 
             lengthBytes: size,
             availableBytes: size,
             extracted: false
-        ), FileSystemDetector.detect(prefix))
+        ), prefixKind)
     }
 
     var table = mbr
@@ -724,6 +771,22 @@ func detectLayout(image: String, size: Int64, fs: any InspectFileSystem) throws 
         ), .unknown)
     }
     if let (kind, partition) = firstKnown {
+        // A native filesystem is a volume the caller attaches read-only. The
+        // layout is the partition it was found in, so the report keeps the
+        // byte offset and length the mapfile conversion needs.
+        if NativeFilesystem(kind: kind) != nil {
+            let offset = partition.byteOffset
+            let available = min(partition.byteLength, size - offset)
+            return .volume(LayoutReport(
+                kind: "whole-disk",
+                scheme: table.scheme,
+                partition: partition.index,
+                offsetBytes: offset,
+                lengthBytes: partition.byteLength,
+                availableBytes: available,
+                extracted: false
+            ), kind)
+        }
         return .unsupported(
             filesystem: kind,
             partition: partition.index,
@@ -891,7 +954,7 @@ func readDamage(
 
 // MARK: - Rendering
 
-private func finish(_ report: InspectReport, options: InspectOptions) -> CLIResult {
+func finish(_ report: InspectReport, options: InspectOptions) -> CLIResult {
     let stdout: String
     let stderr: String
 
@@ -932,39 +995,54 @@ private func renderTTY(_ report: InspectReport) -> String {
     if let paths = report.toolPaths {
         lines.append(pad("TOOLS", 11) + "ntfsinfo \(paths.info) · ntfsls \(paths.ls)")
     }
-
-    switch report.boot.status {
-    case "ok":
-        if let sector = report.boot.sector {
-            lines.append(pad("BOOT", 11) + "ok · \(sector.oemID) · "
-                + "\(sector.bytesPerSector) B/sector · \(sector.clusterSize) B/cluster")
-        } else {
-            lines.append(pad("BOOT", 11) + "ok")
+    if let attachment = report.attachment {
+        lines.append(pad("ATTACH", 11) + "read-only · diskutil image attach --noMount "
+            + "--readOnly · \(attachment.wholeDisk)")
+        for volume in report.nativeVolumes {
+            var text = "\(volume.index) · \(volume.displayName) · \(volume.device) · "
+                + volume.filesystem.displayName + " · " + volume.status
+            if let root = volume.rootEntries { text += " · \(root) root entries" }
+            if let recursive = volume.recursiveEntries { text += " · \(recursive) entries" }
+            if volume.locked { text += " · encrypted, locked, not mounted" }
+            if let reason = volume.reason { text += " · \(reason)" }
+            lines.append(pad("VOLUME", 11) + text)
         }
-    case "invalid":
-        lines.append(pad("BOOT", 11) + "invalid · \(report.boot.reason ?? "unknown reason")")
-    case "restored":
-        lines.append(pad("BOOT", 11) + "restored on the working copy "
-            + (report.boot.workingCopy ?? "?")
-            + (report.boot.backupOffset.map { " (backup at byte \($0))" } ?? ""))
-    case "restore-unavailable":
-        lines.append(pad("BOOT", 11) + "cannot restore · \(report.boot.reason ?? "unknown reason")")
-    default:
-        lines.append(pad("BOOT", 11) + report.boot.status)
     }
 
-    switch report.volume.status {
-    case "ok", "partial":
-        var text = report.volume.status
-        if let info = report.volume.info {
-            text += " · " + volumeDetail(info)
+    if report.attachment == nil {
+        switch report.boot.status {
+        case "ok":
+            if let sector = report.boot.sector {
+                lines.append(pad("BOOT", 11) + "ok · \(sector.oemID) · "
+                    + "\(sector.bytesPerSector) B/sector · \(sector.clusterSize) B/cluster")
+            } else {
+                lines.append(pad("BOOT", 11) + "ok")
+            }
+        case "invalid":
+            lines.append(pad("BOOT", 11) + "invalid · \(report.boot.reason ?? "unknown reason")")
+        case "restored":
+            lines.append(pad("BOOT", 11) + "restored on the working copy "
+                + (report.boot.workingCopy ?? "?")
+                + (report.boot.backupOffset.map { " (backup at byte \($0))" } ?? ""))
+        case "restore-unavailable":
+            lines.append(pad("BOOT", 11) + "cannot restore · \(report.boot.reason ?? "unknown reason")")
+        default:
+            lines.append(pad("BOOT", 11) + report.boot.status)
         }
-        if let reason = report.volume.reason { text += " · " + reason }
-        lines.append(pad("VOLUME", 11) + text)
-    case "skipped":
-        lines.append(pad("VOLUME", 11) + "not opened")
-    default:
-        lines.append(pad("VOLUME", 11) + "cannot open · \(report.volume.reason ?? "unknown reason")")
+    
+        switch report.volume.status {
+        case "ok", "partial":
+            var text = report.volume.status
+            if let info = report.volume.info {
+                text += " · " + volumeDetail(info)
+            }
+            if let reason = report.volume.reason { text += " · " + reason }
+            lines.append(pad("VOLUME", 11) + text)
+        case "skipped":
+            lines.append(pad("VOLUME", 11) + "not opened")
+        default:
+            lines.append(pad("VOLUME", 11) + "cannot open · \(report.volume.reason ?? "unknown reason")")
+        }
     }
 
     switch report.listing.status {
@@ -1043,6 +1121,41 @@ private func renderJSON(_ report: InspectReport) -> String {
         object["tools"] = ["ntfsinfo": paths.info, "ntfsls": paths.ls]
     } else {
         object["tools"] = NSNull()
+    }
+
+    if let attachment = report.attachment {
+        object["attach"] = [
+            "mode": "read-only",
+            "whole_disk": attachment.wholeDisk,
+            "no_mount": true,
+            "volumes": attachment.volumes.map { volume in
+                [
+                    "index": volume.index,
+                    "device": volume.device,
+                    "name": volume.name ?? NSNull(),
+                    "filesystem": volume.filesystem.rawValue,
+                    "encrypted": volume.encrypted,
+                    "locked": volume.locked,
+                ] as [String: Any]
+            },
+        ]
+        object["volumes"] = report.nativeVolumes.map { volume in
+            var value: [String: Any] = [
+                "index": volume.index,
+                "device": volume.device,
+                "filesystem": volume.filesystem.rawValue,
+                "encrypted": volume.encrypted,
+                "locked": volume.locked,
+                "status": volume.status,
+                "truncated": volume.truncated,
+            ]
+            value["name"] = volume.name ?? NSNull()
+            value["reason"] = volume.reason ?? NSNull()
+            value["root_entries"] = volume.rootEntries.map { $0 } ?? NSNull()
+            value["recursive_entries"] = volume.recursiveEntries.map { $0 } ?? NSNull()
+            value["directories"] = volume.directories.map { $0 } ?? NSNull()
+            return value
+        }
     }
 
     if let layout = report.layout {
@@ -1171,9 +1284,10 @@ func describe(_ error: Error) -> String {
 
 private let inspectUsage = "usage: disktriage inspect <image> [options]\n"
     + "\n"
-    + "Inspects an image read-only. NTFS only in v1: the ntfs-3g userspace\n"
-    + "tools (ntfsinfo, ntfsls) read the image; nothing is mounted and the\n"
-    + "image is never written.\n"
+    + "Inspects an image read-only. NTFS is read with the ntfs-3g userspace\n"
+    + "tools (ntfsinfo, ntfsls), without mounting it. APFS, HFS+, exFAT and\n"
+    + "FAT are attached with diskutil image attach --noMount --readOnly and\n"
+    + "mounted readOnly nobrowse. The image is never written.\n"
     + "\n"
     + "  --mapfile <path>        damage notes from this ddrescue mapfile\n"
     + "                          (default: <image>.mapfile when it exists)\n"

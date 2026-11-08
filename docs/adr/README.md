@@ -92,3 +92,6 @@ what it adds.
 | [0022](0022-homebrew-packaging.md) | Homebrew tap packaging, keg-relative ntfs-3g, one version | accepted | 2026-11-08 |
 | [0023](0023-apache-2-0-licence.md) | Apache-2.0 licence, GPL tools as separate processes | accepted | 2026-11-08 |
 | [0024](0024-test-fixture-bootstrap.md) | Test fixtures are built by a tracked bootstrap | accepted | 2026-11-08 |
+| [0025](0025-native-read-only-attach.md) | Native read-only attach for APFS, HFS+, exFAT and FAT | accepted | 2026-11-08 |
+| [0026](0026-apfs-multi-volume-representation.md) | APFS multi-volume representation and `copy --volume` | accepted | 2026-11-08 |
+| [0027](0027-native-attach-leak-guard.md) | The gate fails on a leaked native attach or mountpoint | accepted | 2026-11-08 |

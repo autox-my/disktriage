@@ -1,0 +1,17 @@
+# REQ-0291 — docs/adr/0026-apfs-multi-volume-representation.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0291
+statement: "The copy command shall refuse an unknown or ambiguous --volume selector."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-apfs-multi-volume-representation.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeCopyTests::REQ0291_refusesUnknownVolume()"
+  - "DiskTriageCoreTests.NativeVolumeModelTests::REQ0291_refusesUnknownOrAmbiguousSelector()"

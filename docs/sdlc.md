@@ -123,14 +123,19 @@ Golden `SignalSet` JSON lives in `Tests/Fixtures/` and is replayed against the
 core. A fixture is code: it is reviewed like code.
 
 The live NTFS tests need a built ntfs-3g prefix and synthetic images, which are
-64–80 MiB each and cannot be committed. `scripts/bootstrap.sh` is the one
-documented setup command: it builds the pinned ntfs-3g tools into
-`.build/ntfs-prefix` and generates the images under `.build/fixtures/ntfs` from
-the tracked generator in `tools/ntfs-fixture/`. `Tests/TestSupport` locates them
-through `DISKTRIAGE_NTFS_PREFIX` / `DISKTRIAGE_FIXTURE_DIR`, then `.build/`;
+64–80 MiB each and cannot be committed. The live native tests need APFS, HFS+,
+exFAT and FAT images (tens of MiB each, plus a sparse 2 GiB APFS container).
+`scripts/bootstrap.sh` is the one documented setup command: it builds the pinned
+ntfs-3g tools into `.build/ntfs-prefix`, generates the NTFS images under
+`.build/fixtures/ntfs` from `tools/ntfs-fixture/`, and generates the native
+images under `.build/fixtures/native` from `tools/native-fixture/`.
+`Tests/TestSupport` locates them through `DISKTRIAGE_NTFS_PREFIX`,
+`DISKTRIAGE_FIXTURE_DIR` and `DISKTRIAGE_NATIVE_FIXTURE_DIR`, then `.build/`;
 `captures/` is never a test input. When the bootstrap output is absent the gate
 is **3** and names the command (ADR
-[0024](./adr/0024-test-fixture-bootstrap.md)).
+[0024](./adr/0024-test-fixture-bootstrap.md)); the native generator is the only
+code that attaches an image read-write (ADR
+[0025](./adr/0025-native-read-only-attach.md)).
 
 - Every collected section carries a `status`; include `denied`, `timeout` and
   `unsupported` fixtures, not only happy values.

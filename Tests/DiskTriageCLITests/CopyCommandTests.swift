@@ -773,9 +773,12 @@ struct CopyCommandTests {
         #expect(on["image_sha256"] as? String == (try sha256(path: image)))
     }
 
-    // REQ-0133: non-NTFS filesystems are named and refused, never mounted.
-    @Test("REQ0133 a non-NTFS image is refused as not implemented")
-    func REQ0133_nonNTFSIsRefused() throws {
+    // REQ-0133: a non-NTFS filesystem is named and copied through the native
+    // read-only attach. The old "refused as not implemented" expectation moved
+    // with the feature; the claim and the test changed in the same commit
+    // (docs/adr/0025).
+    @Test("REQ0133 a non-NTFS image is copied through the native read-only attach")
+    func REQ0133_nonNTFSIsCopiedNatively() throws {
         var bytes = [UInt8](repeating: 0, count: 8192)
         bytes.replaceSubrange(32..<36, with: Array("NXSB".utf8))
         let image = try makeFile(bytes)
@@ -784,15 +787,17 @@ struct CopyCommandTests {
             try? FileManager.default.removeItem(atPath: image)
             try? FileManager.default.removeItem(atPath: destination)
         }
+        let runner = ScriptedNativeRunner(
+            attachResult: nativeAttachment(volumes: [("/dev/disk8", "DTAPFS", .apfs, false)]),
+            tree: ["hello.txt": .file(Data("hello\n".utf8))]
+        )
 
         let result = runCopy(
             arguments: [image, "--to", destination],
-            dependencies: copyDependencies(tools: try Self.workingTools())
+            dependencies: copyDependencies(tools: nil, native: runner)
         )
-        #expect(result.exitCode == 30)
-        #expect(result.stderr.contains("apfs"))
-        #expect(result.stderr.contains("native read-only attach not implemented yet"))
-        #expect(!FileManager.default.fileExists(atPath: destination))
+        #expect(result.exitCode == 0, "\(result.stdout) \(result.stderr)")
+        #expect(FileManager.default.fileExists(atPath: destination + "/hello.txt"))
     }
 
     // REQ-0121-style precondition: missing tools are exit 30 with the hint.
@@ -835,7 +840,8 @@ struct CopyCommandTests {
         fileSystem: any CopyFileSystem = LiveCopyFileSystem(),
         chunkSize: Int = CopyLimits.streamChunkBytes,
         observer: (any CopyChunkObserving)? = nil,
-        maxBytes: Int64? = nil
+        maxBytes: Int64? = nil,
+        native: (any NativeAttachRunning)? = nil
     ) -> CopyDependencies {
         CopyDependencies(
             fileSystem: fileSystem,
@@ -845,7 +851,12 @@ struct CopyCommandTests {
             now: { Date(timeIntervalSince1970: 1_791_360_000) },
             chunkSize: chunkSize,
             maxBytesOverride: maxBytes,
-            chunkObserver: observer
+            chunkObserver: observer,
+            native: native,
+            mountReader: LiveMountedVolumeReader(),
+            resolveNative: false,
+            installSignalTrap: false,
+            mountPointRoot: temp.path
         )
     }
 

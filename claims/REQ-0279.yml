@@ -1,0 +1,17 @@
+# REQ-0279 — docs/adr/0025-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0279
+statement: "The tool shall consult the mapfile and report unreadable native filesystem regions as zero-filled."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0025-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeInspectTests::REQ0279_REQ0280_damageIsVolumeLevel()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0279_REQ0281_liveMapfileDamage()"

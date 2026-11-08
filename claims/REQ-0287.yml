@@ -1,0 +1,18 @@
+# REQ-0287 — docs/adr/0026-apfs-multi-volume-representation.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0287
+statement: "The inspect command shall list every mountable volume of an APFS container."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0026-apfs-multi-volume-representation.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCLITests.NativeInspectTests::REQ0287_REQ0305_apfsListsEveryVolume()"
+  - "DiskTriageCLITests.NativeLiveTests::REQ0287_REQ0305_liveAPFSListsTwoVolumes()"
+  - "DiskTriageCoreTests.NativeVolumeModelTests::REQ0287_REQ0288_singleNeedsNoSelectorAndSeveralRequireOne()"

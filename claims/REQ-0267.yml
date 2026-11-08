@@ -1,0 +1,16 @@
+# REQ-0267 — docs/adr/0025-native-read-only-attach.md §Decision
+# Authored from the decision record; the parse, canonical form and address are derived at load.
+schema: req.claim/2
+claim_id: REQ-0267
+statement: "The native command policy shall reject every argv shape that is not on its read-only allow-list."
+applicability: []
+relations: []
+rationale:
+  source: docs/adr/0025-native-read-only-attach.md#decision
+  date: 2026-11-08
+  rejected_alternatives: []
+  assumptions: []
+pins:
+  modality: "SHALL"
+tests:
+  - "DiskTriageCollectorsTests.NativeCommandPolicyTests::REQ0267_REQ0268_rejectsWritableAndThirdPartyShapes()"
