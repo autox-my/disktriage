@@ -54,15 +54,17 @@ runtime dependencies:
 
 ```sh
 brew install ddrescue smartmontools
-git clone <repository>
+git clone https://github.com/autox-my/disktriage
 cd disktriage
 scripts/bootstrap.sh      # ntfs-3g prefix + synthetic NTFS test fixtures
 swift build
 bash scripts/check.sh     # 0 PASS, 1 FAIL, 3 UNVERIFIABLE
 ```
 
-The gate also needs `req` (the requirement-traceability tool) and `xmllint`. A
-missing tool is UNVERIFIABLE (3) with a message, never a pass.
+The gate also needs `xmllint` and `req`, the author's requirement-traceability
+tool, which is **not publicly available yet**. A missing tool is UNVERIFIABLE
+(3) with a message, never a pass, so without `req` the gate cannot reach 0.
+`swift build` and `swift test` do not need it.
 
 `scripts/bootstrap.sh` is the one documented setup command. It builds the
 pinned ntfs-3g tools and the live-test images under `.build/`, is idempotent,
