@@ -44,9 +44,14 @@ Both workflows source it; no workflow and no document holds a second copy. The
 install is:
 
 ```sh
-cargo install --git https://github.com/autox-my/req.git \
-  --rev f871f80e22807fc8db6c1b9e6ee7b49c45197910 --locked --root "$HOME/.cargo" req
+git clone https://github.com/autox-my/req.git "$src"
+git -C "$src" checkout f871f80e22807fc8db6c1b9e6ee7b49c45197910
+cargo install --path "$src" --locked --root "$HOME/.cargo" req
 ```
+
+The install builds from a clone checked out at the pin rather than `cargo
+install --git`, because a `--git` build has no `.git` and reports `built from
+unknown`, which the provenance check refuses (found on the first CI run).
 
 `req_install` accepts a binary only when `req --version` reports
 `built from f871f80`; a stale `req` on `PATH` is rebuilt, and a missing

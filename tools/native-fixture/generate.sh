@@ -200,8 +200,14 @@ diskutil image create blank --format RAW --size 2g --volumeName DTAPFS1 --fs APF
 
 # 2. HFS+ (diskutil image create has no HFS+ filesystem option).
 note "== HFS+ image =="
+hfs_log="$(mktemp "${TMPDIR:-/tmp}/dt-hfs.XXXXXX")"
 hdiutil create -size 64m -fs HFS+ -volname DTHFS -quiet "$OUT/hfs-disk.dmg" \
-    >/dev/null 2>&1 || die "cannot create the HFS+ image"
+    >"$hfs_log" 2>&1 || {
+    cat "$hfs_log" >&2
+    rm -f "$hfs_log"
+    die "cannot create the HFS+ image"
+}
+rm -f "$hfs_log"
 
 # 3. Populate each single-volume image through a read-write attach. This is the
 #    fixture generator's only writable attach; the product never does this.
