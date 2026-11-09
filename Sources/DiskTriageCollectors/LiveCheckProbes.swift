@@ -17,16 +17,26 @@ public struct LiveCheckProbes: CheckProbing {
     /// The running executable's path, resolved for the keg-relative libexec
     /// lookup. Injected in tests; `Bundle.main.executablePath` in production.
     private let executablePath: String?
+    /// `/Volumes` is listed through this seam, names only. A hung network mount
+    /// makes every attribute lookup block, so the lister never resolves one.
+    private let volumeLister: any VolumeListing
+    /// The hard bound on that listing. A listing that does not answer is a
+    /// timeout row (UNVERIFIABLE), never PASS.
+    private let volumeListTimeout: TimeInterval
 
     public init(
         executor: any CommandExecuting = ProcessRunner(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
         versionRunner: (any CommandExecuting)? = nil,
-        executablePath: String? = Bundle.main.executablePath
+        executablePath: String? = Bundle.main.executablePath,
+        volumeLister: any VolumeListing = POSIXVolumeLister(),
+        volumeListTimeout: TimeInterval = 2
     ) {
         self.executor = executor
         self.environment = environment
         self.executablePath = executablePath
+        self.volumeLister = volumeLister
+        self.volumeListTimeout = volumeListTimeout
         // The self-test's own read-only shapes; 30 s covers the tiny log probe.
         self.checkRunner = versionRunner
             ?? ProcessRunner(policy: .check, timeout: 30, outputLimit: 1_048_576)
@@ -44,11 +54,22 @@ public struct LiveCheckProbes: CheckProbing {
     }
 
     public func removableVolumeAccess() -> CheckProbe {
-        do {
-            let entries = try FileManager.default.contentsOfDirectory(atPath: "/Volumes")
+        // Names come from readdir, never `contentsOfDirectory`: the latter
+        // resolves entry metadata and blocks forever beside a hung WebDAV
+        // mount. The listing itself still gets a hard bound, and a timeout is
+        // UNVERIFIABLE — an absent signal is never a pass.
+        switch boundedVolumeListing(
+            using: volumeLister,
+            path: "/Volumes",
+            within: volumeListTimeout
+        ) {
+        case .timedOut:
+            let bound = String(format: "%g", volumeListTimeout)
+            return .unverifiable("/Volumes did not answer within \(bound) s (hung mount?)")
+        case .listed(.failed(let reason)):
+            return .fail("cannot list /Volumes: \(reason)")
+        case .listed(.names(let entries)):
             return .pass("/Volumes lists \(entries.count) entries")
-        } catch {
-            return .fail("cannot list /Volumes: \(error.localizedDescription)")
         }
     }
 
