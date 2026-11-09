@@ -72,7 +72,8 @@ req_install() {
     rm -rf "$src"
     [ "$rc" -eq 0 ] || return 1
     req_reports_rev "$root/bin/req" || {
-        echo "req at $root/bin/req does not report 'built from $REQ_SHORT'" >&2
+        echo "req at $root/bin/req does not report 'built from $REQ_SHORT'; it reports:" >&2
+        "$root/bin/req" --version >&2 || true
         return 1
     }
     req_ensure_path "$root/bin"
