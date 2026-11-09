@@ -1,4 +1,4 @@
-# REQ-0322 — docs/adr/0029-volume-listing-without-stat.md §Decision
+# REQ-0322 — docs/adr/0030-volume-listing-without-stat.md §Decision
 # Authored from the measured hung WebDAV mount in /Volumes; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0322
@@ -6,7 +6,7 @@ statement: "The removable-volume probe shall report a timeout when /Volumes does
 applicability: []
 relations: []
 rationale:
-  source: docs/adr/0029-volume-listing-without-stat.md#decision
+  source: docs/adr/0030-volume-listing-without-stat.md#decision
   date: 2026-11-09
   rejected_alternatives:
     - "Waiting for the listing: a kernel call stuck on a hung mount has no deadline of its own."

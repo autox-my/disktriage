@@ -447,8 +447,111 @@ else
     fail "ntfs-3g pin" "formula '$formula_pin' != shell '$shell_pin'"
 fi
 
+# (h) The release formula renders from a published url, and the url and sha256
+# rules bite before any tarball or build exists. scripts/package.sh formula
+# --url uses the same function; the probe never touches the network.
+# shellcheck source=lib/formula.sh
+. "$ROOT/scripts/lib/formula.sh"
+
+formula_root="$TMP/formula"
+mkdir -p "$formula_root"
+cat >"$formula_root/template.rb" <<'RB'
+class Disktriage < Formula
+  url "__DISKTRIAGE_SOURCE_URL__"
+  sha256 "__DISKTRIAGE_SOURCE_SHA256__"
+end
+RB
+sha64="$(printf 'a%.0s' $(seq 64))"
+release_url="https://github.com/autox-my/disktriage/releases/download/v0.1.0/disktriage-0.1.0.tar.gz"
+
+output="$(render_formula "$formula_root/template.rb" "$formula_root/out.rb" "$release_url" "$sha64" 2>&1)"
+got=$?
+expect_rc "render_formula substitutes a release url" 0 "$got" "$output"
+if grep -qF "$release_url" "$formula_root/out.rb" && grep -qF "$sha64" "$formula_root/out.rb" \
+    && ! grep -q '__DISKTRIAGE_' "$formula_root/out.rb"; then
+    echo "ok   probe render_formula wrote the url and sha256"
+else
+    fail "render_formula output" "expected the url and sha256 and no placeholder"
+fi
+
+output="$(render_formula "$formula_root/template.rb" "$formula_root/bad.rb" "file:///tmp/disktriage.tar.gz" "$sha64" 2>&1)"
+got=$?
+expect_rc "render_formula rejects a non-http url" 1 "$got" "$output" "https://"
+
+output="$(render_formula "$formula_root/template.rb" "$formula_root/bad.rb" "$release_url" "${sha64%a}" 2>&1)"
+got=$?
+expect_rc "render_formula rejects a short sha256" 1 "$got" "$output" "64 characters"
+
+output="$(render_formula "$formula_root/template.rb" "$formula_root/bad.rb" "$release_url" "$(printf '%s' "$sha64" | tr 'abcdef' 'ABCDEF')" 2>&1)"
+got=$?
+expect_rc "render_formula rejects an uppercase sha256" 1 "$got" "$output" "lowercase hex"
+
+cat >"$formula_root/incomplete.rb" <<'RB'
+class Disktriage < Formula
+  url "__DISKTRIAGE_SOURCE_URL__"
+end
+RB
+output="$(render_formula "$formula_root/incomplete.rb" "$formula_root/bad.rb" "$release_url" "$sha64" 2>&1)"
+got=$?
+expect_rc "render_formula rejects a template without a token" 1 "$got" "$output" "missing"
+
+# The --url option itself: an invalid value is a usage-stage failure, so it is
+# rejected before the version lookup (which would build a release binary).
+output="$("$ROOT/scripts/package.sh" formula --url file:///tmp/disktriage.tar.gz 2>&1)"
+got=$?
+expect_rc "package.sh formula --url rejects a non-http url" 1 "$got" "$output" "invalid --url"
+
+output="$("$ROOT/scripts/package.sh" formula --url 2>&1)"
+got=$?
+expect_rc "package.sh formula --url needs a value" 2 "$got" "$output" "--url needs a value"
+
+output="$("$ROOT/scripts/package.sh" formula --bogus 2>&1)"
+got=$?
+expect_rc "package.sh formula rejects an unknown option" 2 "$got" "$output" "unknown option"
+
+# (i) The req pin: one full commit sha, and a binary that reports a different
+# build is never accepted. The probe uses fake binaries, never the network.
+# shellcheck source=../.github/scripts/req.sh
+. "$ROOT/.github/scripts/req.sh"
+case "$REQ_REV" in
+    *[!0-9a-f]* | "") fail "req pin" "REQ_REV is not lowercase hex: $REQ_REV" ;;
+    *)
+        if [ "${#REQ_REV}" -eq 40 ]; then
+            echo "ok   probe req pin is a full commit -> $REQ_REV"
+        else
+            fail "req pin" "REQ_REV must be 40 characters, got ${#REQ_REV}"
+        fi
+        ;;
+esac
+if [ "$REQ_SHORT" = "${REQ_REV:0:7}" ] && [ "${#REQ_SHORT}" -eq 7 ]; then
+    echo "ok   probe req short pin -> $REQ_SHORT"
+else
+    fail "req short pin" "REQ_SHORT '$REQ_SHORT' is not the first seven characters"
+fi
+
+fake_req="$TMP/fake-req"
+# Same column alignment as the real `req --version` (measured on CI, 2026-11-09).
+printf '#!/bin/sh\necho "req 0.1.0"\necho "  built from         %s"\n' "$REQ_SHORT" >"$fake_req"
+printf '#!/bin/sh\necho "req 0.1.0"\necho "  built from         deadbee"\n' >"$TMP/fake-req-stale"
+chmod +x "$fake_req" "$TMP/fake-req-stale"
+if req_reports_rev "$fake_req"; then
+    echo "ok   probe req_reports_rev accepts the pinned build"
+else
+    fail "req provenance" "req_reports_rev rejected a binary built from $REQ_SHORT"
+fi
+if req_reports_rev "$TMP/fake-req-stale"; then
+    fail "req provenance" "req_reports_rev accepted a binary built from a different commit"
+else
+    echo "ok   probe req_reports_rev rejects a stale build"
+fi
+if req_reports_rev "$TMP/does-not-exist"; then
+    fail "req provenance" "req_reports_rev accepted a missing binary"
+else
+    echo "ok   probe req_reports_rev rejects a missing binary"
+fi
+
 if [ "$failures" -ne 0 ]; then
     echo "FAIL          $failures probe(s) failed"
     exit 1
 fi
-echo "PASS          the gate's pass/fail/skip, temp-leak and requirement rules bite"
+echo "PASS          the gate's pass/fail/skip, temp-leak, requirement, formula and req-pin rules bite"

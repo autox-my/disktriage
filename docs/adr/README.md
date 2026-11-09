@@ -96,4 +96,5 @@ what it adds.
 | [0026](0026-native-read-only-attach.md) | Native read-only attach for APFS, HFS+, exFAT and FAT | accepted | 2026-11-08 |
 | [0027](0027-apfs-multi-volume-representation.md) | APFS multi-volume representation and `copy --volume` | accepted | 2026-11-08 |
 | [0028](0028-native-attach-leak-guard.md) | The gate fails on a leaked native attach or mountpoint | accepted | 2026-11-08 |
-| [0029](0029-volume-listing-without-stat.md) | The removable-volume row lists `/Volumes` by name, under a hard bound | accepted | 2026-11-09 |
+| [0029](0029-gate-required-in-ci-and-tagged-releases.md) | The gate is a required CI check, and a tag cuts the release | accepted | 2026-11-09 |
+| [0030](0030-volume-listing-without-stat.md) | The removable-volume row lists `/Volumes` by name, under a hard bound | accepted | 2026-11-09 |

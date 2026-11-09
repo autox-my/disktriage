@@ -1,4 +1,4 @@
-# 0029. The removable-volume row lists `/Volumes` by name, under a hard bound
+# 0030. The removable-volume row lists `/Volumes` by name, under a hard bound
 
 Status: accepted
 Date: 2026-11-09

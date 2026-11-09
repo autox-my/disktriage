@@ -1,0 +1,112 @@
+name: Tap
+
+# brew test-bot's checks, run directly: `brew style` and
+# `brew audit --strict --online` on the formulae this change touches. No
+# third-party actions beyond checkout, and no write permission.
+#
+# With Formula/ empty (the scaffold, before the first release) the job says
+# there is nothing to check and exits 0; it never claims a formula passed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Formula/**'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    paths:
+      - 'Formula/**'
+      - '.github/workflows/tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_ENV_HINTS: 1
+
+jobs:
+  formulae:
+    name: brew style + audit
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The changed-formula diff needs the pull request's base commit.
+          fetch-depth: 0
+
+      - name: Find changed formulae
+        id: changed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          files=()
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$BASE_SHA" ]; then
+            while IFS= read -r file; do
+              [ -n "$file" ] && files+=("$file")
+            done < <(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD -- 'Formula/*.rb')
+          else
+            while IFS= read -r file; do
+              [ -n "$file" ] && files+=("$file")
+            done < <(git ls-files 'Formula/*.rb')
+          fi
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::notice title=No formula to check::Formula/ has no .rb file yet, so there is nothing to style or audit. The real formula arrives with the first tagged release."
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf '%s\n' "${files[@]}"
+          printf '%s\n' "${files[@]}" > "$RUNNER_TEMP/formulae.txt"
+          echo "have=true" >> "$GITHUB_OUTPUT"
+
+      # `brew audit <path>` is disabled; a formula is audited by name from a
+      # tap. Symlink this checkout into the Taps directory, register it, and
+      # trust it (a third-party tap is not trusted by default).
+      - name: Register this checkout as the tap
+        if: steps.changed.outputs.have == 'true'
+        id: tap
+        run: |
+          owner="${GITHUB_REPOSITORY%%/*}"
+          name="${GITHUB_REPOSITORY##*/}"
+          tap="${name#homebrew-}"
+          taps="$(brew --repository)/Library/Taps/$owner"
+          mkdir -p "$taps"
+          ln -sfn "$GITHUB_WORKSPACE" "$taps/$name"
+          brew tap "$owner/$tap"
+          brew trust "$owner/$tap"
+          echo "name=$owner/$tap" >> "$GITHUB_OUTPUT"
+
+      - name: brew style
+        if: steps.changed.outputs.have == 'true'
+        run: |
+          while IFS= read -r formula; do
+            [ -n "$formula" ] || continue
+            echo "::group::brew style $formula"
+            brew style "$formula"
+            echo "::endgroup::"
+          done < "$RUNNER_TEMP/formulae.txt"
+
+      # --online fetches the source url and verifies the sha256 against the
+      # published tarball: the check the offline audit in package.sh cannot do.
+      - name: brew audit --strict --online
+        if: steps.changed.outputs.have == 'true'
+        run: |
+          tap="${{ steps.tap.outputs.name }}"
+          while IFS= read -r formula; do
+            [ -n "$formula" ] || continue
+            name="$(basename "$formula" .rb)"
+            echo "::group::brew audit --strict --online $tap/$name"
+            brew audit --strict --online --formula "$tap/$name"
+            echo "::endgroup::"
+          done < "$RUNNER_TEMP/formulae.txt"

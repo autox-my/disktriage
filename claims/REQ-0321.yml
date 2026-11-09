@@ -1,4 +1,4 @@
-# REQ-0321 — docs/adr/0029-volume-listing-without-stat.md §Decision
+# REQ-0321 — docs/adr/0030-volume-listing-without-stat.md §Decision
 # Authored from the measured hung WebDAV mount in /Volumes; the parse, canonical form and address are derived at load.
 schema: req.claim/2
 claim_id: REQ-0321
@@ -6,7 +6,7 @@ statement: "The removable-volume probe shall list /Volumes entry names without r
 applicability: []
 relations: []
 rationale:
-  source: docs/adr/0029-volume-listing-without-stat.md#decision
+  source: docs/adr/0030-volume-listing-without-stat.md#decision
   date: 2026-11-09
   rejected_alternatives:
     - "FileManager.contentsOfDirectory: it resolves entry metadata and blocked for 160-260 s beside a hung WebDAV mount."

@@ -6,6 +6,9 @@
 #   scripts/package.sh formula   write dist/disktriage.rb from the tap template,
 #                                substituting the local file:// tarball url and
 #                                its sha256.
+#   scripts/package.sh formula --url <url>
+#                                render the published form for a release asset;
+#                                the sha256 still comes from the local tarball.
 #   scripts/package.sh verify    ruby -c, brew style/audit, a from-source install
 #                                in a temporary tap, the formula test, the otool
 #                                no-FUSE check, then uninstall and clean up.
@@ -28,6 +31,10 @@ TEMPLATE="$ROOT/packaging/homebrew/Formula/disktriage.rb"
 GENERATED="$DIST/disktriage.rb"
 TAP="local/disktriage-test"
 REPORT="$DIST/verify-report.txt"
+
+# One renderer, shared with scripts/check-gate-probe.sh.
+# shellcheck source=lib/formula.sh
+. "$ROOT/scripts/lib/formula.sh"
 
 usage() {
     sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
@@ -89,8 +96,35 @@ tarball() {
 }
 
 formula() {
+    local url="" version tarball sha_file sha
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --url)
+                [ "$#" -ge 2 ] || {
+                    echo "package.sh formula: --url needs a value" >&2
+                    exit 2
+                }
+                url="$2"
+                shift 2
+                ;;
+            --url=*)
+                url="${1#--url=}"
+                shift
+                ;;
+            *)
+                echo "package.sh formula: unknown option '$1'" >&2
+                usage >&2
+                exit 2
+                ;;
+        esac
+    done
+    # Fail before the version lookup and any build: a bad --url is a usage
+    # error, not something to discover after a release binary exists.
+    if [ -n "$url" ]; then
+        formula_url_ok "$url" || die "invalid --url"
+    fi
+
     need python3
-    local version tarball sha_file sha url
     version="$(version)" || die "cannot read the version from disktriage --version"
     tarball="$DIST/disktriage-$version.tar.gz"
     sha_file="$tarball.sha256"
@@ -100,26 +134,9 @@ formula() {
     fi
     [ -f "$TEMPLATE" ] || die "missing template $TEMPLATE"
     read -r sha _ < "$sha_file"
-    url="file://$tarball"
+    [ -n "$url" ] || url="file://$tarball"
 
-    python3 - "$TEMPLATE" "$GENERATED" "$url" "$sha" <<'PY'
-import sys
-
-template, generated, url, sha = sys.argv[1:]
-text = open(template, encoding="utf-8").read()
-for token, value in (
-    ("__DISKTRIAGE_SOURCE_URL__", url),
-    ("__DISKTRIAGE_SOURCE_SHA256__", sha),
-):
-    if token not in text:
-        sys.exit(f"template is missing {token}")
-    text = text.replace(token, value)
-open(generated, "w", encoding="utf-8").write(text)
-PY
-    [ $? -eq 0 ] || die "cannot render $GENERATED"
-    if grep -q '__DISKTRIAGE_' "$GENERATED"; then
-        die "$GENERATED still contains a placeholder"
-    fi
+    render_formula "$TEMPLATE" "$GENERATED" "$url" "$sha" || die "cannot render $GENERATED"
     note "PASS          formula $GENERATED (url $url)"
 }
 
@@ -324,7 +341,10 @@ PY
 
 case "${1:-}" in
     tarball) tarball ;;
-    formula) formula ;;
+    formula)
+        shift
+        formula "$@"
+        ;;
     verify) verify ;;
     -h|--help|help|"") usage ;;
     *) echo "package.sh: unknown subcommand '$1'" >&2; usage >&2; exit 2 ;;
