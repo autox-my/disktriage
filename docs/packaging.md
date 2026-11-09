@@ -115,10 +115,11 @@ and no workflow here can push to `autox-my/homebrew-tap`.
 These are outward-facing and are deliberately not done by an agent:
 
 1. ~~Choose the homepage.~~ Done: `https://github.com/autox-my/disktriage`.
-2. **Publish the tap repository** `autox-my/homebrew-tap` from the scaffold in
+2. ~~Publish the tap repository.~~ Done 2026-11-09:
+   `https://github.com/autox-my/homebrew-tap`, from the scaffold in
    [`packaging/homebrew-tap/`](../packaging/homebrew-tap/README.md) (users run
-   `brew tap autox-my/tap`). It is not published yet, and its `Formula/` must
-   stay empty until a release exists. The README says both.
+   `brew tap autox-my/tap`). Its `Formula/` is empty and must stay so until a
+   release exists; copy the release's rendered formula into it then.
 3. **Tag the release** once the gate is green:
    `git tag -a v<version> -m "disktriage <version>" && git push origin v<version>`.
    The release workflow verifies the tag against `DisktriageVersion.current`,

@@ -9,7 +9,7 @@ brew tap autox-my/tap
 brew install disktriage
 ```
 
-## Status: nothing here is published yet
+## Status: no formula yet
 
 `Formula/` is deliberately empty. The formula is generated from a tagged
 release's source tarball and attached to that release; a human then copies it

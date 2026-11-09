@@ -41,8 +41,8 @@ verdict can be formed (usage errors are 2).
 ## Install
 
 The v1 distribution route is a Homebrew tap. **No release exists yet**: the
-tap (`autox-my/homebrew-tap`) is scaffolded but not published, so the commands
-below fail until the first tagged release. Once it is published:
+tap (`autox-my/homebrew-tap`) is published but has no formula, so the commands
+below fail until the first tagged release adds one:
 
 ```sh
 brew tap autox-my/tap
