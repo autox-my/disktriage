@@ -198,6 +198,22 @@ diskutil image create blank --format RAW --size 64m --volumeName DTFAT --fs MS-D
 diskutil image create blank --format RAW --size 2g --volumeName DTAPFS1 --fs APFS \
     "$OUT/apfs-disk.img" >/dev/null 2>&1 || die "cannot create the APFS image"
 
+# Detach whatever is still attached from IMAGE (a path this generator owns).
+# `hdiutil create` has failed with "Resource busy" on a GitHub runner after a
+# half-finished attach; deleting the file does not detach it, so a retry would
+# leave a second, orphaned attach that the gate's leak guard rightly reports.
+detach_stale_image() {
+    local image="$1" dev
+    while IFS= read -r dev; do
+        [ -n "$dev" ] || continue
+        note "detaching stale attach $dev of $image"
+        hdiutil detach "$dev" >/dev/null 2>&1 || hdiutil detach -force "$dev" >/dev/null 2>&1 || true
+    done < <(hdiutil info 2>/dev/null | awk -v p="$image" '
+        /^================================================/ { hit = 0; next }
+        /^image-path/ { hit = (index($0, p) > 0); next }
+        hit && /^\/dev\/disk[0-9]+[ \t]/ { print $1 }')
+}
+
 # 2. HFS+ (diskutil image create has no HFS+ filesystem option).
 note "== HFS+ image =="
 # `hdiutil create` has failed here with no output about one run in three on a
@@ -213,10 +229,12 @@ for attempt in 1 2 3 4 5; do
     fi
     note "hdiutil create HFS+ failed (attempt $attempt); retrying"
     cat "$hfs_log" >&2
+    detach_stale_image "$OUT/hfs-disk.dmg"
     sleep 3
 done
 rm -f "$hfs_log"
 [ "$hfs_ok" = 1 ] || die "cannot create the HFS+ image"
+detach_stale_image "$OUT/hfs-disk.dmg"
 
 # 3. Populate each single-volume image through a read-write attach. This is the
 #    fixture generator's only writable attach; the product never does this.
