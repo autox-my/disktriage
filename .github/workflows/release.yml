@@ -1,0 +1,272 @@
+name: Release
+
+# A pushed tag `v*.*.*` is the only trigger. The tag must be exactly
+# v<DisktriageVersion.current>; the job then runs the full gate, builds the
+# source tarball, creates the GitHub Release and attaches the tarball, its
+# sha256 and the rendered Homebrew formula. It does NOT push to the tap: that
+# needs a token the human has not created (docs/packaging.md).
+#
+# Nothing is released by merging this workflow; only pushing a matching tag
+# starts it. See docs/ci.md and
+# docs/adr/0029-gate-required-in-ci-and-tagged-releases.md.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# Minimal: the release and its assets are the only writes. No id-token, no
+# packages, no secrets beyond the workflow token.
+permissions:
+  contents: write
+
+# Tags are immutable and a release must not be cancelled half-created.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: release
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Cheap and first: a typo'd tag must fail before a 30-minute gate run.
+      # The source file is the single version surface, so a tarball name, the
+      # tag and `disktriage --version` cannot disagree.
+      - name: Verify the tag matches DisktriageVersion.current
+        id: version
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag '$tag' is not v<major>.<minor>.<patch>"
+            exit 1
+          fi
+
+          file="Sources/DiskTriageCore/Version.swift"
+          matches="$(grep -c 'public static let current = "' "$file")"
+          if [ "$matches" -ne 1 ]; then
+            echo "::error::$file has $matches DisktriageVersion.current lines; expected exactly one"
+            exit 1
+          fi
+          version="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' "$file")"
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::tag '$tag' does not match DisktriageVersion.current '$version' (expected v$version)"
+            exit 1
+          fi
+
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+          echo "tag $tag matches DisktriageVersion.current $version"
+
+      - name: Select Xcode
+        id: xcode
+        run: |
+          app="$(.github/scripts/select-xcode.sh stable)"
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+          echo "DEVELOPER_DIR=$app/Contents/Developer" >> "$GITHUB_ENV"
+          {
+            echo "app=$app"
+            echo "version=$version"
+            echo "major=${version%%.*}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Selected $app ($version)"
+
+      - name: Toolchain
+        run: |
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR:-unset}"
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+          sw_vers
+
+      # The pin lives in scripts/lib/ntfs-3g.sh; read it here so the cache key
+      # follows the pin, exactly as ci.yml does.
+      - name: Read the ntfs-3g pin
+        id: ntfs
+        run: |
+          . scripts/lib/ntfs-3g.sh
+          {
+            echo "version=$NTFS3G_VERSION"
+            echo "sha256=$NTFS3G_SHA256"
+          } >> "$GITHUB_OUTPUT"
+          echo "ntfs-3g $NTFS3G_VERSION ($NTFS3G_SHA256)"
+
+      - name: Cache ntfs-3g download and prefix
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .build/ntfs-cache
+            .build/ntfs-prefix
+          key: ntfs3g-${{ runner.os }}-${{ runner.arch }}-xcode${{ steps.xcode.outputs.major }}-${{ steps.ntfs.outputs.sha256 }}-v1
+          restore-keys: |
+            ntfs3g-${{ runner.os }}-${{ runner.arch }}-xcode${{ steps.xcode.outputs.major }}-
+            ntfs3g-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Cache req and the cargo registry
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: req-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/req.sh') }}
+          restore-keys: |
+            req-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Runtime dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
+        run: |
+          missing=()
+          command -v ddrescue >/dev/null 2>&1 || missing+=(ddrescue)
+          command -v smartctl >/dev/null 2>&1 || missing+=(smartmontools)
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Installing: ${missing[*]}"
+            brew install "${missing[@]}"
+          else
+            echo "ddrescue and smartctl already installed"
+          fi
+
+          if command -v xmllint >/dev/null 2>&1; then
+            echo "xmllint: $(command -v xmllint)"
+          else
+            brew install libxml2
+            echo "$(brew --prefix libxml2)/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Build test fixtures
+        timeout-minutes: 20
+        run: scripts/bootstrap.sh
+
+      - name: Install req at the pinned commit
+        timeout-minutes: 15
+        run: |
+          . .github/scripts/req.sh
+          req_install
+          req --version
+
+      # Required: a release is cut only from a tree whose gate is green. Exit 3
+      # (UNVERIFIABLE) is a failure here, never a pass.
+      - name: Gate
+        timeout-minutes: 30
+        run: |
+          rc=0
+          bash scripts/check.sh || rc=$?
+          echo "scripts/check.sh exited $rc"
+          case "$rc" in
+            0) exit 0 ;;
+            3)
+              echo "::error title=Gate unverifiable::scripts/check.sh answered 3 (UNVERIFIABLE); no release is cut. See docs/ci.md."
+              exit 3
+              ;;
+            *)
+              echo "::error title=Gate failed::scripts/check.sh answered $rc; no release is cut."
+              exit "$rc"
+              ;;
+          esac
+
+      - name: Build the release binary
+        timeout-minutes: 15
+        run: swift build -c release
+
+      # `git archive HEAD`, so the tree that was gated is the tree in the
+      # tarball. dist/ is gitignored and never part of the archive.
+      - name: Build the source tarball
+        run: scripts/package.sh tarball
+
+      - name: Check the release assets exist
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tarball="dist/disktriage-$VERSION.tar.gz"
+          for asset in "$tarball" "$tarball.sha256"; do
+            if [ ! -s "$asset" ]; then
+              echo "::error::missing release asset $asset"
+              exit 1
+            fi
+            echo "asset $asset"
+          done
+          cat "$tarball.sha256"
+
+      # contents: write, through the workflow token only. --verify-tag refuses
+      # to invent the tag, and a pre-existing release is an error rather than a
+      # silent overwrite: deleting and re-cutting a release is the human's call.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tarball="dist/disktriage-$VERSION.tar.gz"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release $TAG already exists; delete it deliberately before re-running"
+            exit 1
+          fi
+          gh release create "$TAG" \
+            "$tarball" \
+            "$tarball.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "disktriage $TAG" \
+            --generate-notes \
+            --verify-tag
+
+      # The formula's url is the tarball asset in this same release; the
+      # sha256 is the one the local tarball has. The rendered file is printed
+      # so the run log carries it even if the asset is later removed.
+      - name: Render the tap formula for the release asset
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/disktriage-$VERSION.tar.gz"
+          scripts/package.sh formula --url "$url"
+          if ! grep -qF "$url" dist/disktriage.rb; then
+            echo "::error::dist/disktriage.rb does not carry the release url"
+            exit 1
+          fi
+          echo "== dist/disktriage.rb =="
+          cat dist/disktriage.rb
+
+      # The tap is not pushed to automatically: autox-my/homebrew-tap needs a
+      # token the human has not created. The formula travels as a release asset
+      # instead, and a human copies it into the tap (docs/packaging.md).
+      - name: Attach the formula to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release upload "$TAG" dist/disktriage.rb --repo "$GITHUB_REPOSITORY"
+
+      - name: Upload the formula as a workflow artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: formula-${{ steps.version.outputs.tag }}
+          path: dist/disktriage.rb
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            echo "### disktriage $TAG released"
+            echo
+            echo "- gate: PASS (scripts/check.sh exited 0)"
+            echo "- assets: \`disktriage-$VERSION.tar.gz\`, its \`.sha256\`, and \`disktriage.rb\`"
+            echo "- tap: **not** pushed. Copy \`dist/disktriage.rb\` into \`autox-my/homebrew-tap/Formula/\` by hand."
+          } >> "$GITHUB_STEP_SUMMARY"

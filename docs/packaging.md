@@ -1,9 +1,10 @@
 # Packaging: the Homebrew tap
 
-This page is the local packaging procedure. It builds a source tarball, renders
-the tap formula against that tarball and verifies the install without
-publishing anything. The decisions behind it are
-[ADR 0022](adr/0022-homebrew-packaging.md); the plan is
+This page is the packaging procedure: it builds a source tarball, renders the
+tap formula against it, verifies the install, and records how a tagged release
+is cut without publishing anything by hand. The decisions behind it are
+[ADR 0022](adr/0022-homebrew-packaging.md) and
+[ADR 0029](adr/0029-gate-required-in-ci-and-tagged-releases.md); the plan is
 [`diskdoctor.md` §13](../diskdoctor.md#13-naming--distribution).
 
 The signed `.app` is P4 and needs a Developer ID; it is not part of this
@@ -32,16 +33,26 @@ they are not linked into or bundled with `disktriage`.
 swift build -c release              # so package.sh reads the real version
 scripts/package.sh tarball          # dist/disktriage-<version>.tar.gz + .sha256
 scripts/package.sh formula          # dist/disktriage.rb, local file:// url
+scripts/package.sh formula --url https://…/disktriage-<version>.tar.gz
+                                    # the published form: url replaced, sha256
+                                    # still taken from the local tarball
 ```
 
 `tarball` archives `HEAD` only (`git archive`), so commit first. `dist/` is
 gitignored and is never part of the archive. `formula` replaces the template's
 `__DISKTRIAGE_SOURCE_URL__` and `__DISKTRIAGE_SOURCE_SHA256__` with the local
-`file://` tarball and its sha256; the checked-in template keeps placeholders
-for a release.
+`file://` tarball and its sha256; `formula --url` substitutes a release-asset
+URL instead and keeps the sha256 from the local tarball, which is what the
+release workflow does after building it. A non-`http(s)` `--url` is rejected
+before the version lookup, and the renderer refuses a placeholder, a short or a
+non-hex digest, and a template that lacks a token.
 
 The template lives at
 [`packaging/homebrew/Formula/disktriage.rb`](../packaging/homebrew/Formula/disktriage.rb).
+The tap repository's scaffold is
+[`packaging/homebrew-tap/`](../packaging/homebrew-tap/README.md): a README, its
+own `brew style` + `brew audit --strict --online` workflow, and an empty
+`Formula/` (the real formula only arrives with the first release).
 
 ## Verify locally
 
@@ -87,24 +98,46 @@ the host's Full Disk Access row was denied, which is a valid verdict; the
 --formula` was identical before and after, and the temporary tap, trust entry
 and install were removed.
 
+## Release
+
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) runs when a
+tag `v*.*.*` is pushed (ADR [0029](adr/0029-gate-required-in-ci-and-tagged-releases.md)).
+It refuses a tag that is not exactly `v<DisktriageVersion.current>`, runs the
+full gate, builds the tarball, creates the GitHub Release with the tarball and
+its `.sha256`, renders `Formula/disktriage.rb` against the release-asset URL,
+prints it, and attaches it to the release and to the run's artifacts.
+
+It does not publish the tap. Nothing is released until the human pushes a tag,
+and no workflow here can push to `autox-my/homebrew-tap`.
+
 ## What the human still has to do
 
 These are outward-facing and are deliberately not done by an agent:
 
 1. ~~Choose the homepage.~~ Done: `https://github.com/autox-my/disktriage`.
-2. **Publish the tap repository** `autox-my/homebrew-tap` (users run
-   `brew tap autox-my/tap`) and put the formula at `Formula/disktriage.rb`.
-   The tap is not published yet; the README says so.
-3. **Tag the release** and build the release archive. Replace the template's
-   `__DISKTRIAGE_SOURCE_URL__` and `__DISKTRIAGE_SOURCE_SHA256__` with the
-   published archive and its real sha256 (or let a release job run
-   `scripts/package.sh tarball` and substitute those two values).
-4. **Decide the bundle identifier** before the first signed build. It is
+2. **Publish the tap repository** `autox-my/homebrew-tap` from the scaffold in
+   [`packaging/homebrew-tap/`](../packaging/homebrew-tap/README.md) (users run
+   `brew tap autox-my/tap`). It is not published yet, and its `Formula/` must
+   stay empty until a release exists. The README says both.
+3. **Tag the release** once the gate is green:
+   `git tag -a v<version> -m "disktriage <version>" && git push origin v<version>`.
+   The release workflow verifies the tag against `DisktriageVersion.current`,
+   runs the gate, and creates the release with the tarball, its `.sha256` and
+   the rendered formula. Nothing is released yet.
+4. **Copy the rendered formula** from the release asset (or the run's
+   `formula-<tag>` artifact) into `autox-my/homebrew-tap/Formula/disktriage.rb`
+   and commit it there. The workflow does not push to the tap: that needs a
+   `TAP_TOKEN` secret the human has not created, and a `contents: write` token
+   scoped to this repository must not be reused for another one. Wire that
+   token up later if the copy should become automatic.
+5. **Decide the bundle identifier** before the first signed build. It is
    permanent for TCC and is not needed for the CLI-only tap.
-5. **P4 only:** sign and notarize the `.app` with a Developer ID, and decide
+6. **P4 only:** sign and notarize the `.app` with a Developer ID, and decide
    whether to ship a bottle. Neither is claimed by this change.
-6. `brew audit --strict --formula --online` once the real url exists, since
-   the offline audit cannot check the published archive.
+7. `brew audit --strict --formula --online` runs in the tap's CI on every
+   changed formula; run it by hand before copying if the tap CI is not set up
+   yet. The offline audit in `package.sh verify` cannot check the published
+   archive.
 
 The licence is no longer on this list: the project is Apache-2.0 (ADR
 [0023](adr/0023-apache-2-0-licence.md)), and the formula declares it.
