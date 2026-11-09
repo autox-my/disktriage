@@ -40,8 +40,9 @@ verdict can be formed (usage errors are 2).
 
 ## Install
 
-The v1 distribution route is a Homebrew tap. It is **not published yet**, so
-the commands below will work once `autox-my/homebrew-tap` exists:
+The v1 distribution route is a Homebrew tap. **No release exists yet**: the
+tap (`autox-my/homebrew-tap`) is scaffolded but not published, so the commands
+below fail until the first tagged release. Once it is published:
 
 ```sh
 brew tap autox-my/tap
@@ -50,7 +51,8 @@ brew install disktriage
 
 The tap installs `disktriage`, the ntfs-3g userspace tools under its own
 `libexec`, and declares `ddrescue` and `smartmontools` as dependencies. The
-signed `.app` is future work.
+signed `.app` is future work. The release flow is in
+[`docs/packaging.md`](docs/packaging.md#release).
 
 ## Build from source
 
@@ -66,13 +68,14 @@ swift build
 bash scripts/check.sh     # 0 PASS, 1 FAIL, 3 UNVERIFIABLE
 ```
 
-The gate also needs `xmllint` and [`req`](https://github.com/autox-my/req), the
-author's requirement-traceability tool (Apache-2.0). `req` publishes no prebuilt
-release yet, so build it from source at a commit you choose (see its
-[Install](https://github.com/autox-my/req#install)):
+The gate also needs `xmllint` (it ships with macOS) and [`req`](https://github.com/autox-my/req), the
+requirement-traceability tool (Apache-2.0). `req` is public but publishes no prebuilt
+release, so CI and this command build it from a pinned commit; `cargo` is
+needed only for that install:
 
-```bash
-cargo install --git https://github.com/autox-my/req.git --rev <REV> --locked
+```sh
+. .github/scripts/req.sh && req_install
+bash scripts/check.sh
 ```
 
 A missing tool is UNVERIFIABLE (3) with a message, never a pass, so without

@@ -1,11 +1,19 @@
 # Continuous integration
 
-The workflow is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml). It
-builds the package and runs the test suite on GitHub-hosted macOS runners, which
-are free for public repositories. The decision behind it is ADR
-[0025](./adr/0025-continuous-integration.md).
+Two workflows:
 
-## What runs
+- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — build, test and
+  the full gate on every push and pull request.
+- [`.github/workflows/release.yml`](../.github/workflows/release.yml) — the
+  release, triggered only by pushing a tag `v*.*.*`.
+
+Both run on GitHub-hosted macOS runners, which are free for public
+repositories. The decisions behind them are ADR
+[0025](./adr/0025-continuous-integration.md) (the runner and the honest-job
+rule) and ADR [0029](./adr/0029-gate-required-in-ci-and-tagged-releases.md)
+(`req` is public, so the gate is required, and releases are cut from a tag).
+
+## What runs in CI
 
 | | |
 |---|---|
@@ -39,15 +47,17 @@ Each entry runs the same steps:
    built tools). The tarball is sha256-verified on every run and a restored
    prefix must carry the pinned version marker, so a stale cache can be
    rejected but never trusted. Bump the `-v1` suffix in the key to bust it.
-6. **Runtime dependencies**, only when missing: `ddrescue` and `smartmontools`
+6. **Cache** `~/.cargo/bin`, `~/.cargo/registry` and `~/.cargo/git`. The key
+   hashes `.github/scripts/req.sh`, the one file holding the `req` pin, so a
+   pin change busts the cache. A restored `req` is checked against the pin
+   before it is used, so a stale binary is rebuilt, never trusted.
+7. **Runtime dependencies**, only when missing: `ddrescue` and `smartmontools`
    via Homebrew. `xmllint` ships with macOS and is checked with
    `command -v xmllint`; `libxml2` is installed only if it is absent (its
    `bin` is added to `PATH`, since the formula is keg-only).
-7. **`scripts/bootstrap.sh`**: builds the pinned ntfs-3g tools and the
-   synthetic NTFS images under `.build/`. No `sudo`, no mount, no `/dev`; the
-   only network use is the pinned tarball.
-8. **Fixture environment**: `scripts/lib/fixtures.sh` — the same locator the
-   gate uses — exports `DISKTRIAGE_NTFS_PREFIX` and `DISKTRIAGE_FIXTURE_DIR`.
+8. **`scripts/bootstrap.sh`**: builds the pinned ntfs-3g tools and the
+   synthetic NTFS/native fixture images under `.build/`. No `sudo`, no mount of
+   a physical device, no `/dev`; the only network use is the pinned tarball.
 9. **`swift build`** and **`swift test --xunit-output .build/test-results/junit.xml`**.
 10. **Report rule**: the test step loads `scripts/lib/junit-report.sh`, the
     gate's own reader. Zero test cases is a failure, and a skipped test is
@@ -58,31 +68,73 @@ Each entry runs the same steps:
     snapshot is taken immediately before the suite, the after snapshot in the
     final step, and `temp_leak_verdict` answers exactly as it does in the gate.
     A hosted runner starts clean, so anything new was left by this run.
-12. **Gate, only if `req` is installed**: when `command -v req` succeeds the
-    job runs `bash scripts/check.sh` and propagates its exit status. On today's
-    runners `req` is not installed, so the step prints a notice that the full
-    gate was **not** run and exits 0. The job never claims a gate pass.
+12. **Install `req` at the pinned commit** (below), **probe the gate's script
+    rules** with `scripts/check-gate-probe.sh` (faked reports, leaked temp
+    state, the requirement steps, the release formula renderer and the req
+    pin), then **`bash scripts/check.sh`** as the gate. Exit **0** passes;
+    **anything else fails the job**. An exit **3** is annotated as
+    UNVERIFIABLE so the run says which third state it hit rather than
+    reporting a bare failure. The gate is not conditional on a tool being
+    present: a missing `req`, `xmllint` or fixture is a failure of this job,
+    never a silent pass.
 
 Third-party actions are pinned to a full commit SHA with the tag in a trailing
 comment; only `actions/checkout`, `actions/cache` and
 `actions/upload-artifact` are used.
 
+## The `req` pin
+
+`req` is the requirement-traceability tool the gate runs. It is public
+(`github.com/autox-my/req`, Apache-2.0) but publishes **no prebuilt release**,
+so a commit is the provenance.
+
+The pin lives in exactly one place: [`.github/scripts/req.sh`](../.github/scripts/req.sh),
+as a full 40-character commit. Both workflows source it and call
+`req_install`; nothing else names a revision.
+
+```
+REQ_REV = f871f80e22807fc8db6c1b9e6ee7b49c45197910
+```
+
+The install is a source build, using the Cargo that ships in the `macos-26`
+runner image (the image README lists Rust 1.98.0, Cargo 1.98.0 and rustup
+1.29.0):
+
+```sh
+cargo install --git https://github.com/autox-my/req.git \
+  --rev f871f80e22807fc8db6c1b9e6ee7b49c45197910 --locked --root "$HOME/.cargo" req
+```
+
+The trailing `req` is the package name, not decoration: at this revision the
+repository carries three binaries (`req`, `req-paraphrase`, `req-tier2`), and an
+install with no package selection fails with *"multiple packages with binaries
+found"*. That is a limitation of the install line in `req`'s own README, not a
+pin choice; `req.sh` carries the working command.
+
+`req --version` prints `built from <short sha>`. `req_install` refuses a binary
+that does not report the pinned short sha, so a `req` already on `PATH` from a
+different commit cannot answer for this one. If `cargo` is missing the step
+fails; it never skips the gate.
+
+Measured on 2026-11-09 with a build from this rev:
+
+- `req --version` → `req 0.1.0`, `built from f871f80`;
+- `req --root . canon --fail-on-flag` on this corpus → exit 0, *"315 claims
+  (0 unstructured); pins: 282 on 241 claim(s), 0 flagged"*.
+
+Bumping the pin is a normal change: edit the sha in `req.sh`, let the cache key
+follow it, and run the gate locally with `REQ_BIN` pointing at the new build.
+
 ## What does not run, and why
 
-- **The full gate.** `scripts/check.sh` needs `req`, the author's
-  requirement-traceability tool, which is not published yet, and the
-  requirement steps answer UNVERIFIABLE without it. A private tool cannot be
-  installed from CI, and faking its answer would make the gate lie, so the
-  workflow reports **build + test** and says so. `req` is neither stubbed nor
-  silently skipped: its absence is printed as a notice on the run.
 - **Linux.** `Package.swift` declares macOS 13 and the guard links
   `DiskArbitration`/`CoreFoundation`; the CLI and collectors use `IOKit` and
   `hdiutil`. A Linux job would need a different package row, not a different
   runner label.
 - **Root, Full Disk Access, a physical disk, or the network.** The suite reads
-  synthetic NTFS images generated under `.build/`, fakes the hardware seams, and
-  has no privileged step; the only download is the pinned, sha256-verified
-  ntfs-3g tarball.
+  synthetic NTFS/native images generated under `.build/`, fakes the hardware
+  seams, and has no privileged step; the only downloads are the pinned,
+  sha256-verified ntfs-3g tarball and the pinned `req` source.
 - **A self-hosted runner.** This is a public repository: a fork pull request
   would execute contributor code on the owner's machine. Hosted runners are
   disposable and free for public repositories.
@@ -101,6 +153,36 @@ The `xcode-27` label is a GitHub-hosted preview image, not a self-hosted
 runner; `.github/actionlint.yaml` declares it only because actionlint's label
 table predates it.
 
+## The release workflow
+
+`.github/workflows/release.yml` is triggered **only** by pushing a tag
+matching `v*.*.*`, declares `permissions: contents: write` and nothing else,
+and does not cancel an in-flight release. It:
+
+1. checks the tag is exactly `v<DisktriageVersion.current>` (and that the tag
+   has the `v<major>.<minor>.<patch>` shape) — before anything expensive runs;
+2. selects Xcode, installs the missing runtime dependencies, builds the
+   fixtures, installs `req` at the pin;
+3. runs the full gate and stops on anything but exit 0 — no release is cut
+   from a red or UNVERIFIABLE tree;
+4. builds the release binary and `scripts/package.sh tarball`, which archives
+   `HEAD` (the tagged commit) and writes the `.sha256`;
+5. creates the GitHub Release with `gh release create`, attaching the tarball
+   and its `.sha256`; a pre-existing release is an error, never an overwrite;
+6. renders the formula for the release asset URL
+   (`scripts/package.sh formula --url https://github.com/<owner>/<repo>/releases/download/<tag>/disktriage-<version>.tar.gz`),
+   prints it to the log, attaches it to the release with `gh release upload`,
+   and uploads it as the workflow artifact `formula-<tag>`.
+
+7. It does **not** push to the tap. That needs a token the human has not
+   created; the formula travels as a release asset instead. Copying it into
+   `autox-my/homebrew-tap/Formula/disktriage.rb` is the human step in
+   [`docs/packaging.md`](./packaging.md#what-the-human-still-has-to-do).
+
+Nothing is released by merging this workflow, and a tag push is a deliberate
+act. Do not re-run a failed release without deciding what to do with the
+release it may already have created.
+
 ## Running the same steps locally
 
 ```sh
@@ -113,7 +195,16 @@ bash scripts/check.sh                    # the full gate, needs req + xmllint
 ```
 
 `scripts/check.sh` exports the fixture variables itself, so the two commands
-agree with CI without any extra environment. To pick Xcode the way CI does:
+agree with CI without any extra environment. To install `req` exactly as CI
+does:
+
+```sh
+. .github/scripts/req.sh
+req_install
+bash scripts/check.sh
+```
+
+To pick Xcode the way CI does:
 
 ```sh
 app="$(.github/scripts/select-xcode.sh stable)"   # or: newest
@@ -123,11 +214,12 @@ DEVELOPER_DIR="$app/Contents/Developer" swift build
 The selection script is exercised without an Xcode install by pointing
 `XCODE_APP_DIR` at a directory of fake `Xcode*.app` bundles.
 
-Lint the workflow with [`actionlint`](https://github.com/rhysd/actionlint):
+Lint the workflows with [`actionlint`](https://github.com/rhysd/actionlint):
 
 ```sh
 brew install actionlint
-actionlint .github/workflows/ci.yml
+actionlint .github/workflows/ci.yml .github/workflows/release.yml \
+  packaging/homebrew-tap/.github/workflows/tests.yml
 ```
 
 `.github/actionlint.yaml` lists the `xcode-27` preview label because
@@ -143,6 +235,9 @@ GitHub-hosted image, not a self-hosted runner.
   needs `sudo` or a write permission.
 - GitHub may hold the first run from a first-time contributor for maintainer
   approval. Everything after that is the same workflow as a maintainer branch.
+- The release workflow is `push: tags` only. A fork pull request cannot trigger
+  it, and its `contents: write` token exists only for a tag push in this
+  repository.
 - Because the runner is GitHub-hosted, a fork does not get near the owner's
   hardware.
 
@@ -154,11 +249,8 @@ In *Settings → Branches → Branch protection*, require:
 build + test (macos-26, newest stable Xcode)
 ```
 
-Do **not** require the `xcode-27 preview` entry: it is `continue-on-error` and
-may be red or unavailable while the image is a preview. The stable check name
-carries the matrix name verbatim, so renaming the matrix entry renames the
-required check — update both together.
-
-Until `req` is public the gate cannot be a required check; requiring this job
-means requiring **build + test**, not the tri-state gate. The distinction is
-deliberate: a green check here is not a statement that the gate passed.
+That check now includes the full gate. Do **not** require the `xcode-27
+preview` entry: it is `continue-on-error` and may be red or unavailable while
+the image is a preview. The stable check name carries the matrix name
+verbatim, so renaming the matrix entry renames the required check — update both
+together.

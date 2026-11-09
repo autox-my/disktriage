@@ -1,9 +1,10 @@
 name: CI
 
-# Build + test on GitHub-hosted macOS runners. The full gate (scripts/check.sh)
-# needs `req`, which is not published yet, so it is run only when `req` is
-# present and otherwise the job says plainly that it did not run. See
-# docs/ci.md and docs/adr/0025-continuous-integration.md.
+# Build + test on GitHub-hosted macOS runners, then the full gate
+# (scripts/check.sh) with `req` installed from its pinned public commit. The
+# stable entry is the required check; the xcode-27 entry stays informational.
+# See docs/ci.md and docs/adr/0025-continuous-integration.md,
+# docs/adr/0029-gate-required-in-ci-and-tagged-releases.md.
 
 on:
   push:
@@ -101,6 +102,21 @@ jobs:
           restore-keys: |
             ntfs3g-${{ runner.os }}-${{ runner.arch }}-xcode${{ steps.xcode.outputs.major }}-
             ntfs3g-${{ runner.os }}-${{ runner.arch }}-
+
+      # req is public now: cache its build output. The key hashes the one file
+      # that holds the pin, so changing the pin busts the cache; req_install
+      # still verifies the provenance on every run, so a stale entry is never
+      # trusted.
+      - name: Cache req and the cargo registry
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: req-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/req.sh') }}
+          restore-keys: |
+            req-${{ runner.os }}-${{ runner.arch }}-
 
       # Only what the image lacks. xmllint ships with macOS; libxml2 is keg-only
       # and its bin directory is added to PATH only if the system one is absent.
@@ -253,17 +269,42 @@ jobs:
           temp_leak_snapshot > "$RUNNER_TEMP/temp-after.txt"
           temp_leak_verdict "$RUNNER_TEMP/temp-before.txt" "$RUNNER_TEMP/temp-after.txt"
 
-      # Honest by construction: without `req` the full gate cannot reach 0, so
-      # this job does not claim it. The notice is the finding.
-      - name: Gate (only when req is installed)
+      # Cargo is preinstalled on the GitHub macOS image (Rust 1.98.0 / Cargo
+      # 1.98.0 in the macos-26 README). The full commit pin and the provenance
+      # check live in .github/scripts/req.sh, never here.
+      - name: Install req at the pinned commit
+        timeout-minutes: 15
         run: |
-          if ! command -v req >/dev/null 2>&1; then
-            echo "::notice title=Gate not run::The full gate (scripts/check.sh) needs 'req', the requirement-traceability tool, which is not published yet. This job therefore reports build + test only; it does not claim the gate passed. See docs/ci.md."
-            echo "NOT RUN: scripts/check.sh — req is not on PATH"
-            exit 0
-          fi
+          . .github/scripts/req.sh
+          req_install
+          req --version
 
+      # The rules the gate's scripts enforce (report counting, leaks, the
+      # requirement steps, the release formula renderer and the req pin) are
+      # proven here against faked inputs. This is where the probe's bite is
+      # measured; the gate itself runs the real suite.
+      - name: Probe the gate's script rules
+        timeout-minutes: 10
+        run: bash scripts/check-gate-probe.sh
+
+      # The full gate is required now that req is public (ADR 0029): exit 0 is
+      # a pass, anything else fails this job. Actions has no third state, so an
+      # exit 3 (UNVERIFIABLE) is annotated as such rather than reported as a
+      # plain failure.
+      - name: Gate
+        timeout-minutes: 25
+        run: |
           rc=0
           bash scripts/check.sh || rc=$?
           echo "scripts/check.sh exited $rc"
-          exit "$rc"
+          case "$rc" in
+            0) exit 0 ;;
+            3)
+              echo "::error title=Gate unverifiable::scripts/check.sh answered 3 (UNVERIFIABLE). A missing tool, fixture or report is a finding, never a pass; see docs/ci.md."
+              exit 3
+              ;;
+            *)
+              echo "::error title=Gate failed::scripts/check.sh answered $rc; see the step log."
+              exit "$rc"
+              ;;
+          esac
