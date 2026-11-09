@@ -68,8 +68,8 @@ swift build
 bash scripts/check.sh     # 0 PASS, 1 FAIL, 3 UNVERIFIABLE
 ```
 
-The gate also needs `xmllint` (it ships with macOS) and `req`, the
-requirement-traceability tool. `req` is public but publishes no prebuilt
+The gate also needs `xmllint` (it ships with macOS) and [`req`](https://github.com/autox-my/req), the
+requirement-traceability tool (Apache-2.0). `req` is public but publishes no prebuilt
 release, so CI and this command build it from a pinned commit; `cargo` is
 needed only for that install:
 

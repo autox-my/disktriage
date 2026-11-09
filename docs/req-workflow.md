@@ -139,7 +139,7 @@ the report), not inferred:
 
 So Swift Testing is a usable evidence source for `req`: `classname` is present and non-empty, `name`
 is XML-escaped by SwiftPM, and the trailing `()` is accepted verbatim — no name-escaping problem, no
-missing `classname`, nothing that needs a `req` change or a Forgejo issue. Two limits are SwiftPM's,
+missing `classname`, nothing that needs a `req` change or an issue against it. Two limits are SwiftPM's,
 not `req`'s, and are handled in `scripts/`: the report is at a sibling path, and a parameterised test
 has no per-argument ids. On the real corpus `req check --test-report
 .build/test-results/junit-swift-testing.xml` is still **3** — because 40 of the 124 claims are
