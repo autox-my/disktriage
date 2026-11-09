@@ -7,10 +7,9 @@
 #   req_install          # a req built from $REQ_REV on PATH, or the step fails
 #
 # req is public (github.com/autox-my/req, Apache-2.0) but publishes no prebuilt
-# release yet, so a commit is the provenance: the pinned commit is cloned,
-# checked out and built with `cargo install --path`, and `req --version` prints
-# `built from <short sha>` (a `cargo install --git` build prints `unknown`, as
-# its source copy has no .git). The pin is a full 40-character commit, never a
+# release yet, so a commit is the provenance: `cargo install --git <repo>
+# --rev <full sha> --locked` builds it, and `req --version` prints
+# `built from <short sha>`. The pin is a full 40-character commit, never a
 # branch or a tag that can move.
 #
 # The trailing `req` in the install command is the package name. The repository
@@ -28,7 +27,8 @@ REQ_SHORT="${REQ_REV:0:7}"
 # req_reports_rev PATH — 0 when the binary says it was built from the pin.
 req_reports_rev() {
     [ -x "$1" ] || return 1
-    "$1" --version 2>/dev/null | grep -q "built from $REQ_SHORT"
+    # The real output aligns its columns: "  built from         f871f80".
+    "$1" --version 2>/dev/null | grep -Eq "built from[[:space:]]+$REQ_SHORT"
 }
 
 # req_ensure_path DIR — put DIR on PATH now and for later workflow steps.
@@ -58,19 +58,8 @@ req_install() {
         return 1
     }
 
-    # Clone and check out the pin, then install from that checkout. `cargo
-    # install --git` builds from a cargo-managed copy that has no .git, so
-    # `req --version` would say `built from unknown` (measured on the CI
-    # runner); a real checkout makes the provenance line truthful.
     echo "installing req from $REQ_REPO at $REQ_REV"
-    local src
-    src="$(mktemp -d "${TMPDIR:-/tmp}/req-src.XXXXXX")" || return 1
-    git clone --quiet "$REQ_REPO" "$src" &&
-        git -C "$src" checkout --quiet "$REQ_REV" &&
-        cargo install --path "$src" --locked --root "$root" req
-    local rc=$?
-    rm -rf "$src"
-    [ "$rc" -eq 0 ] || return 1
+    cargo install --git "$REQ_REPO" --rev "$REQ_REV" --locked --root "$root" req || return 1
     req_reports_rev "$root/bin/req" || {
         echo "req at $root/bin/req does not report 'built from $REQ_SHORT'; it reports:" >&2
         "$root/bin/req" --version >&2 || true

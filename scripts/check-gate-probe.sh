@@ -530,8 +530,9 @@ else
 fi
 
 fake_req="$TMP/fake-req"
-printf '#!/bin/sh\necho "req 0.1.0"\necho "  built from %s"\n' "$REQ_SHORT" >"$fake_req"
-printf '#!/bin/sh\necho "req 0.1.0"\necho "  built from deadbee"\n' >"$TMP/fake-req-stale"
+# Same column alignment as the real `req --version` (measured on CI, 2026-11-09).
+printf '#!/bin/sh\necho "req 0.1.0"\necho "  built from         %s"\n' "$REQ_SHORT" >"$fake_req"
+printf '#!/bin/sh\necho "req 0.1.0"\necho "  built from         deadbee"\n' >"$TMP/fake-req-stale"
 chmod +x "$fake_req" "$TMP/fake-req-stale"
 if req_reports_rev "$fake_req"; then
     echo "ok   probe req_reports_rev accepts the pinned build"

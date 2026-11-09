@@ -101,9 +101,8 @@ runner image (the image README lists Rust 1.98.0, Cargo 1.98.0 and rustup
 1.29.0):
 
 ```sh
-git clone https://github.com/autox-my/req.git "$src"
-git -C "$src" checkout f871f80e22807fc8db6c1b9e6ee7b49c45197910
-cargo install --path "$src" --locked --root "$HOME/.cargo" req
+cargo install --git https://github.com/autox-my/req.git \
+  --rev f871f80e22807fc8db6c1b9e6ee7b49c45197910 --locked --root "$HOME/.cargo" req
 ```
 
 The trailing `req` is the package name, not decoration: at this revision the
@@ -111,11 +110,6 @@ repository carries three binaries (`req`, `req-paraphrase`, `req-tier2`), and an
 install with no package selection fails with *"multiple packages with binaries
 found"*. That is a limitation of the install line in `req`'s own README, not a
 pin choice; `req.sh` carries the working command.
-
-The install builds from a real checkout, not `cargo install --git`: the first CI
-run showed that a `--git` build runs from a cargo-managed copy with no `.git`, so
-`req --version` reports `built from unknown` and the provenance check rightly
-refuses it. A clone checked out at the pin reports `built from f871f80` (measured).
 
 `req --version` prints `built from <short sha>`. `req_install` refuses a binary
 that does not report the pinned short sha, so a `req` already on `PATH` from a
