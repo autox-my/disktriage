@@ -482,7 +482,7 @@ output="$(render_formula "$formula_root/template.rb" "$formula_root/bad.rb" "$re
 got=$?
 expect_rc "render_formula rejects a short sha256" 1 "$got" "$output" "64 characters"
 
-output="$(render_formula "$formula_root/template.rb" "$formula_root/bad.rb" "$release_url" "$(printf '%s' "$sha64" | tr 'a-f' 'A-F')" 2>&1)"
+output="$(render_formula "$formula_root/template.rb" "$formula_root/bad.rb" "$release_url" "$(printf '%s' "$sha64" | tr 'abcdef' 'ABCDEF')" 2>&1)"
 got=$?
 expect_rc "render_formula rejects an uppercase sha256" 1 "$got" "$output" "lowercase hex"
 

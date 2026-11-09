@@ -24,9 +24,11 @@ formula_url_ok() {
 
 # formula_sha256_ok SHA — 64 lowercase hex characters, as `shasum -a 256`
 # writes them. An uppercase or truncated digest must never reach a formula.
+# Explicit digits, not [0-9a-f]: a bash range follows the locale's collation
+# and matches uppercase letters under en_US.UTF-8 (measured on a CI runner).
 formula_sha256_ok() {
     case "$1" in
-        "" | *[!0-9a-f]*)
+        "" | *[!0123456789abcdef]*)
             echo "formula sha256 must be lowercase hex (got '$1')" >&2
             return 1
             ;;
