@@ -131,8 +131,9 @@ These are outward-facing and are deliberately not done by an agent:
    `TAP_TOKEN` secret the human has not created, and a `contents: write` token
    scoped to this repository must not be reused for another one. Wire that
    token up later if the copy should become automatic.
-5. **Decide the bundle identifier** before the first signed build. It is
-   permanent for TCC and is not needed for the CLI-only tap.
+5. ~~Decide the bundle identifier.~~ Done: `my.autox.disktriage`
+   ([ADR 0031](adr/0031-bundle-identifier.md)). It is permanent for TCC and is
+   not needed for the CLI-only tap.
 6. **P4 only:** sign and notarize the `.app` with a Developer ID, and decide
    whether to ship a bottle. Neither is claimed by this change.
 7. `brew audit --strict --formula --online` runs in the tap's CI on every

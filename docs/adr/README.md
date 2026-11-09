@@ -98,3 +98,4 @@ what it adds.
 | [0028](0028-native-attach-leak-guard.md) | The gate fails on a leaked native attach or mountpoint | accepted | 2026-11-08 |
 | [0029](0029-gate-required-in-ci-and-tagged-releases.md) | The gate is a required CI check, and a tag cuts the release | accepted | 2026-11-09 |
 | [0030](0030-volume-listing-without-stat.md) | The removable-volume row lists `/Volumes` by name, under a hard bound | accepted | 2026-11-09 |
+| [0031](0031-bundle-identifier.md) | Bundle identifier `my.autox.disktriage` | accepted | 2026-11-09 |

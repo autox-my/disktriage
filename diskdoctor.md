@@ -636,7 +636,7 @@ matches the image, **not** that the image matches the platter.
 |---|---|---|
 | Implementation language | Swift for macOS collectors (IOKit, DiskArbitration, TCC, signing); the JSON `SignalSet` + shared fixtures keep a later Linux port independent of the language | before P1 |
 | Process identity for FDA | A (Terminal) by default; revisit after P0 attribution results | end of P0 |
-| Final name | choose before any signed build (bundle ID is permanent) | before P4 |
+| Final name | **Decided:** `disktriage`; bundle identifier `my.autox.disktriage` (ADR 0031) | done |
 | Per-file damage attribution | **Decided for v1: volume-level report always, plus `ntfscluster` per-file attribution for NTFS** (spike: `docs/ntfs-spike.md`). An own NTFS parser (3–5 d basic, 1–2 weeks robust) is deferred; reconsider only if the tools fail on real damage. Fixes the manifest schema | before P1 |
 | NTFS inspection dependency | **ntfs-3g userspace tools** as a GPL subprocess on images (not bottled; core formula is Linux-only; tap variant needs macFUSE), built from the upstream tarball with `--disable-ntfs-3g`. macFUSE rejected as a dependency | before P3 |
 | Keep `copy`? | decide after P3; may reduce to `ditto` + manifest | P3 |
@@ -756,8 +756,8 @@ produce it. Timestamps render in UTC unless `--local` is passed, so the test is 
 The original name, "DiskDoctor", collides with Norton Disk Doctor and an Amiga tool, which is why
 it was never committed to. Decision (2026-11-06): renamed to `disktriage`. Known overlap: three
 unrelated small GitHub repos are named DiskTriage; github.com/disktriage is unclaimed; Homebrew has
-no formula of that name. Bundle identifier is still not fixed and must be decided before the first
-signed build, since the bundle identifier is permanent for TCC.
+no formula of that name. The bundle identifier is `my.autox.disktriage` (ADR 0031); it is permanent for TCC, so it was
+fixed before any signed build.
 
 Distribution: Homebrew tap first, signed `.app` wrapper later. Triage depends on `smartctl`
 (smartmontools) and imaging on `ddrescue`; the formula declares both. NTFS inspection depends on
@@ -767,14 +767,19 @@ from source or ships a pinned static build (GPL: comply if bundled). The tap for
 ntfs tools into the keg's `libexec/ntfs-3g` (separate GPL subprocess, no FUSE linkage), and
 `check`/`inspect`/`copy` find them beside the resolved executable, which survives `sudo` stripping
 the environment. `disktriage --version` is the single-source version surface. `dadissent` is not
-installed by the tap. Pre-publication gates for the human: choose a licence (none exists yet),
-fix the homepage, publish the tap, and decide the bundle identifier. A bootable Linux rescue image
+installed by the tap. The licence (Apache-2.0, ADR 0023), homepage, tap and bundle identifier are decided and
+published; signing and notarization (P4) remain human-only. A bootable Linux rescue image
 is the ultimate answer to TCC — it sidesteps the permission model entirely — but is a separate
 product, and awkward on Apple Silicon.
 
 ---
 
 ## 14. Revision history
+
+**v3.11 (2026-11-09), after the first release:**
+
+- §12/§13: bundle identifier fixed as `my.autox.disktriage` (ADR 0031); licence, homepage and tap are
+  published, v0.1.0 is released, and CI runs the full gate (ADR 0029). P4 signing stays human-only.
 
 **v3.10 (2026-11-08), after native attach:**
 
